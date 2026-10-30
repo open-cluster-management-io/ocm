@@ -55,7 +55,7 @@ var _ = AfterSuite(func() {
 
 var _ = Describe("start klusterlet", func() {
 	It("start klusterlet", func() {
-		ctx, stopKlusterlet := context.WithCancel(context.Background())
+		runCtx, stopKlusterlet := context.WithCancel(context.Background())
 		var wg sync.WaitGroup
 		wg.Add(1)
 
@@ -64,7 +64,7 @@ var _ = Describe("start klusterlet", func() {
 			defer GinkgoRecover()
 			defer wg.Done()
 			o := &Options{EnableSyncLabels: true}
-			err := o.RunKlusterletOperator(ctx, &controllercmd.ControllerContext{
+			err := o.RunKlusterletOperator(runCtx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
 			})

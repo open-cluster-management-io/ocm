@@ -73,7 +73,7 @@ var stopHub context.CancelFunc
 var stopProxy context.CancelFunc
 var stopWebhook context.CancelFunc
 
-var startHub func(m *hub.HubManagerOptions)
+var startHub func(ctx context.Context, m *hub.HubManagerOptions)
 var hubOption *hub.HubManagerOptions
 
 var CRDPaths = []string{
@@ -122,7 +122,7 @@ func TestIntegration(t *testing.T) {
 	RunSpecs(t, "Integration Suite")
 }
 
-var _ = BeforeSuite(func() {
+var _ = BeforeSuite(func(ctx SpecContext) {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
@@ -190,7 +190,7 @@ var _ = BeforeSuite(func() {
 	// patch addon for conversion webhook and start webhook
 	apiExtensionClient, err := apiextensionsclient.NewForConfig(cfg)
 	Expect(err).ToNot(HaveOccurred())
-	err = util.AddConversionForAddonAPI(context.TODO(), apiExtensionClient, testEnv, "managedclusteraddons.addon.open-cluster-management.io")
+	err = util.AddConversionForAddonAPI(ctx, apiExtensionClient, testEnv, "managedclusteraddons.addon.open-cluster-management.io")
 	Expect(err).ToNot(HaveOccurred())
 
 	clusterClient, err = clusterclientset.NewForConfig(cfg)
@@ -246,8 +246,8 @@ var _ = BeforeSuite(func() {
 	// the next hub's context and survive the stopHub() meant for it. Two hubs then
 	// reconcile the same clusters, and a hub whose driver accepts every cluster
 	// approves clusters the test expects to stay unapproved.
-	startHub = func(m *hub.HubManagerOptions) {
-		hubCtx, cancelHub := context.WithCancel(context.Background())
+	startHub = func(ctx context.Context, m *hub.HubManagerOptions) {
+		hubCtx, cancelHub := context.WithCancel(ctx)
 		hubStopped := make(chan struct{})
 		stopHub = func() {
 			cancelHub()
@@ -266,7 +266,7 @@ var _ = BeforeSuite(func() {
 		}()
 	}
 
-	startHub(hubOption)
+	startHub(context.Background(), hubOption)
 	var webhookCtx context.Context
 	webhookCtx, stopWebhook = context.WithCancel(context.Background())
 	go func() {
@@ -318,7 +318,7 @@ var _ = AfterSuite(func() {
 // Common test helper functions
 
 // assertSuccessClusterBootstrap verifies that a managed cluster successfully bootstraps to the hub
-func assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret string) {
+func assertSuccessClusterBootstrap(ctx context.Context, managedClusterName, hubKubeconfigSecret string) {
 	// the spoke cluster and csr should be created after bootstrap
 	By("Check existence of ManagedCluster & CSR")
 	Eventually(func() error {
@@ -393,7 +393,7 @@ func assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret strin
 
 	// ensure cluster namespace is in place
 	Eventually(func() error {
-		_, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
+		_, err := kubeClient.CoreV1().Namespaces().Get(ctx, managedClusterName, metav1.GetOptions{})
 		return err
 	}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 }

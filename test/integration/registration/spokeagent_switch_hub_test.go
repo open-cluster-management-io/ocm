@@ -86,7 +86,7 @@ var _ = Describe("switch-hub", Ordered, func() {
 
 		approveAndAcceptManagedCluster(managedClusterName, hub1.kubeClient, hub1.clusterClient, hub1.authn, 10*time.Minute)
 
-		assertManagedClusterSuccessfullyJoined(testNamespace, managedClusterName, hubKubeconfigSecret,
+		assertManagedClusterSuccessfullyJoined(ctx, testNamespace, managedClusterName, hubKubeconfigSecret,
 			hub1.kubeClient, kubeClient, hub1.clusterClient)
 	})
 
@@ -113,7 +113,7 @@ var _ = Describe("switch-hub", Ordered, func() {
 	})
 
 	Context("Hub1 doesn't accept client", func() {
-		It("Should switch to hub2", func() {
+		It("Should switch to hub2", func(ctx SpecContext) {
 			// Update managed cluster to not accept
 			By("Update ManagedCluster to not accept")
 			Eventually(func() error {
@@ -122,7 +122,7 @@ var _ = Describe("switch-hub", Ordered, func() {
 					return err
 				}
 				mc.Spec.HubAcceptsClient = false
-				_, err = hub1.clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), mc, metav1.UpdateOptions{})
+				_, err = hub1.clusterClient.ClusterV1().ManagedClusters().Update(ctx, mc, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
@@ -130,13 +130,13 @@ var _ = Describe("switch-hub", Ordered, func() {
 			By("Approve and accept the ManagedCluster on hub2")
 			approveAndAcceptManagedCluster(managedClusterName, hub2.kubeClient, hub2.clusterClient, hub2.authn, 10*time.Minute)
 
-			assertManagedClusterSuccessfullyJoined(testNamespace, managedClusterName, hubKubeconfigSecret,
+			assertManagedClusterSuccessfullyJoined(ctx, testNamespace, managedClusterName, hubKubeconfigSecret,
 				hub2.kubeClient, kubeClient, hub2.clusterClient)
 		})
 	})
 
 	Context("Hub1 is down and timeout", func() {
-		It("Should switch to hub2", func() {
+		It("Should switch to hub2", func(ctx SpecContext) {
 			By("Stop hub1")
 			// errors are only logged here because the api server takes too long
 			// to stop in a reasonable time and returns a timeout error
@@ -151,7 +151,7 @@ var _ = Describe("switch-hub", Ordered, func() {
 			By("Approve and accept the ManagedCluster on hub2")
 			approveAndAcceptManagedCluster(managedClusterName, hub2.kubeClient, hub2.clusterClient, hub2.authn, 10*time.Minute)
 
-			assertManagedClusterSuccessfullyJoined(testNamespace, managedClusterName, hubKubeconfigSecret,
+			assertManagedClusterSuccessfullyJoined(ctx, testNamespace, managedClusterName, hubKubeconfigSecret,
 				hub2.kubeClient, kubeClient, hub2.clusterClient)
 		})
 	})
@@ -292,7 +292,7 @@ func approveAndAcceptManagedCluster(managedClusterName string,
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func assertManagedClusterSuccessfullyJoined(testNamespace, managedClusterName, hubKubeconfigSecret string,
+func assertManagedClusterSuccessfullyJoined(ctx context.Context, testNamespace, managedClusterName, hubKubeconfigSecret string,
 	hubKubeClient, spokeKubeClient kubernetes.Interface, hubClusterClient clusterclientset.Interface) {
 	// The managed cluster should have accepted condition after it is accepted
 	Eventually(func() error {
@@ -331,7 +331,7 @@ func assertManagedClusterSuccessfullyJoined(testNamespace, managedClusterName, h
 
 	// Ensure cluster namespace is in place
 	Eventually(func() error {
-		_, err := hubKubeClient.CoreV1().Namespaces().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
+		_, err := hubKubeClient.CoreV1().Namespaces().Get(ctx, managedClusterName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

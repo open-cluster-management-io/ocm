@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"context"
 	"testing"
 
 	fakekube "k8s.io/client-go/kubernetes/fake"
@@ -10,7 +9,7 @@ import (
 // TODO: enhance the u-t in the future @xuezhaojun
 func TestCreateBootStrapSelfSubjectAccessReviews(t *testing.T) {
 	kubeClient := fakekube.NewSimpleClientset()
-	ctx := context.TODO()
+	ctx := t.Context()
 
 	// Create sample selfSubjectAccessReviews
 	bootstrapSSARs := GetBootstrapSSARs()
@@ -24,7 +23,7 @@ func TestCreateBootStrapSelfSubjectAccessReviews(t *testing.T) {
 
 func TestCreateHubConfigpSelfSubjectAccessReviews(t *testing.T) {
 	kubeClient := fakekube.NewSimpleClientset()
-	ctx := context.TODO()
+	ctx := t.Context()
 
 	// Create sample selfSubjectAccessReviews
 	hubConfigSSARs := GetHubConfigSSARs("test-cluster")

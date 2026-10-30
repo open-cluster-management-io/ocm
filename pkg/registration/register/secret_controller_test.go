@@ -156,7 +156,7 @@ func TestSync(t *testing.T) {
 				kubeClient.CoreV1(),
 				informerFactory.Core().V1().Secrets().Informer(),
 				"test")
-			err := ctrl.Sync(context.Background(), syncCtx, "test")
+			err := ctrl.Sync(t.Context(), syncCtx, "test")
 			if err != nil {
 				t.Fatal(err)
 			}

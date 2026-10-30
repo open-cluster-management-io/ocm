@@ -97,7 +97,7 @@ func TestE2E(tt *testing.T) {
 // This suite is sensitive to the following environment variables:
 //
 // - KUBECONFIG is the location of the kubeconfig file to use
-var _ = BeforeSuite(func() {
+var _ = BeforeSuite(func(ctx SpecContext) {
 	var err error
 
 	// Setup kubeconfigs
@@ -130,7 +130,7 @@ var _ = BeforeSuite(func() {
 
 	By("Setup default bootstrap-hub-kubeconfig")
 	bootstrapHubKubeConfigSecret, err = spoke.KubeClient.CoreV1().Secrets(helpers.KlusterletDefaultNamespace).
-		Get(context.TODO(), helpers.BootstrapHubKubeConfig, metav1.GetOptions{})
+		Get(ctx, helpers.BootstrapHubKubeConfig, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	// The secret will used via copy and create another secret in other ns, so we need to clean the resourceVersion and namespace
 	bootstrapHubKubeConfigSecret.ResourceVersion = ""
@@ -150,7 +150,7 @@ var _ = BeforeSuite(func() {
 
 	By("Check Klusterlet Operator Ready")
 	Eventually(func() error {
-		return framework.CheckDeploymentReady(context.TODO(), spoke.KubeClient, spoke.KlusterletOperatorNamespace, spoke.KlusterletOperator)
+		return framework.CheckDeploymentReady(ctx, spoke.KubeClient, spoke.KlusterletOperatorNamespace, spoke.KlusterletOperator)
 	}).Should(Succeed())
 
 	By("Enable Work Feature")
@@ -181,7 +181,7 @@ var _ = BeforeSuite(func() {
 	}).Should(Succeed())
 
 	By("Validate image configuration")
-	Expect(validateImageConfiguration()).ToNot(HaveOccurred())
+	Expect(validateImageConfiguration(ctx)).ToNot(HaveOccurred())
 
 	By("Create a universal Klusterlet/managedcluster")
 	framework.CreateAndApproveKlusterlet(
@@ -191,7 +191,7 @@ var _ = BeforeSuite(func() {
 	)
 
 	By("Create a universal ClusterSet and bind it with the universal managedcluster")
-	_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.TODO(), &clusterv1beta2.ManagedClusterSet{
+	_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, &clusterv1beta2.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: universalClusterSetName,
 		},
@@ -209,7 +209,7 @@ var _ = BeforeSuite(func() {
 	}
 
 	Eventually(func() error {
-		umc, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+		umc, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(ctx, universalClusterName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -219,7 +219,7 @@ var _ = BeforeSuite(func() {
 		}
 		labels[clusterv1beta2.ClusterSetLabel] = universalClusterSetName
 		umc.SetLabels(labels)
-		_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), umc, metav1.UpdateOptions{})
+		_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(ctx, umc, metav1.UpdateOptions{})
 		return err
 	}).Should(Succeed())
 })
@@ -230,7 +230,7 @@ var _ = AfterSuite(func() {
 })
 
 // validateImageConfiguration validates that all image configurations use the expected tag
-func validateImageConfiguration() error {
+func validateImageConfiguration(ctx context.Context) error {
 	if expectedImageTag == "" {
 		By("Skipping image validation: no expected image tag specified")
 		return nil
@@ -246,7 +246,7 @@ func validateImageConfiguration() error {
 	}
 
 	// Validate ClusterManager spec after it's deployed
-	if err := validateClusterManagerImageSpecs(); err != nil {
+	if err := validateClusterManagerImageSpecs(ctx); err != nil {
 		validationErrors = append(validationErrors, err)
 	}
 
@@ -297,8 +297,7 @@ func validateImageFormat(image, imageName string) error {
 	return nil
 }
 
-func validateClusterManagerImageSpecs() error {
-	ctx := context.TODO()
+func validateClusterManagerImageSpecs(ctx context.Context) error {
 
 	// Get the ClusterManager resource
 	clusterManager, err := hub.OperatorClient.OperatorV1().ClusterManagers().Get(ctx, "cluster-manager", metav1.GetOptions{})

@@ -1,7 +1,6 @@
 package apply
 
 import (
-	"context"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -327,7 +326,7 @@ func TestApplyUnstructred(t *testing.T) {
 			cache := NewResourceCache()
 			cache.UpdateCachedResourceMetadata(c.required, c.existing)
 			_, _, err := applier.applyUnstructured(
-				context.TODO(), c.required, c.gvr, syncContext.Recorder(), cache)
+				t.Context(), c.required, c.gvr, syncContext.Recorder(), cache)
 
 			if err != nil {
 				t.Errorf("expect no error, but got %v", err)
@@ -394,7 +393,7 @@ func TestUpdateApplyKube(t *testing.T) {
 
 			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			obj, err := applier.Apply(
-				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
+				t.Context(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 
 			if err != nil {
 				t.Errorf("expect no error, but got %v", err)
@@ -463,7 +462,7 @@ func TestUpdateApplyDynamic(t *testing.T) {
 
 			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			obj, err := applier.Apply(
-				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
+				t.Context(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 
 			if err != nil {
 				t.Errorf("expect no error, but got %v", err)
@@ -543,7 +542,7 @@ func TestUpdateApplyApiExtension(t *testing.T) {
 
 			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			obj, err := applier.Apply(
-				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
+				t.Context(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 
 			if err != nil {
 				t.Errorf("expect no error, but got %v", err)

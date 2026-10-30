@@ -36,7 +36,7 @@ var _ = Describe("Template deploy Alpha", func() {
 		err                        error
 	)
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		suffix := rand.String(5)
 		numberOfClusters = 5
 		addonName = fmt.Sprintf("addon-%s", suffix)
@@ -56,7 +56,7 @@ var _ = Describe("Template deploy Alpha", func() {
 		for i := 0; i < numberOfClusters; i++ {
 			managedClusterName := fmt.Sprintf("managedcluster-%s-%d", suffix, i)
 			clusterNames = append(clusterNames, managedClusterName)
-			err = createManagedCluster(hubClusterClient, managedClusterName)
+			err = createManagedCluster(ctx, hubClusterClient, managedClusterName)
 			Expect(err).ToNot(HaveOccurred())
 		}
 
@@ -81,10 +81,10 @@ var _ = Describe("Template deploy Alpha", func() {
 				},
 			},
 		}
-		_, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
+		_, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(ctx, cma, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		assertClusterManagementAddOnAnnotationsAlpha(addonName)
+		assertClusterManagementAddOnAnnotationsAlpha(ctx, addonName)
 
 		// prepare addon template
 		addonTemplateData, err := os.ReadFile("./test/integration/addon/testmanifests/addontemplate.yaml")
@@ -96,7 +96,7 @@ var _ = Describe("Template deploy Alpha", func() {
 		_, _, err = decoder.Decode(addonTemplateData, nil, addonTemplate)
 		Expect(err).ToNot(HaveOccurred())
 
-		_, err = hubAddonClient.AddonV1alpha1().AddOnTemplates().Create(context.Background(), addonTemplate, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1alpha1().AddOnTemplates().Create(ctx, addonTemplate, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// prepare addon deployment config
@@ -122,42 +122,42 @@ var _ = Describe("Template deploy Alpha", func() {
 			},
 		}
 		_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(addonDeployConfigNamespace).Create(
-			context.Background(), addonDeploymentConfig, metav1.CreateOptions{})
+			ctx, addonDeploymentConfig, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// prepare placement
 		pns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: placementNamespace}}
-		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), pns, metav1.CreateOptions{})
+		_, err = hubKubeClient.CoreV1().Namespaces().Create(ctx, pns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		placement := &clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: placementName, Namespace: placementNamespace}}
 		_, err = hubClusterClient.ClusterV1beta1().Placements(placementNamespace).Create(
-			context.Background(), placement, metav1.CreateOptions{})
+			ctx, placement, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// prepare placement decisions
-		err = createPlacementDecision(hubClusterClient, placementNamespace, placementName, "0", clusterNames...)
+		err = createPlacementDecision(ctx, hubClusterClient, placementNamespace, placementName, "0", clusterNames...)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx SpecContext) {
 		for _, managedClusterName := range clusterNames {
-			err = hubKubeClient.CoreV1().Namespaces().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
+			err = hubKubeClient.CoreV1().Namespaces().Delete(ctx, managedClusterName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
-			err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
+			err = hubClusterClient.ClusterV1().ManagedClusters().Delete(ctx, managedClusterName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		}
 
-		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
+		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(ctx,
 			addonName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("Should deploy agent for addon template", func() {
+	It("Should deploy agent for addon template", func(ctx SpecContext) {
 		By("check mca created")
 		Eventually(func() error {
 			for i := 0; i < numberOfClusters; i++ {
-				_, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterNames[i]).Get(context.Background(), addonName, metav1.GetOptions{})
+				_, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterNames[i]).Get(ctx, addonName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -167,11 +167,11 @@ var _ = Describe("Template deploy Alpha", func() {
 
 		By("check no work rendered")
 		for i := 0; i < numberOfClusters; i++ {
-			checkWorkRendered(clusterNames[i], 0)
+			checkWorkRendered(ctx, clusterNames[i], 0)
 		}
 
 		By("update cma")
-		clusterManagementAddon, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), addonName, metav1.GetOptions{})
+		clusterManagementAddon, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, addonName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		clusterManagementAddon.Spec.InstallStrategy = addonapiv1alpha1.InstallStrategy{
@@ -206,18 +206,18 @@ var _ = Describe("Template deploy Alpha", func() {
 			},
 		}
 
-		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Update(context.Background(), clusterManagementAddon, metav1.UpdateOptions{})
+		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Update(ctx, clusterManagementAddon, metav1.UpdateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("check mca condition")
-		assertManagedClusterAddOnConditionsAlpha(addonName, clusterNames[0], metav1.Condition{
+		assertManagedClusterAddOnConditionsAlpha(ctx, addonName, clusterNames[0], metav1.Condition{
 			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
 			Status:  metav1.ConditionTrue,
 			Reason:  "ConfigurationsConfigured",
 			Message: "Configurations configured",
 		})
 		for i := 1; i < numberOfClusters; i++ {
-			assertManagedClusterAddOnConditionsAlpha(addonName, clusterNames[i], metav1.Condition{
+			assertManagedClusterAddOnConditionsAlpha(ctx, addonName, clusterNames[i], metav1.Condition{
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
 				Status:  metav1.ConditionFalse,
 				Reason:  "ConfigurationsNotConfigured",
@@ -226,23 +226,23 @@ var _ = Describe("Template deploy Alpha", func() {
 		}
 
 		By("check work rendered on the first cluster")
-		checkWorkRendered(clusterNames[0], 1)
+		checkWorkRendered(ctx, clusterNames[0], 1)
 		for i := 1; i < numberOfClusters; i++ {
-			checkWorkRendered(clusterNames[i], 0)
+			checkWorkRendered(ctx, clusterNames[i], 0)
 		}
 
 		By("update work status to trigger addon status")
-		updateManifestWorkStatus(hubWorkClient, clusterNames[0], manifestWorkName, metav1.ConditionTrue)
+		updateManifestWorkStatus(ctx, hubWorkClient, clusterNames[0], manifestWorkName, metav1.ConditionTrue)
 
 		By("check mca condition")
-		assertManagedClusterAddOnConditionsAlpha(addonName, clusterNames[1], metav1.Condition{
+		assertManagedClusterAddOnConditionsAlpha(ctx, addonName, clusterNames[1], metav1.Condition{
 			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
 			Status:  metav1.ConditionTrue,
 			Reason:  "ConfigurationsConfigured",
 			Message: "Configurations configured",
 		})
 		for i := 2; i < numberOfClusters; i++ {
-			assertManagedClusterAddOnConditionsAlpha(addonName, clusterNames[i], metav1.Condition{
+			assertManagedClusterAddOnConditionsAlpha(ctx, addonName, clusterNames[i], metav1.Condition{
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
 				Status:  metav1.ConditionFalse,
 				Reason:  "ConfigurationsNotConfigured",
@@ -251,16 +251,16 @@ var _ = Describe("Template deploy Alpha", func() {
 		}
 
 		By("check work rendered on the second cluster")
-		checkWorkRendered(clusterNames[1], 1)
+		checkWorkRendered(ctx, clusterNames[1], 1)
 		for i := 2; i < numberOfClusters; i++ {
-			checkWorkRendered(clusterNames[i], 0)
+			checkWorkRendered(ctx, clusterNames[i], 0)
 		}
 	})
 })
 
-func checkWorkRendered(clusterName string, expectedCount int) {
+func checkWorkRendered(ctx context.Context, clusterName string, expectedCount int) {
 	Eventually(func() error {
-		work, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).List(context.Background(), metav1.ListOptions{})
+		work, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return err
 		}

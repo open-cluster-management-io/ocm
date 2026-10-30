@@ -1,7 +1,6 @@
 package importer
 
 import (
-	"context"
 	"testing"
 
 	"github.com/ghodss/yaml"
@@ -84,7 +83,7 @@ func TestRenderBootstrapHubKubeConfig(t *testing.T) {
 				},
 			)
 			config := &chart.KlusterletChartConfig{}
-			config, err := RenderBootstrapHubKubeConfig(client, c.apiserverURL, c.bootstrapSA)(context.TODO(), nil, config)
+			config, err := RenderBootstrapHubKubeConfig(client, c.apiserverURL, c.bootstrapSA)(t.Context(), nil, config)
 			if err != nil {
 				t.Fatalf("failed to render bootstrap hub kubeconfig: %v", err)
 			}
@@ -124,7 +123,7 @@ func TestRenderImage(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			config := &chart.KlusterletChartConfig{}
 			render := RenderImage(c.image)
-			config, err := render(context.TODO(), nil, config)
+			config, err := render(t.Context(), nil, config)
 			if err != nil {
 				t.Fatalf("failed to render image: %v", err)
 			}
@@ -201,7 +200,7 @@ func TestRenderImagePullSecret(t *testing.T) {
 			client := kubefake.NewClientset(c.secrets...)
 			config := &chart.KlusterletChartConfig{}
 			render := RenderImagePullSecret(client, "test", c.secretName)
-			config, err := render(context.TODO(), nil, config)
+			config, err := render(t.Context(), nil, config)
 			if err != nil {
 				t.Fatalf("failed to render image: %v", err)
 			}
@@ -311,7 +310,7 @@ func TestRenderFromConfigSecret(t *testing.T) {
 				CreateNamespace:        true,
 				BootstrapHubKubeConfig: "test-kubeconfig",
 			}
-			result, err := render(context.TODO(), cluster, config)
+			result, err := render(t.Context(), cluster, config)
 			if c.expectErr {
 				if err == nil {
 					t.Errorf("expected error, got nil")
@@ -353,7 +352,7 @@ func TestRenderFromConfigSecret_OverlayPreservesDefaults(t *testing.T) {
 		CreateNamespace:        true,
 		BootstrapHubKubeConfig: "keep-me",
 	}
-	got, err := render(context.TODO(), cluster, seed)
+	got, err := render(t.Context(), cluster, seed)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

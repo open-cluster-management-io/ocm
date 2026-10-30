@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -23,7 +22,7 @@ var _ = Describe("Taints update check", Label("registration-taint"), func() {
 			managedCluster *clusterv1.ManagedCluster
 			clusterName    string
 		)
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			clusterName = fmt.Sprintf("managedcluster-%s", rand.String(6))
 			managedCluster = &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -33,21 +32,21 @@ var _ = Describe("Taints update check", Label("registration-taint"), func() {
 					HubAcceptsClient: true,
 				},
 			}
-			managedCluster, err = hub.ClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
+			managedCluster, err = hub.ClusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		AfterEach(func() {
-			err := hub.ClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
+		AfterEach(func(ctx SpecContext) {
+			err := hub.ClusterClient.ClusterV1().ManagedClusters().Delete(ctx, clusterName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("Should update taints automatically", func() {
+		It("Should update taints automatically", func(ctx SpecContext) {
 			managedClusters := hub.ClusterClient.ClusterV1().ManagedClusters()
 
 			By("Should only be one UnreachableTaint")
 			Eventually(func() error {
-				if managedCluster, err = managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{}); err != nil {
+				if managedCluster, err = managedClusters.Get(ctx, clusterName, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				if len(managedCluster.Spec.Taints) != 1 {
@@ -61,11 +60,11 @@ var _ = Describe("Taints update check", Label("registration-taint"), func() {
 
 			By("Change the LeaseDurationSeconds to 60")
 			Eventually(func() error {
-				if managedCluster, err = managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{}); err != nil {
+				if managedCluster, err = managedClusters.Get(ctx, clusterName, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				managedCluster.Spec.LeaseDurationSeconds = 60
-				if _, err = managedClusters.Update(context.TODO(), managedCluster, metav1.UpdateOptions{}); err != nil {
+				if _, err = managedClusters.Update(ctx, managedCluster, metav1.UpdateOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -73,7 +72,7 @@ var _ = Describe("Taints update check", Label("registration-taint"), func() {
 
 			By("Add a ManagedClusterConditionAvailable condition")
 			Eventually(func() error {
-				if managedCluster, err = managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{}); err != nil {
+				if managedCluster, err = managedClusters.Get(ctx, clusterName, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				meta.SetStatusCondition(&(managedCluster.Status.Conditions), metav1.Condition{
@@ -81,7 +80,7 @@ var _ = Describe("Taints update check", Label("registration-taint"), func() {
 					Status: metav1.ConditionTrue,
 					Reason: "ForTest",
 				})
-				if _, err = managedClusters.UpdateStatus(context.TODO(), managedCluster, metav1.UpdateOptions{}); err != nil {
+				if _, err = managedClusters.UpdateStatus(ctx, managedCluster, metav1.UpdateOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -89,7 +88,7 @@ var _ = Describe("Taints update check", Label("registration-taint"), func() {
 
 			By("The taints len should be 0")
 			Eventually(func() error {
-				if managedCluster, err = managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{}); err != nil {
+				if managedCluster, err = managedClusters.Get(ctx, clusterName, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				if len(managedCluster.Spec.Taints) != 0 {
@@ -100,7 +99,7 @@ var _ = Describe("Taints update check", Label("registration-taint"), func() {
 
 			By("Set the ManagedClusterConditionAvailable status to false")
 			Eventually(func() error {
-				if managedCluster, err = managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{}); err != nil {
+				if managedCluster, err = managedClusters.Get(ctx, clusterName, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				meta.SetStatusCondition(&(managedCluster.Status.Conditions), metav1.Condition{
@@ -108,7 +107,7 @@ var _ = Describe("Taints update check", Label("registration-taint"), func() {
 					Status: metav1.ConditionFalse,
 					Reason: "ForTest",
 				})
-				if _, err = managedClusters.UpdateStatus(context.TODO(), managedCluster, metav1.UpdateOptions{}); err != nil {
+				if _, err = managedClusters.UpdateStatus(ctx, managedCluster, metav1.UpdateOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -116,7 +115,7 @@ var _ = Describe("Taints update check", Label("registration-taint"), func() {
 
 			By("Should only be one UnavailableTaint")
 			Eventually(func() error {
-				if managedCluster, err = managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{}); err != nil {
+				if managedCluster, err = managedClusters.Get(ctx, clusterName, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				if len(managedCluster.Spec.Taints) != 1 {
@@ -130,7 +129,7 @@ var _ = Describe("Taints update check", Label("registration-taint"), func() {
 
 			By("Set the ManagedClusterConditionAvailable status to unknown")
 			Eventually(func() error {
-				if managedCluster, err = managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{}); err != nil {
+				if managedCluster, err = managedClusters.Get(ctx, clusterName, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				meta.SetStatusCondition(&(managedCluster.Status.Conditions), metav1.Condition{
@@ -138,7 +137,7 @@ var _ = Describe("Taints update check", Label("registration-taint"), func() {
 					Status: metav1.ConditionUnknown,
 					Reason: "ForTest",
 				})
-				if _, err = managedClusters.UpdateStatus(context.TODO(), managedCluster, metav1.UpdateOptions{}); err != nil {
+				if _, err = managedClusters.UpdateStatus(ctx, managedCluster, metav1.UpdateOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -146,7 +145,7 @@ var _ = Describe("Taints update check", Label("registration-taint"), func() {
 
 			By("Should only be one UnreachableTaint")
 			Eventually(func() error {
-				if managedCluster, err = managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{}); err != nil {
+				if managedCluster, err = managedClusters.Get(ctx, clusterName, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				if len(managedCluster.Spec.Taints) != 1 {

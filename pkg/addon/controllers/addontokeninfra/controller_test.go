@@ -791,7 +791,7 @@ func TestReconcile(t *testing.T) {
 				kubeInformers.Rbac().V1().RoleBindings(),
 			)
 
-			err := controller.Sync(context.TODO(), syncContext, c.syncKey)
+			err := controller.Sync(t.Context(), syncContext, c.syncKey)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}

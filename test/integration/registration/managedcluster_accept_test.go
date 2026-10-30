@@ -1,7 +1,6 @@
 package registration_test
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 
@@ -26,22 +25,22 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 	var testCustomLabel2 = "custom-label2"
 	var testCustomLabelValue2 = "custom-value2"
 
-	BeforeAll(func() {
+	BeforeAll(func(ctx SpecContext) {
 		// stop the hub and start new hub with the updated option
 		stopHub()
 
 		awsHubOptionWithLabelSetting := hub.NewHubManagerOptions()
 		awsHubOptionWithLabelSetting.Labels = fmt.Sprintf("%s=%s,%s=%s", testCustomLabel, testCustomLabelValue, testCustomLabel2, testCustomLabelValue2)
-		startHub(awsHubOptionWithLabelSetting)
+		startHub(ctx, awsHubOptionWithLabelSetting)
 
 		// stop hub with awsOption and restart hub with default option
-		DeferCleanup(func() {
+		DeferCleanup(func(ctx SpecContext) {
 			stopHub()
-			startHub(hubOption)
+			startHub(ctx, hubOption)
 		})
 	})
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		managedClusterName := fmt.Sprintf("managedcluster-%s", rand.String(6))
 		managedCluster = &clusterv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -51,11 +50,11 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 				HubAcceptsClient: true,
 			},
 		}
-		_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
+		_, err := clusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		// Checks if the namespace has the required labels
 		Eventually(func() error {
-			namespace, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
+			namespace, err := kubeClient.CoreV1().Namespaces().Get(ctx, managedCluster.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -69,7 +68,7 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 		// Check rbac files should be created
 		Eventually(func() error {
 			// check clusterrole is correct
-			clusterRole, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), mclClusterRoleName(managedCluster.Name), metav1.GetOptions{})
+			clusterRole, err := kubeClient.RbacV1().ClusterRoles().Get(ctx, mclClusterRoleName(managedCluster.Name), metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -84,7 +83,7 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		Eventually(func() error {
-			clusterRoleBinding, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(),
+			clusterRoleBinding, err := kubeClient.RbacV1().ClusterRoleBindings().Get(ctx,
 				mclClusterRoleBindingName(managedCluster.Name), metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -97,7 +96,7 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 
 		Eventually(func() error {
 			registrationRoleBinding, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).
-				Get(context.Background(), registrationRoleBindingName(managedCluster.Name), metav1.GetOptions{})
+				Get(ctx, registrationRoleBindingName(managedCluster.Name), metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -108,7 +107,7 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		Eventually(func() error {
-			workRoleBinding, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(),
+			workRoleBinding, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(ctx,
 				workRoleBindingName(managedCluster.Name), metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -120,7 +119,7 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		Eventually(func() error {
-			registrationClusterRole, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(),
+			registrationClusterRole, err := kubeClient.RbacV1().ClusterRoles().Get(ctx,
 				"open-cluster-management:managedcluster:registration", metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -134,7 +133,7 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		Eventually(func() error {
-			workClusterRole, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(),
+			workClusterRole, err := kubeClient.RbacV1().ClusterRoles().Get(ctx,
 				"open-cluster-management:managedcluster:work", metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -147,12 +146,12 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		manifestWork := testinghelpers.NewManifestWork(managedCluster.Name, "test-work-1", []string{}, nil, nil, nil)
-		_, err = workClient.WorkV1().ManifestWorks(managedCluster.Name).Create(context.Background(), manifestWork, metav1.CreateOptions{})
+		_, err = workClient.WorkV1().ManifestWorks(managedCluster.Name).Create(ctx, manifestWork, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 	})
-	It("should set hubAcceptsClient to false", func() {
+	It("should set hubAcceptsClient to false", func(ctx SpecContext) {
 		Eventually(func() error {
-			mc, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
+			mc, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, managedCluster.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -163,12 +162,12 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 		// Set hubAcceptsClient to false
 		Eventually(func() error {
-			mc, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
+			mc, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, managedCluster.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			mc.Spec.HubAcceptsClient = false
-			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), mc, metav1.UpdateOptions{})
+			_, err = clusterClient.ClusterV1().ManagedClusters().Update(ctx, mc, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
@@ -179,7 +178,7 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 		// * workRolebinding should be deleted
 		Eventually(func() error {
 			// Check clusterrole is updated with reduced permissions
-			clusterRole, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), mclClusterRoleName(managedCluster.Name), metav1.GetOptions{})
+			clusterRole, err := kubeClient.RbacV1().ClusterRoles().Get(ctx, mclClusterRoleName(managedCluster.Name), metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -205,14 +204,14 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 
 		Eventually(func() error {
 			// ClusterRoleBinding should still exist
-			_, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), mclClusterRoleBindingName(managedCluster.Name), metav1.GetOptions{})
+			_, err := kubeClient.RbacV1().ClusterRoleBindings().Get(ctx, mclClusterRoleBindingName(managedCluster.Name), metav1.GetOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		Eventually(func() error {
 			// Registration rolebinding should be deleted
 			_, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).
-				Get(context.Background(), registrationRoleBindingName(managedCluster.Name), metav1.GetOptions{})
+				Get(ctx, registrationRoleBindingName(managedCluster.Name), metav1.GetOptions{})
 			if err == nil {
 				return fmt.Errorf("registration rolebinding should be deleted")
 			}
@@ -223,12 +222,12 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		// Work rolebinding should be deleted after manifestworks are removed
-		err := workClient.WorkV1().ManifestWorks(managedCluster.Name).Delete(context.Background(), "test-work-1", metav1.DeleteOptions{})
+		err := workClient.WorkV1().ManifestWorks(managedCluster.Name).Delete(ctx, "test-work-1", metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() bool {
 			// Work rolebinding should be deleted
-			_, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(), workRoleBindingName(managedCluster.Name), metav1.GetOptions{})
+			_, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(ctx, workRoleBindingName(managedCluster.Name), metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, 3*eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 

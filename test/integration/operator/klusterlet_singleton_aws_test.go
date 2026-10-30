@@ -23,8 +23,8 @@ var _ = Describe("Klusterlet Singleton mode with aws auth", func() {
 	var deploymentName string
 	var saName string
 
-	BeforeEach(func() {
-		var ctx context.Context
+	BeforeEach(func(ctx SpecContext) {
+		var runCtx context.Context
 		klusterlet = &operatorapiv1.Klusterlet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("klusterlet-%s", rand.String(6)),
@@ -64,15 +64,15 @@ var _ = Describe("Klusterlet Singleton mode with aws auth", func() {
 				Name: agentNamespace,
 			},
 		}
-		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		ctx, cancel = context.WithCancel(context.Background())
-		go startKlusterletOperator(ctx)
+		runCtx, cancel = context.WithCancel(context.Background())
+		go startKlusterletOperator(runCtx)
 	})
 
-	AfterEach(func() {
-		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), agentNamespace, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err := kubeClient.CoreV1().Namespaces().Delete(ctx, agentNamespace, metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		if cancel != nil {
@@ -86,17 +86,17 @@ var _ = Describe("Klusterlet Singleton mode with aws auth", func() {
 			saName = fmt.Sprintf("%s-work-sa", klusterlet.Name)
 		})
 
-		AfterEach(func() {
-			Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
+		AfterEach(func(ctx SpecContext) {
+			Expect(operatorClient.OperatorV1().Klusterlets().Delete(ctx, klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
 		})
 
-		It("should have expected resource created successfully when registered with aws auth", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("should have expected resource created successfully when registered with aws auth", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Check service account
 			Eventually(func() bool {
-				sa, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(context.Background(), saName, metav1.GetOptions{})
+				sa, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(ctx, saName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -105,7 +105,7 @@ var _ = Describe("Klusterlet Singleton mode with aws auth", func() {
 
 			// Check deployment
 			Eventually(func() bool {
-				deployment, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
+				deployment, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(ctx, deploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}

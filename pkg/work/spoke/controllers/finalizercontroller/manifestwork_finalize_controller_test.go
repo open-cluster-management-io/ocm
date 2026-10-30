@@ -1,7 +1,6 @@
 package finalizercontroller
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -205,7 +204,7 @@ func TestSyncManifestWorkController(t *testing.T) {
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, c.workName)
-			err := controller.sync(context.TODO(), controllerContext, c.workName)
+			err := controller.sync(t.Context(), controllerContext, c.workName)
 			if err != nil {
 				t.Errorf("Expect no sync error, but got %v", err)
 			}

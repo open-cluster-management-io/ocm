@@ -14,7 +14,7 @@ import (
 )
 
 var _ = Describe("Certificate Rotation", func() {
-	It("Certificate should be automatically rotated when it is about to expire", func() {
+	It("Certificate should be automatically rotated when it is about to expire", func(ctx SpecContext) {
 		var err error
 
 		managedClusterName := "rotationtest-spokecluster"

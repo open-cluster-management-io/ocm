@@ -1,7 +1,6 @@
 package statuscontroller
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -194,7 +193,7 @@ func TestSync(t *testing.T) {
 			controller := newTestController(t, c.klusterlet, c.object...)
 			syncContext := testingcommon.NewFakeSyncContext(t, c.klusterlet.Name)
 
-			err := controller.controller.sync(context.TODO(), syncContext, c.klusterlet.Name)
+			err := controller.controller.sync(t.Context(), syncContext, c.klusterlet.Name)
 			if err != nil {
 				t.Errorf("Expected no error when update status: %v", err)
 			}

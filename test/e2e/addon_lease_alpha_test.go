@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -25,7 +24,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 	const availableLabelValue = "available"
 	Context("Checking addon lease on managed cluster to update addon status", func() {
 		var addOnName string
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			// create an addon on created managed cluster
 			addOnName = fmt.Sprintf("addon-%s", rand.String(6))
 			By(fmt.Sprintf("Creating managed cluster addon %q", addOnName))
@@ -34,7 +33,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 
 			// create addon installation namespace
 			By(fmt.Sprintf("Creating managed cluster addon installation namespace %q", addOnName))
-			_, err = spoke.KubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+			_, err = spoke.KubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: addOnName,
 				},
@@ -42,15 +41,15 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
-			err := spoke.KubeClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+			err := spoke.KubeClient.CoreV1().Namespaces().Delete(ctx, addOnName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("Should keep addon status to available", func() {
+		It("Should keep addon status to available", func(ctx SpecContext) {
 			By(fmt.Sprintf("Creating lease %q for managed cluster addon %q", addOnName, addOnName))
-			_, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Create(context.TODO(), &coordv1.Lease{
+			_, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Create(ctx, &coordv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      addOnName,
 					Namespace: addOnName,
@@ -62,7 +61,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
-				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -74,7 +73,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 
 			// check if the cluster has a label for addon with expected value
 			Eventually(func() bool {
-				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(ctx, universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -86,9 +85,9 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 			}).Should(BeTrue())
 		})
 
-		It("Should update addon status to unavailable if addon stops to update its lease", func() {
+		It("Should update addon status to unavailable if addon stops to update its lease", func(ctx SpecContext) {
 			By(fmt.Sprintf("Creating lease %q for managed cluster addon %q", addOnName, addOnName))
-			_, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Create(context.TODO(), &coordv1.Lease{
+			_, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Create(ctx, &coordv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      addOnName,
 					Namespace: addOnName,
@@ -100,7 +99,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
-				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -112,7 +111,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 
 			// check if the cluster has a label for addon with expected value
 			Eventually(func() bool {
-				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(ctx, universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -124,14 +123,14 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 			}).Should(BeTrue())
 
 			By(fmt.Sprintf("Updating lease %q with a past time", addOnName))
-			lease, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			lease, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Get(ctx, addOnName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			lease.Spec.RenewTime = &metav1.MicroTime{Time: time.Now().Add(-10 * time.Minute)}
-			_, err = spoke.KubeClient.CoordinationV1().Leases(addOnName).Update(context.TODO(), lease, metav1.UpdateOptions{})
+			_, err = spoke.KubeClient.CoordinationV1().Leases(addOnName).Update(ctx, lease, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
-				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -143,7 +142,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 
 			// check if the cluster has a label for addon with expected value
 			Eventually(func() bool {
-				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(ctx, universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -155,9 +154,9 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 			}).Should(BeTrue())
 		})
 
-		It("Should update addon status to unknown if there is no lease for this addon", func() {
+		It("Should update addon status to unknown if there is no lease for this addon", func(ctx SpecContext) {
 			By(fmt.Sprintf("Creating lease %q for managed cluster addon %q", addOnName, addOnName))
-			_, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Create(context.TODO(), &coordv1.Lease{
+			_, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Create(ctx, &coordv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      addOnName,
 					Namespace: addOnName,
@@ -169,7 +168,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
-				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -181,7 +180,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 
 			// check if the cluster has a label for addon with expected value
 			Eventually(func() bool {
-				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(ctx, universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -193,11 +192,11 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 			}).Should(BeTrue())
 
 			By(fmt.Sprintf("Deleting lease %q", addOnName))
-			err = spoke.KubeClient.CoordinationV1().Leases(addOnName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+			err = spoke.KubeClient.CoordinationV1().Leases(addOnName).Delete(ctx, addOnName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
-				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -209,7 +208,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 
 			// check if the cluster has a label for addon with expected value
 			Eventually(func() bool {
-				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(ctx, universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -224,7 +223,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 
 	Context("Checking managed cluster status to update addon status", func() {
 		var klusterletName, clusterName, addOnName string
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
 			clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
 			agentNamespace := fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
@@ -238,7 +237,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 
 			// create addon installation namespace
 			By(fmt.Sprintf("Creating managed cluster addon installation namespace %q", addOnName))
-			_, err := spoke.KubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+			_, err := spoke.KubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: addOnName,
 				},
@@ -246,17 +245,17 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
-			err := hub.KubeClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+			err := hub.KubeClient.CoreV1().Namespaces().Delete(ctx, addOnName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
 			framework.CleanKlusterletRelatedResources(hub, spoke, klusterletName, clusterName)
 		})
 
-		It("Should update addon status to unknown if managed cluster stops to update its lease", func() {
+		It("Should update addon status to unknown if managed cluster stops to update its lease", func(ctx SpecContext) {
 			By(fmt.Sprintf("Creating lease %q for managed cluster addon %q", addOnName, addOnName))
-			_, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Create(context.TODO(), &coordv1.Lease{
+			_, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Create(ctx, &coordv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      addOnName,
 					Namespace: addOnName,
@@ -268,7 +267,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
-				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -284,11 +283,11 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 
 			// delete registration agent to stop agent update its status
 			By("Stoping klusterlet")
-			err = spoke.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(), klusterletName, metav1.DeleteOptions{})
+			err = spoke.OperatorClient.OperatorV1().Klusterlets().Delete(ctx, klusterletName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
-				_, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(), klusterletName, metav1.GetOptions{})
+				_, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(ctx, klusterletName, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
 					klog.Infof("klusterlet %s deleted successfully", klusterletName)
 					return nil
@@ -302,7 +301,7 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 
 			// for speeding up test, update managed cluster status to unknown manually
 			By(fmt.Sprintf("Updating managed cluster %s status to unknown", clusterName))
-			found, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+			found, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(ctx, clusterName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			found.Status = clusterv1.ManagedClusterStatus{
 				Conditions: []metav1.Condition{
@@ -315,11 +314,11 @@ var _ = Describe("Addon Health Check (v1alpha1)", Label("addon-lease"), func() {
 					},
 				},
 			}
-			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.TODO(), found, metav1.UpdateOptions{})
+			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().UpdateStatus(ctx, found, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
-				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

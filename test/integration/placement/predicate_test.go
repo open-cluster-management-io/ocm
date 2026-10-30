@@ -25,7 +25,7 @@ var _ = Describe("Predicates", func() {
 	var clusterSet1Name string
 	var suffix string
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		suffix = rand.String(5)
 		namespace = fmt.Sprintf("ns-%s", suffix)
 		placementName = fmt.Sprintf("placement-%s", suffix)
@@ -37,15 +37,15 @@ var _ = Describe("Predicates", func() {
 				Name: namespace,
 			},
 		}
-		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// start controller manager
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
+		var runCtx context.Context
+		runCtx, cancel = context.WithCancel(context.Background())
 		go func() {
 			defer GinkgoRecover()
-			err := controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
+			err := controllers.RunControllerManager(runCtx, &controllercmd.ControllerContext{
 				KubeConfig:    restConfig,
 				EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
 			})
@@ -53,21 +53,21 @@ var _ = Describe("Predicates", func() {
 		}()
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx SpecContext) {
 		if cancel != nil {
 			cancel()
 		}
-		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+		err := kubeClient.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	Context("Cluster Selector", func() {
-		It("Should schedule placement successfully once spec.Predicates LabelSelector changes", func() {
-			assertBindingClusterSet(clusterSet1Name, namespace)
-			assertCreatingClusters(clusterSet1Name, 2, "cloud", "Azure")
-			assertCreatingClusters(clusterSet1Name, 3, "cloud", "Amazon")
+		It("Should schedule placement successfully once spec.Predicates LabelSelector changes", func(ctx SpecContext) {
+			assertBindingClusterSet(ctx, clusterSet1Name, namespace)
+			assertCreatingClusters(ctx, clusterSet1Name, 2, "cloud", "Azure")
+			assertCreatingClusters(ctx, clusterSet1Name, 3, "cloud", "Amazon")
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(10).Build()
-			assertCreatingPlacementWithDecision(placement, 5, 1)
+			assertCreatingPlacementWithDecision(ctx, placement, 5, 1)
 
 			By("add the predicates")
 			// add a predicates
@@ -83,9 +83,9 @@ var _ = Describe("Predicates", func() {
 				},
 			}
 			placement.Spec.Predicates = predicates
-			assertPatchingPlacementSpec(placement)
-			assertPlacementDecisionNumbers(placementName, namespace, 3, 1)
-			assertPlacementStatusDecisionGroups(
+			assertPatchingPlacementSpec(ctx, placement)
+			assertPlacementDecisionNumbers(ctx, placementName, namespace, 3, 1)
+			assertPlacementStatusDecisionGroups(ctx,
 				placementName, namespace,
 				[]clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{testinghelpers.PlacementDecisionName(placementName, 1)}, ClustersCount: 3}})
 
@@ -103,16 +103,16 @@ var _ = Describe("Predicates", func() {
 				},
 			}
 			placement.Spec.Predicates = predicates
-			assertPatchingPlacementSpec(placement)
-			assertPlacementDecisionNumbers(placementName, namespace, 2, 1)
+			assertPatchingPlacementSpec(ctx, placement)
+			assertPlacementDecisionNumbers(ctx, placementName, namespace, 2, 1)
 		})
 
-		It("Should schedule placement successfully once spec.Predicates ClaimSelector changes", func() {
-			assertBindingClusterSet(clusterSet1Name, namespace)
-			assertCreatingClusters(clusterSet1Name, 2, "cloud", "Azure")
-			assertCreatingClusters(clusterSet1Name, 3, "cloud", "Amazon")
+		It("Should schedule placement successfully once spec.Predicates ClaimSelector changes", func(ctx SpecContext) {
+			assertBindingClusterSet(ctx, clusterSet1Name, namespace)
+			assertCreatingClusters(ctx, clusterSet1Name, 2, "cloud", "Azure")
+			assertCreatingClusters(ctx, clusterSet1Name, 3, "cloud", "Amazon")
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(10).Build()
-			assertCreatingPlacementWithDecision(placement, 5, 1)
+			assertCreatingPlacementWithDecision(ctx, placement, 5, 1)
 
 			By("add the predicates")
 			// add a predicates
@@ -132,8 +132,8 @@ var _ = Describe("Predicates", func() {
 				},
 			}
 			placement.Spec.Predicates = predicates
-			assertPatchingPlacementSpec(placement)
-			assertPlacementDecisionNumbers(placementName, namespace, 3, 1)
+			assertPatchingPlacementSpec(ctx, placement)
+			assertPlacementDecisionNumbers(ctx, placementName, namespace, 3, 1)
 
 			By("change the predicates")
 			// change the predicates
@@ -153,34 +153,34 @@ var _ = Describe("Predicates", func() {
 				},
 			}
 			placement.Spec.Predicates = predicates
-			assertPatchingPlacementSpec(placement)
-			assertPlacementDecisionNumbers(placementName, namespace, 2, 1)
+			assertPatchingPlacementSpec(ctx, placement)
+			assertPlacementDecisionNumbers(ctx, placementName, namespace, 2, 1)
 		})
 
-		It("Should schedule placement successfully once spec.Predicates CelSelector changes", func() {
+		It("Should schedule placement successfully once spec.Predicates CelSelector changes", func(ctx SpecContext) {
 			// cluster settings
-			assertBindingClusterSet(clusterSet1Name, namespace)
-			clusterNames := assertCreatingClusters(clusterSet1Name, 2)
+			assertBindingClusterSet(ctx, clusterSet1Name, namespace)
+			clusterNames := assertCreatingClusters(ctx, clusterSet1Name, 2)
 
 			// Creating the clusters with resources
-			assertCreatingAddOnPlacementScores(clusterNames[0], "demo", "demo", 70)
-			assertCreatingAddOnPlacementScores(clusterNames[1], "demo", "demo", 90)
+			assertCreatingAddOnPlacementScores(ctx, clusterNames[0], "demo", "demo", 70)
+			assertCreatingAddOnPlacementScores(ctx, clusterNames[1], "demo", "demo", 90)
 
 			// Checking the result of the placement
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(1).AddPredicate(nil, nil,
 				&clusterapiv1beta1.ClusterCelSelector{
 					CelExpressions: []string{`xxxx.expression`},
 				}).Build()
-			assertCreatingPlacement(placement)
-			assertPlacementDecisionNumbers(placementName, namespace, 0, 1)
-			assertPlacementConditionMisconfigured(placementName, namespace, true)
+			assertCreatingPlacement(ctx, placement)
+			assertPlacementDecisionNumbers(ctx, placementName, namespace, 0, 1)
+			assertPlacementConditionMisconfigured(ctx, placementName, namespace, true)
 
 			placement.Spec.Predicates[0].RequiredClusterSelector.CelSelector.CelExpressions = []string{
 				`managedCluster.scores("demo").filter(s, s.name == 'demo').all(e, e.value > 80)`,
 			}
-			assertPatchingPlacementSpec(placement)
-			assertPlacementDecisionNumbers(placementName, namespace, 1, 1)
-			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[1]})
+			assertPatchingPlacementSpec(ctx, placement)
+			assertPlacementDecisionNumbers(ctx, placementName, namespace, 1, 1)
+			assertPlacementDecisionClusterNames(ctx, placementName, namespace, []string{clusterNames[1]})
 		})
 	})
 })

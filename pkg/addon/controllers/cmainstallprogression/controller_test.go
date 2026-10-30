@@ -1,7 +1,6 @@
 package cmainstallprogression
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -481,7 +480,7 @@ func TestReconcile(t *testing.T) {
 				addonInformers.Addon().V1beta1().ClusterManagementAddOns(),
 			)
 
-			err := controller.Sync(context.TODO(), syncContext, c.syncKey)
+			err := controller.Sync(t.Context(), syncContext, c.syncKey)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}

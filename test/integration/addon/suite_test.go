@@ -64,7 +64,7 @@ func TestIntegration(t *testing.T) {
 	RunSpecs(t, "Integration Suite")
 }
 
-var _ = BeforeSuite(func() {
+var _ = BeforeSuite(func(ctx SpecContext) {
 	By("bootstrapping test environment")
 
 	// start a kube-apiserver
@@ -87,7 +87,7 @@ var _ = BeforeSuite(func() {
 	// v1alpha1 (storage version) and v1beta1 (used by controllers).
 	apiExtClient, err := apiextensionsclient.NewForConfig(cfg)
 	Expect(err).ToNot(HaveOccurred())
-	err = util.AddConversionForAddonAPI(context.TODO(), apiExtClient, testEnv,
+	err = util.AddConversionForAddonAPI(ctx, apiExtClient, testEnv,
 		"clustermanagementaddons.addon.open-cluster-management.io",
 		"managedclusteraddons.addon.open-cluster-management.io")
 	Expect(err).ToNot(HaveOccurred())

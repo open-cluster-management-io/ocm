@@ -1,7 +1,6 @@
 package manifestworkgarbagecollection
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -116,7 +115,7 @@ func TestManifestWorkGarbageCollectionController(t *testing.T) {
 				workLister: workInformerFactory.Work().V1().ManifestWorks().Lister(),
 			}
 
-			ctx := context.TODO()
+			ctx := t.Context()
 			workInformerFactory.Start(ctx.Done())
 			workInformerFactory.WaitForCacheSync(ctx.Done())
 

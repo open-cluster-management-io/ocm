@@ -53,7 +53,7 @@ var _ = Describe("Addon Token Registration", func() {
 		}()
 	})
 
-	JustBeforeEach(func() {
+	JustBeforeEach(func(ctx SpecContext) {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("token-cluster-%s", suffix)
 		hubKubeconfigSecret = fmt.Sprintf("token-hub-kubeconfig-secret-%s", suffix)
@@ -88,10 +88,10 @@ var _ = Describe("Addon Token Registration", func() {
 		}
 	})
 
-	assertValidTokenCredential := func(secretNamespace, secretName, expectedProxyURL string) {
+	assertValidTokenCredential := func(ctx context.Context, secretNamespace, secretName, expectedProxyURL string) {
 		By("Check token credential in secret")
 		Eventually(func() bool {
-			secret, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+			secret, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -117,11 +117,11 @@ var _ = Describe("Addon Token Registration", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	}
 
-	assertTokenRefreshedCondition := func(clusterName, addonName string) {
+	assertTokenRefreshedCondition := func(ctx context.Context, clusterName, addonName string) {
 		By("Check token refreshed addon status condition")
 		Eventually(func() bool {
 			addon, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(clusterName).
-				Get(context.TODO(), addonName, metav1.GetOptions{})
+				Get(ctx, addonName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -142,10 +142,10 @@ var _ = Describe("Addon Token Registration", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	assertValidClientCertificate := func(secretNamespace, secretName, expectedProxyURL string) {
+	assertValidClientCertificate := func(ctx context.Context, secretNamespace, secretName, expectedProxyURL string) {
 		By("Check client certificate in secret")
 		Eventually(func() error {
-			secret, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+			secret, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -190,10 +190,10 @@ var _ = Describe("Addon Token Registration", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	}
 
-	assertAddOnRegistrationUpdate := func(namespace string) {
+	assertAddOnRegistrationUpdate := func(ctx context.Context, namespace string) {
 		Eventually(func() error {
 			addOn, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
-				Get(context.TODO(), addOnName, metav1.GetOptions{})
+				Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -205,12 +205,12 @@ var _ = Describe("Addon Token Registration", func() {
 			}
 			addOn.Status.Namespace = namespace
 			_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
-				UpdateStatus(context.TODO(), addOn, metav1.UpdateOptions{})
+				UpdateStatus(ctx, addOn, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 	}
 
-	assertSuccessAddOnEnabling := func() {
+	assertSuccessAddOnEnabling := func(ctx context.Context) {
 		By("Create ManagedClusterAddOn cr for token authentication")
 		// create addon namespace
 		ns := &corev1.Namespace{
@@ -218,7 +218,7 @@ var _ = Describe("Addon Token Registration", func() {
 				Name: addOnName,
 			},
 		}
-		_, err = kubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+		_, err = kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		// create addon
@@ -229,37 +229,37 @@ var _ = Describe("Addon Token Registration", func() {
 			},
 			Spec: addonv1beta1.ManagedClusterAddOnSpec{},
 		}
-		_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
+		_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(ctx, addOn, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+		_, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	assertSuccessAddOnBootstrap := func(registrationType addonv1beta1.RegistrationType, signerName string) {
-		assertSuccessAddOnEnabling()
-		assertAddOnRegistrationUpdate(addOnName)
-		assertValidTokenCredential(addOnName, getSecretName(registrationType, addOnName, signerName), expectedProxyURL)
+	assertSuccessAddOnBootstrap := func(ctx context.Context, registrationType addonv1beta1.RegistrationType, signerName string) {
+		assertSuccessAddOnEnabling(ctx)
+		assertAddOnRegistrationUpdate(ctx, addOnName)
+		assertValidTokenCredential(ctx, addOnName, getSecretName(registrationType, addOnName, signerName), expectedProxyURL)
 		assertAddonLabel(managedClusterName, addOnName, "unreachable")
-		assertTokenRefreshedCondition(managedClusterName, addOnName)
+		assertTokenRefreshedCondition(ctx, managedClusterName, addOnName)
 	}
 
-	assertSecretGone := func(secretNamespace, secretName string) {
+	assertSecretGone := func(ctx context.Context, secretNamespace, secretName string) {
 		Eventually(func() bool {
-			_, err = kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+			_, err = kubeClient.CoreV1().Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	}
 
 	assertRegistrationSucceed := func(registrationType addonv1beta1.RegistrationType, signerName string) {
-		It("should register addon with token successfully", func() {
-			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
-			assertSuccessAddOnBootstrap(registrationType, signerName)
+		It("should register addon with token successfully", func(ctx SpecContext) {
+			assertSuccessClusterBootstrap(ctx, managedClusterName, hubKubeconfigSecret)
+			assertSuccessAddOnBootstrap(ctx, registrationType, signerName)
 
 			By("Delete the addon and check if secret is gone")
-			err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+			err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(ctx, addOnName, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			assertSecretGone(addOnName, getSecretName(registrationType, addOnName, signerName))
+			assertSecretGone(ctx, addOnName, getSecretName(registrationType, addOnName, signerName))
 
 			assertHasNoAddonLabel(managedClusterName, addOnName)
 		})
@@ -272,8 +272,8 @@ var _ = Describe("Addon Token Registration", func() {
 		})
 		assertRegistrationSucceed(addonv1beta1.KubeClient, "")
 
-		It("should register addon with token successfully even when the install namespace is not available at the beginning", func() {
-			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
+		It("should register addon with token successfully even when the install namespace is not available at the beginning", func(ctx SpecContext) {
+			assertSuccessClusterBootstrap(ctx, managedClusterName, hubKubeconfigSecret)
 
 			By("Create ManagedClusterAddOn cr for token authentication")
 
@@ -285,11 +285,11 @@ var _ = Describe("Addon Token Registration", func() {
 				},
 				Spec: addonv1beta1.ManagedClusterAddOnSpec{},
 			}
-			_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
+			_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(ctx, addOn, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() error {
-				created, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				created, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -299,13 +299,13 @@ var _ = Describe("Addon Token Registration", func() {
 					},
 				}
 				created.Status.Namespace = addOnName
-				_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
+				_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).UpdateStatus(ctx, created, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 			By("Wait for addon namespace - token should not be created yet")
 			Consistently(func() bool {
-				_, err := kubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), getSecretName(addonv1beta1.KubeClient, addOnName, ""), metav1.GetOptions{})
+				_, err := kubeClient.CoreV1().Secrets(addOnName).Get(ctx, getSecretName(addonv1beta1.KubeClient, addOnName, ""), metav1.GetOptions{})
 				return errors.IsNotFound(err)
 			}, 10*time.Second, 2*time.Second).Should(BeTrue())
 
@@ -316,23 +316,23 @@ var _ = Describe("Addon Token Registration", func() {
 					Name: addOnName,
 				},
 			}
-			_, err = kubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+			_, err = kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			assertValidTokenCredential(addOnName, getSecretName(addonv1beta1.KubeClient, addOnName, ""), expectedProxyURL)
+			assertValidTokenCredential(ctx, addOnName, getSecretName(addonv1beta1.KubeClient, addOnName, ""), expectedProxyURL)
 
 			By("Delete the addon and check if secret is gone")
-			err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+			err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(ctx, addOnName, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			assertSecretGone(addOnName, getSecretName(addonv1beta1.KubeClient, addOnName, ""))
+			assertSecretGone(ctx, addOnName, getSecretName(addonv1beta1.KubeClient, addOnName, ""))
 		})
 
-		It("should rotate token successfully", func() {
-			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
-			assertSuccessAddOnBootstrap(addonv1beta1.KubeClient, "")
+		It("should rotate token successfully", func(ctx SpecContext) {
+			assertSuccessClusterBootstrap(ctx, managedClusterName, hubKubeconfigSecret)
+			assertSuccessAddOnBootstrap(ctx, addonv1beta1.KubeClient, "")
 
 			secretName := getSecretName(addonv1beta1.KubeClient, addOnName, "")
-			secret, err := kubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
+			secret, err := kubeClient.CoreV1().Secrets(addOnName).Get(ctx, secretName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			originalToken := secret.Data[token.TokenFile]
 			Expect(originalToken).NotTo(BeNil())
@@ -340,18 +340,18 @@ var _ = Describe("Addon Token Registration", func() {
 			By("Trigger token rotation by deleting the ServiceAccount")
 			// ServiceAccount naming convention: <addon-name>-agent
 			serviceAccountName := fmt.Sprintf("%s-agent", addOnName)
-			err = kubeClient.CoreV1().ServiceAccounts(managedClusterName).Delete(context.TODO(), serviceAccountName, metav1.DeleteOptions{})
+			err = kubeClient.CoreV1().ServiceAccounts(managedClusterName).Delete(ctx, serviceAccountName, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Wait for ServiceAccount to be recreated")
 			Eventually(func() bool {
-				_, err := kubeClient.CoreV1().ServiceAccounts(managedClusterName).Get(context.TODO(), serviceAccountName, metav1.GetOptions{})
+				_, err := kubeClient.CoreV1().ServiceAccounts(managedClusterName).Get(ctx, serviceAccountName, metav1.GetOptions{})
 				return err == nil
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			By("Wait for token rotation")
 			Eventually(func() bool {
-				newSecret, err := kubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
+				newSecret, err := kubeClient.CoreV1().Secrets(addOnName).Get(ctx, secretName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -366,14 +366,14 @@ var _ = Describe("Addon Token Registration", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 
-		It("should switch from token to CSR driver successfully", func() {
-			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
-			assertSuccessAddOnBootstrap(addonv1beta1.KubeClient, "")
+		It("should switch from token to CSR driver successfully", func(ctx SpecContext) {
+			assertSuccessClusterBootstrap(ctx, managedClusterName, hubKubeconfigSecret)
+			assertSuccessAddOnBootstrap(ctx, addonv1beta1.KubeClient, "")
 
 			secretName := getSecretName(addonv1beta1.KubeClient, addOnName, "")
 
 			By("Verify token-based secret exists")
-			secret, err := kubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
+			secret, err := kubeClient.CoreV1().Secrets(addOnName).Get(ctx, secretName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(secret.Data[token.TokenFile]).NotTo(BeNil())
 
@@ -400,7 +400,7 @@ var _ = Describe("Addon Token Registration", func() {
 			By("Update addon registration with subject for CSR")
 			Eventually(func() error {
 				addOn, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
-					Get(context.TODO(), addOnName, metav1.GetOptions{})
+					Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -411,17 +411,17 @@ var _ = Describe("Addon Token Registration", func() {
 					},
 				}
 				_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
-					UpdateStatus(context.TODO(), addOn, metav1.UpdateOptions{})
+					UpdateStatus(ctx, addOn, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 			By("Approve CSR and verify client certificate")
 			assertSuccessCSRApproval()
-			assertValidClientCertificate(addOnName, secretName, expectedProxyURL)
+			assertValidClientCertificate(ctx, addOnName, secretName, expectedProxyURL)
 
 			By("Verify CSR credentials exist in secret")
 			Eventually(func() bool {
-				secret, err := kubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
+				secret, err := kubeClient.CoreV1().Secrets(addOnName).Get(ctx, secretName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -432,7 +432,7 @@ var _ = Describe("Addon Token Registration", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 
-		It("should switch from CSR to token driver successfully", func() {
+		It("should switch from CSR to token driver successfully", func(ctx SpecContext) {
 			By("Start with CSR driver")
 			cancel()
 
@@ -453,14 +453,14 @@ var _ = Describe("Addon Token Registration", func() {
 
 			cancel = runAgent("csr-to-token-test", agentOptions, commOptions, spokeCfg)
 
-			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
+			assertSuccessClusterBootstrap(ctx, managedClusterName, hubKubeconfigSecret)
 
 			By("Create addon with CSR-based registration")
-			assertSuccessAddOnEnabling()
+			assertSuccessAddOnEnabling(ctx)
 
 			Eventually(func() error {
 				addOn, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
-					Get(context.TODO(), addOnName, metav1.GetOptions{})
+					Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -472,7 +472,7 @@ var _ = Describe("Addon Token Registration", func() {
 				}
 				addOn.Status.Namespace = addOnName
 				_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
-					UpdateStatus(context.TODO(), addOn, metav1.UpdateOptions{})
+					UpdateStatus(ctx, addOn, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
@@ -480,10 +480,10 @@ var _ = Describe("Addon Token Registration", func() {
 
 			By("Approve CSR and verify client certificate")
 			assertSuccessCSRApproval()
-			assertValidClientCertificate(addOnName, secretName, expectedProxyURL)
+			assertValidClientCertificate(ctx, addOnName, secretName, expectedProxyURL)
 
 			By("Verify CSR-based secret exists")
-			secret, err := kubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
+			secret, err := kubeClient.CoreV1().Secrets(addOnName).Get(ctx, secretName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(secret.Data[csr.TLSCertFile]).NotTo(BeNil())
 			Expect(secret.Data[csr.TLSKeyFile]).NotTo(BeNil())
@@ -511,7 +511,7 @@ var _ = Describe("Addon Token Registration", func() {
 			By("Update addon registration to remove subject (for token)")
 			Eventually(func() error {
 				addOn, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
-					Get(context.TODO(), addOnName, metav1.GetOptions{})
+					Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -522,17 +522,17 @@ var _ = Describe("Addon Token Registration", func() {
 					},
 				}
 				_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
-					UpdateStatus(context.TODO(), addOn, metav1.UpdateOptions{})
+					UpdateStatus(ctx, addOn, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 			By("Verify token credential is created")
-			assertValidTokenCredential(addOnName, secretName, expectedProxyURL)
-			assertTokenRefreshedCondition(managedClusterName, addOnName)
+			assertValidTokenCredential(ctx, addOnName, secretName, expectedProxyURL)
+			assertTokenRefreshedCondition(ctx, managedClusterName, addOnName)
 
 			By("Verify token credentials exist in secret")
 			Eventually(func() bool {
-				secret, err := kubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
+				secret, err := kubeClient.CoreV1().Secrets(addOnName).Get(ctx, secretName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}

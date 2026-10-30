@@ -1,7 +1,6 @@
 package templateagent
 
 import (
-	"context"
 	"reflect"
 	"testing"
 
@@ -265,7 +264,7 @@ func TestGetValues(t *testing.T) {
 			}
 
 			agentAddon := &CRDTemplateAgentAddon{
-				logger:         klog.FromContext(context.TODO()),
+				logger:         klog.FromContext(t.Context()),
 				getValuesFuncs: []addonfactory.GetValuesFunc{getValueFunc},
 			}
 

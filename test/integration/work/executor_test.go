@@ -34,7 +34,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 	roleName := "role1"
 	executorName := "test-executor"
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		err := features.SpokeMutableFeatureGate.Set("ExecutorValidatingCaches=true")
 		Expect(err).NotTo(HaveOccurred())
 		DeferCleanup(func() {
@@ -46,12 +46,12 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
 		}
-		_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err = spokeKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
-		go startWorkAgent(ctx, clusterName)
+		var runCtx context.Context
+		runCtx, cancel = context.WithCancel(context.Background())
+		go startWorkAgent(runCtx, clusterName)
 
 		// reset manifests
 		manifests = nil
@@ -64,12 +64,12 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 		work.Spec.Executor = executor
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx SpecContext) {
 		if cancel != nil {
 			cancel()
 		}
 		err := spokeKubeClient.CoreV1().Namespaces().Delete(
-			context.Background(), clusterName, metav1.DeleteOptions{})
+			ctx, clusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -90,9 +90,9 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			}
 		})
 
-		It("Executor does not have permission", func() {
+		It("Executor does not have permission", func(ctx SpecContext) {
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
@@ -106,9 +106,9 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			util.AssertNonexistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("Executor does not have permission to partial resources", func() {
+		It("Executor does not have permission to partial resources", func(ctx SpecContext) {
 			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
-				context.TODO(), &rbacv1.Role{
+				ctx, &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: clusterName,
 						Name:      roleName,
@@ -124,7 +124,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
-				context.TODO(), &rbacv1.RoleBinding{
+				ctx, &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: clusterName,
 						Name:      roleName,
@@ -145,7 +145,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
@@ -166,9 +166,9 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("Executor has permission for all resources", func() {
+		It("Executor has permission for all resources", func(ctx SpecContext) {
 			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
-				context.TODO(), &rbacv1.Role{
+				ctx, &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: clusterName,
 						Name:      roleName,
@@ -184,7 +184,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
-				context.TODO(), &rbacv1.RoleBinding{
+				ctx, &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: clusterName,
 						Name:      roleName,
@@ -205,7 +205,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
@@ -237,9 +237,9 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			}
 		})
 
-		It("Executor does not have delete permission and delete option is foreground", func() {
+		It("Executor does not have delete permission and delete option is foreground", func(ctx SpecContext) {
 			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
-				context.TODO(), &rbacv1.Role{
+				ctx, &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: clusterName,
 						Name:      roleName,
@@ -255,7 +255,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
-				context.TODO(), &rbacv1.RoleBinding{
+				ctx, &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: clusterName,
 						Name:      roleName,
@@ -276,7 +276,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
@@ -290,9 +290,9 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			util.AssertNonexistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("Executor does not have delete permission and delete option is orphan", func() {
+		It("Executor does not have delete permission and delete option is orphan", func(ctx SpecContext) {
 			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
-				context.TODO(), &rbacv1.Role{
+				ctx, &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: clusterName,
 						Name:      roleName,
@@ -308,7 +308,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
-				context.TODO(), &rbacv1.RoleBinding{
+				ctx, &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: clusterName,
 						Name:      roleName,
@@ -332,7 +332,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeOrphan,
 			}
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
@@ -346,9 +346,9 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("Executor does not have delete permission and delete option is selectively orphan", func() {
+		It("Executor does not have delete permission and delete option is selectively orphan", func(ctx SpecContext) {
 			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
-				context.TODO(), &rbacv1.Role{
+				ctx, &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: clusterName,
 						Name:      roleName,
@@ -364,7 +364,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
-				context.TODO(), &rbacv1.RoleBinding{
+				ctx, &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: clusterName,
 						Name:      roleName,
@@ -397,7 +397,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				},
 			}
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
@@ -450,9 +450,9 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			}
 		})
 
-		It("no permission", func() {
+		It("no permission", func(ctx SpecContext) {
 			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
-				context.TODO(), &rbacv1.Role{
+				ctx, &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
 						Namespace: clusterName,
@@ -468,7 +468,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
-				context.TODO(), &rbacv1.RoleBinding{
+				ctx, &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
 						Namespace: clusterName,
@@ -489,7 +489,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
@@ -508,9 +508,9 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("no permission for already existing resource", func() {
+		It("no permission for already existing resource", func(ctx SpecContext) {
 			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
-				context.TODO(), &rbacv1.Role{
+				ctx, &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
 						Namespace: clusterName,
@@ -526,7 +526,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
-				context.TODO(), &rbacv1.RoleBinding{
+				ctx, &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
 						Namespace: clusterName,
@@ -548,7 +548,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 
 			// make the role exist with lower permission
 			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
-				context.TODO(), &rbacv1.Role{
+				ctx, &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "role-cm-creator",
 						Namespace: clusterName,
@@ -564,7 +564,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
@@ -584,9 +584,9 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("with permission", func() {
+		It("with permission", func(ctx SpecContext) {
 			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
-				context.TODO(), &rbacv1.Role{
+				ctx, &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
 						Namespace: clusterName,
@@ -607,7 +607,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
-				context.TODO(), &rbacv1.RoleBinding{
+				ctx, &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
 						Namespace: clusterName,
@@ -628,7 +628,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
@@ -647,9 +647,9 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("with permission for already exist resource", func() {
+		It("with permission for already exist resource", func(ctx SpecContext) {
 			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
-				context.TODO(), &rbacv1.Role{
+				ctx, &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
 						Namespace: clusterName,
@@ -670,7 +670,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
-				context.TODO(), &rbacv1.RoleBinding{
+				ctx, &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
 						Namespace: clusterName,
@@ -692,7 +692,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 
 			// make the role exist with lower permission
 			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
-				context.TODO(), &rbacv1.Role{
+				ctx, &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "role-cm-creator",
 						Namespace: clusterName,
@@ -708,7 +708,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
@@ -729,9 +729,9 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 	})
 
 	Context("Caches are in effect", func() {
-		createRBAC := func(clusterName, executorName string) {
+		createRBAC := func(ctx context.Context, clusterName, executorName string) {
 			_, err := spokeKubeClient.RbacV1().Roles(clusterName).Create(
-				context.TODO(), &rbacv1.Role{
+				ctx, &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: clusterName,
 						Name:      roleName,
@@ -747,7 +747,7 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
-				context.TODO(), &rbacv1.RoleBinding{
+				ctx, &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: clusterName,
 						Name:      roleName,
@@ -767,12 +767,12 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		}
-		deleteRBAC := func(clusterName string) {
+		deleteRBAC := func(ctx context.Context, clusterName string) {
 			err := spokeKubeClient.RbacV1().Roles(clusterName).Delete(
-				context.TODO(), roleName, metav1.DeleteOptions{})
+				ctx, roleName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Delete(
-				context.TODO(), roleName, metav1.DeleteOptions{})
+				ctx, roleName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		}
 		BeforeEach(func() {
@@ -790,9 +790,9 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			}
 		})
 
-		It("Permission change", func() {
+		It("Permission change", func(ctx SpecContext) {
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
@@ -805,8 +805,8 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			By("ensure configmaps do not exist")
 			util.AssertNonexistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			createRBAC(clusterName, executorName)
-			addConfigMapToManifestWork(hubWorkClient, work.Name, clusterName, cm2)
+			createRBAC(ctx, clusterName, executorName)
+			addConfigMapToManifestWork(ctx, hubWorkClient, work.Name, clusterName, cm2)
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
 				metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue},
@@ -818,8 +818,8 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 			By("ensure configmaps cm1 and cm2 exist")
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			deleteRBAC(clusterName)
-			addConfigMapToManifestWork(hubWorkClient, work.Name, clusterName, "cm3")
+			deleteRBAC(ctx, clusterName)
+			addConfigMapToManifestWork(ctx, hubWorkClient, work.Name, clusterName, "cm3")
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
 				metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionFalse,
@@ -845,10 +845,10 @@ var _ = Describe("ManifestWork Executor Subject", func() {
 	})
 })
 
-func addConfigMapToManifestWork(manifestWorkClient workclientset.Interface, manifestWorkName string,
+func addConfigMapToManifestWork(ctx context.Context, manifestWorkClient workclientset.Interface, manifestWorkName string,
 	clusterName string, appendConfigMapName string) {
 	manifestWork, err := manifestWorkClient.WorkV1().ManifestWorks(clusterName).Get(
-		context.TODO(), manifestWorkName, metav1.GetOptions{})
+		ctx, manifestWorkName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	oldData, err := json.Marshal(manifestWork)
@@ -863,7 +863,7 @@ func addConfigMapToManifestWork(manifestWorkClient workclientset.Interface, mani
 	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
 	Expect(err).ToNot(HaveOccurred())
 
-	_, err = manifestWorkClient.WorkV1().ManifestWorks(clusterName).Patch(context.Background(),
+	_, err = manifestWorkClient.WorkV1().ManifestWorks(clusterName).Patch(ctx,
 		manifestWorkName, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	Expect(err).ToNot(HaveOccurred())
 }

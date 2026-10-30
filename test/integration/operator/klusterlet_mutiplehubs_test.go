@@ -25,7 +25,7 @@ var _ = Describe("Deploy Klusterlet with Multiplehubs enabled", func() {
 		boostrapKubeConfigSecretHub2 = "bootstraphub2" // #nosec G101
 	)
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		By("Configure Klusterlet CR")
 		klusterlet = &operatorapiv1.Klusterlet{
 			ObjectMeta: metav1.ObjectMeta{
@@ -74,30 +74,30 @@ var _ = Describe("Deploy Klusterlet with Multiplehubs enabled", func() {
 			},
 		}
 
-		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
-		go startKlusterletOperator(ctx)
+		var runCtx context.Context
+		runCtx, cancel = context.WithCancel(context.Background())
+		go startKlusterletOperator(runCtx)
 	})
-	AfterEach(func() {
-		Expect(kubeClient.CoreV1().Namespaces().Delete(context.Background(), agentNamespace, metav1.DeleteOptions{})).Should(Succeed())
+	AfterEach(func(ctx SpecContext) {
+		Expect(kubeClient.CoreV1().Namespaces().Delete(ctx, agentNamespace, metav1.DeleteOptions{})).Should(Succeed())
 		cancel()
 	})
 
-	It("should have expected resources deployed", func() {
+	It("should have expected resources deployed", func(ctx SpecContext) {
 		var err error
 
 		By("Create 2 bootstrapKubeConfig secrets")
-		_, err = kubeClient.CoreV1().Secrets(agentNamespace).Create(context.TODO(), &corev1.Secret{
+		_, err = kubeClient.CoreV1().Secrets(agentNamespace).Create(ctx, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      boostrapKubeConfigSecretHub1,
 				Namespace: agentNamespace,
 			},
 		}, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
-		_, err = kubeClient.CoreV1().Secrets(agentNamespace).Create(context.TODO(), &corev1.Secret{
+		_, err = kubeClient.CoreV1().Secrets(agentNamespace).Create(ctx, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      boostrapKubeConfigSecretHub2,
 				Namespace: agentNamespace,
@@ -106,11 +106,11 @@ var _ = Describe("Deploy Klusterlet with Multiplehubs enabled", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create the Klusterlet")
-		_, err = operatorClient.OperatorV1().Klusterlets().Create(context.TODO(), klusterlet, metav1.CreateOptions{})
+		_, err = operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(func() error {
-			actual, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+			actual, err := operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -125,7 +125,7 @@ var _ = Describe("Deploy Klusterlet with Multiplehubs enabled", func() {
 
 		By("Check deployment")
 		Eventually(func() error {
-			deployment, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(context.Background(), fmt.Sprintf("%s-agent", klusterlet.Name), metav1.GetOptions{})
+			deployment, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(ctx, fmt.Sprintf("%s-agent", klusterlet.Name), metav1.GetOptions{})
 			if err != nil {
 				return err
 			}

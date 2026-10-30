@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -22,7 +21,7 @@ var _ = Describe("AddConfigs Beta", func() {
 	var configDefaultName string
 	var err error
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
 		configDefaultNamespace = fmt.Sprintf("default-config-%s", suffix)
@@ -37,22 +36,22 @@ var _ = Describe("AddConfigs Beta", func() {
 				HubAcceptsClient: true,
 			},
 		}
-		_, err = hubClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
+		_, err = hubClusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		clusterNS := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: managedClusterName}}
-		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), clusterNS, metav1.CreateOptions{})
+		_, err = hubKubeClient.CoreV1().Namespaces().Create(ctx, clusterNS, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// prepare ClusterManagementAddon
-		_, err = createClusterManagementAddOnBeta(testAddOnConfigsImpl.name, configDefaultNamespace, configDefaultName)
+		_, err = createClusterManagementAddOnBeta(ctx, testAddOnConfigsImpl.name, configDefaultNamespace, configDefaultName)
 		Expect(err).ToNot(HaveOccurred())
 
-		assertClusterManagementAddOnAnnotationsBeta(testAddOnConfigsImpl.name)
+		assertClusterManagementAddOnAnnotationsBeta(ctx, testAddOnConfigsImpl.name)
 
 		// prepare default config
 		configDefaultNS := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: configDefaultNamespace}}
-		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), configDefaultNS, metav1.CreateOptions{})
+		_, err = hubKubeClient.CoreV1().Namespaces().Create(ctx, configDefaultNS, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		addOnDefaultConfig := &addonapiv1beta1.AddOnDeploymentConfig{
@@ -63,23 +62,23 @@ var _ = Describe("AddConfigs Beta", func() {
 			Spec: addOnDefaultConfigSpecBeta,
 		}
 		_, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(configDefaultNamespace).Create(
-			context.Background(), addOnDefaultConfig, metav1.CreateOptions{})
+			ctx, addOnDefaultConfig, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	AfterEach(func() {
-		err = hubKubeClient.CoreV1().Namespaces().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err = hubKubeClient.CoreV1().Namespaces().Delete(ctx, managedClusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
-		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
+		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(ctx, managedClusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
-		err = hubKubeClient.CoreV1().Namespaces().Delete(context.Background(), configDefaultNamespace, metav1.DeleteOptions{})
+		err = hubKubeClient.CoreV1().Namespaces().Delete(ctx, configDefaultNamespace, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
-		err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Delete(context.Background(), testAddOnConfigsImpl.name, metav1.DeleteOptions{})
+		err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Delete(ctx, testAddOnConfigsImpl.name, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		delete(testAddOnConfigsImpl.registrations, managedClusterName)
 	})
 
-	It("Should use default config", func() {
+	It("Should use default config", func(ctx SpecContext) {
 		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      testAddOnConfigsImpl.name,
@@ -87,11 +86,11 @@ var _ = Describe("AddConfigs Beta", func() {
 			},
 			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{},
 		}
-		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(ctx, addon, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// check cma status
-		assertClusterManagementAddOnDefaultConfigReferencesBeta(testAddOnConfigsImpl.name, addonapiv1beta1.DefaultConfigReference{
+		assertClusterManagementAddOnDefaultConfigReferencesBeta(ctx, testAddOnConfigsImpl.name, addonapiv1beta1.DefaultConfigReference{
 			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    addOnDeploymentConfigGVR.Group,
 				Resource: addOnDeploymentConfigGVR.Resource,
@@ -104,10 +103,10 @@ var _ = Describe("AddConfigs Beta", func() {
 				SpecHash: addOnDefaultConfigSpecHash,
 			},
 		})
-		assertClusterManagementAddOnInstallProgressionBeta(testAddOnConfigsImpl.name)
+		assertClusterManagementAddOnInstallProgressionBeta(ctx, testAddOnConfigsImpl.name)
 
 		// check mca status
-		assertManagedClusterAddOnConfigReferencesBeta(testAddOnConfigsImpl.name, managedClusterName, addonapiv1beta1.ConfigReference{
+		assertManagedClusterAddOnConfigReferencesBeta(ctx, testAddOnConfigsImpl.name, managedClusterName, addonapiv1beta1.ConfigReference{
 			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    addOnDeploymentConfigGVR.Group,
 				Resource: addOnDeploymentConfigGVR.Resource,
@@ -123,8 +122,8 @@ var _ = Describe("AddConfigs Beta", func() {
 		})
 	})
 
-	It("Should override default config by install strategy", func() {
-		cma, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), testAddOnConfigsImpl.name, metav1.GetOptions{})
+	It("Should override default config by install strategy", func(ctx SpecContext) {
+		cma, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(ctx, testAddOnConfigsImpl.name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		cma.Spec.InstallStrategy = addonapiv1beta1.InstallStrategy{
@@ -150,10 +149,10 @@ var _ = Describe("AddConfigs Beta", func() {
 				},
 			},
 		}
-		patchClusterManagementAddOnBeta(context.Background(), cma)
+		patchClusterManagementAddOnBeta(ctx, cma)
 
 		placement := &clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: configDefaultNamespace}}
-		_, err = hubClusterClient.ClusterV1beta1().Placements(configDefaultNamespace).Create(context.Background(), placement, metav1.CreateOptions{})
+		_, err = hubClusterClient.ClusterV1beta1().Placements(configDefaultNamespace).Create(ctx, placement, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		decision := &clusterv1beta1.PlacementDecision{
@@ -166,17 +165,17 @@ var _ = Describe("AddConfigs Beta", func() {
 				},
 			},
 		}
-		decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(configDefaultNamespace).Create(context.Background(), decision, metav1.CreateOptions{})
+		decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(configDefaultNamespace).Create(ctx, decision, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		decision.Status.Decisions = []clusterv1beta1.ClusterDecision{
 			{ClusterName: managedClusterName},
 		}
-		_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(configDefaultNamespace).UpdateStatus(context.Background(), decision, metav1.UpdateOptions{})
+		_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(configDefaultNamespace).UpdateStatus(ctx, decision, metav1.UpdateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// check cma status
-		assertClusterManagementAddOnDefaultConfigReferencesBeta(testAddOnConfigsImpl.name, addonapiv1beta1.DefaultConfigReference{
+		assertClusterManagementAddOnDefaultConfigReferencesBeta(ctx, testAddOnConfigsImpl.name, addonapiv1beta1.DefaultConfigReference{
 			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    addOnDeploymentConfigGVR.Group,
 				Resource: addOnDeploymentConfigGVR.Resource,
@@ -189,7 +188,7 @@ var _ = Describe("AddConfigs Beta", func() {
 				SpecHash: addOnDefaultConfigSpecHash,
 			},
 		})
-		assertClusterManagementAddOnInstallProgressionBeta(testAddOnConfigsImpl.name, addonapiv1beta1.InstallProgression{
+		assertClusterManagementAddOnInstallProgressionBeta(ctx, testAddOnConfigsImpl.name, addonapiv1beta1.InstallProgression{
 			PlacementRef: addonapiv1beta1.PlacementRef{Name: "test-placement", Namespace: configDefaultNamespace},
 			ConfigReferences: []addonapiv1beta1.InstallConfigReference{
 				{
@@ -209,7 +208,7 @@ var _ = Describe("AddConfigs Beta", func() {
 		})
 
 		// check mca status
-		assertManagedClusterAddOnConfigReferencesBeta(testAddOnConfigsImpl.name, managedClusterName, addonapiv1beta1.ConfigReference{
+		assertManagedClusterAddOnConfigReferencesBeta(ctx, testAddOnConfigsImpl.name, managedClusterName, addonapiv1beta1.ConfigReference{
 			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    addOnDeploymentConfigGVR.Group,
 				Resource: addOnDeploymentConfigGVR.Resource,
@@ -225,7 +224,7 @@ var _ = Describe("AddConfigs Beta", func() {
 		})
 	})
 
-	It("Should override default config", func() {
+	It("Should override default config", func(ctx SpecContext) {
 		addOnConfig := &addonapiv1beta1.AddOnDeploymentConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "addon-config",
@@ -233,7 +232,7 @@ var _ = Describe("AddConfigs Beta", func() {
 			},
 			Spec: addOnTest1ConfigSpecBeta,
 		}
-		_, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Create(context.Background(), addOnConfig, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Create(ctx, addOnConfig, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		addon := &addonapiv1beta1.ManagedClusterAddOn{
@@ -256,7 +255,7 @@ var _ = Describe("AddConfigs Beta", func() {
 				},
 			},
 		}
-		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(ctx, addon, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		addon.Status = addonapiv1beta1.ManagedClusterAddOnStatus{
@@ -267,10 +266,10 @@ var _ = Describe("AddConfigs Beta", func() {
 				},
 			},
 		}
-		updateManagedClusterAddOnStatusBeta(context.Background(), addon)
+		updateManagedClusterAddOnStatusBeta(ctx, addon)
 
 		// check cma status
-		assertClusterManagementAddOnDefaultConfigReferencesBeta(testAddOnConfigsImpl.name, addonapiv1beta1.DefaultConfigReference{
+		assertClusterManagementAddOnDefaultConfigReferencesBeta(ctx, testAddOnConfigsImpl.name, addonapiv1beta1.DefaultConfigReference{
 			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    addOnDeploymentConfigGVR.Group,
 				Resource: addOnDeploymentConfigGVR.Resource,
@@ -283,10 +282,10 @@ var _ = Describe("AddConfigs Beta", func() {
 				SpecHash: addOnDefaultConfigSpecHash,
 			},
 		})
-		assertClusterManagementAddOnInstallProgressionBeta(testAddOnConfigsImpl.name)
+		assertClusterManagementAddOnInstallProgressionBeta(ctx, testAddOnConfigsImpl.name)
 
 		// check mca status
-		assertManagedClusterAddOnConfigReferencesBeta(testAddOnConfigsImpl.name, managedClusterName, addonapiv1beta1.ConfigReference{
+		assertManagedClusterAddOnConfigReferencesBeta(ctx, testAddOnConfigsImpl.name, managedClusterName, addonapiv1beta1.ConfigReference{
 			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    addOnDeploymentConfigGVR.Group,
 				Resource: addOnDeploymentConfigGVR.Resource,
@@ -302,7 +301,7 @@ var _ = Describe("AddConfigs Beta", func() {
 		})
 	})
 
-	It("Should update config spec successfully", func() {
+	It("Should update config spec successfully", func(ctx SpecContext) {
 		addOnConfig := &addonapiv1beta1.AddOnDeploymentConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "addon-config",
@@ -310,7 +309,7 @@ var _ = Describe("AddConfigs Beta", func() {
 			},
 			Spec: addOnTest1ConfigSpecBeta,
 		}
-		_, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Create(context.Background(), addOnConfig, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Create(ctx, addOnConfig, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		addon := &addonapiv1beta1.ManagedClusterAddOn{
@@ -333,7 +332,7 @@ var _ = Describe("AddConfigs Beta", func() {
 				},
 			},
 		}
-		addon, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
+		addon, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(ctx, addon, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		addon.Status = addonapiv1beta1.ManagedClusterAddOnStatus{
@@ -344,10 +343,10 @@ var _ = Describe("AddConfigs Beta", func() {
 				},
 			},
 		}
-		updateManagedClusterAddOnStatusBeta(context.Background(), addon)
+		updateManagedClusterAddOnStatusBeta(ctx, addon)
 
 		// check mca status
-		assertManagedClusterAddOnConfigReferencesBeta(testAddOnConfigsImpl.name, managedClusterName, addonapiv1beta1.ConfigReference{
+		assertManagedClusterAddOnConfigReferencesBeta(ctx, testAddOnConfigsImpl.name, managedClusterName, addonapiv1beta1.ConfigReference{
 			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    addOnDeploymentConfigGVR.Group,
 				Resource: addOnDeploymentConfigGVR.Resource,
@@ -362,15 +361,15 @@ var _ = Describe("AddConfigs Beta", func() {
 			},
 		})
 
-		addOnConfig, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Get(context.Background(), addOnConfig.Name, metav1.GetOptions{})
+		addOnConfig, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Get(ctx, addOnConfig.Name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		addOnConfig.Spec = addOnTest2ConfigSpecBeta
-		_, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Update(context.Background(), addOnConfig, metav1.UpdateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Update(ctx, addOnConfig, metav1.UpdateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// check mca status
-		assertManagedClusterAddOnConfigReferencesBeta(testAddOnConfigsImpl.name, managedClusterName, addonapiv1beta1.ConfigReference{
+		assertManagedClusterAddOnConfigReferencesBeta(ctx, testAddOnConfigsImpl.name, managedClusterName, addonapiv1beta1.ConfigReference{
 			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    addOnDeploymentConfigGVR.Group,
 				Resource: addOnDeploymentConfigGVR.Resource,
@@ -386,7 +385,7 @@ var _ = Describe("AddConfigs Beta", func() {
 		})
 	})
 
-	It("Should not update unsupported config spec hash", func() {
+	It("Should not update unsupported config spec hash", func(ctx SpecContext) {
 		// do not update mca status.SupportedConfigs
 		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
@@ -408,11 +407,11 @@ var _ = Describe("AddConfigs Beta", func() {
 				},
 			},
 		}
-		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(ctx, addon, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// check mca status
-		assertManagedClusterAddOnConfigReferencesBeta(testAddOnConfigsImpl.name, managedClusterName, addonapiv1beta1.ConfigReference{
+		assertManagedClusterAddOnConfigReferencesBeta(ctx, testAddOnConfigsImpl.name, managedClusterName, addonapiv1beta1.ConfigReference{
 			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    addOnDeploymentConfigGVR.Group,
 				Resource: addOnDeploymentConfigGVR.Resource,
@@ -441,7 +440,7 @@ var _ = Describe("AddConfigs Beta", func() {
 		})
 	})
 
-	It("Should preserve config reference ordering for multiple same-GVK configs in a placement", func() {
+	It("Should preserve config reference ordering for multiple same-GVK configs in a placement", func(ctx SpecContext) {
 		// Create two AddonDeploymentConfigs of the same GVK in the placement namespace.
 		// The ordering in the CMA placement spec should be preserved in both the CMA status
 		// InstallProgressions and the MCA status ConfigReferences.
@@ -453,7 +452,7 @@ var _ = Describe("AddConfigs Beta", func() {
 			Spec: addOnTest1ConfigSpecBeta,
 		}
 		_, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(configDefaultNamespace).Create(
-			context.Background(), config1, metav1.CreateOptions{})
+			ctx, config1, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		config2 := &addonapiv1beta1.AddOnDeploymentConfig{
@@ -464,13 +463,13 @@ var _ = Describe("AddConfigs Beta", func() {
 			Spec: addOnTest2ConfigSpecBeta,
 		}
 		_, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(configDefaultNamespace).Create(
-			context.Background(), config2, metav1.CreateOptions{})
+			ctx, config2, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// Patch CMA to use a placement strategy with 2 configs of the same GVK.
 		// The ordering config-first → config-second must be preserved.
 		cma, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(
-			context.Background(), testAddOnConfigsImpl.name, metav1.GetOptions{})
+			ctx, testAddOnConfigsImpl.name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		cma.Spec.InstallStrategy = addonapiv1beta1.InstallStrategy{
@@ -509,14 +508,14 @@ var _ = Describe("AddConfigs Beta", func() {
 				},
 			},
 		}
-		patchClusterManagementAddOnBeta(context.Background(), cma)
+		patchClusterManagementAddOnBeta(ctx, cma)
 
 		// Create placement and placement decision so the cluster is selected.
 		placement := &clusterv1beta1.Placement{
 			ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: configDefaultNamespace},
 		}
 		_, err = hubClusterClient.ClusterV1beta1().Placements(configDefaultNamespace).Create(
-			context.Background(), placement, metav1.CreateOptions{})
+			ctx, placement, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		decision := &clusterv1beta1.PlacementDecision{
@@ -530,18 +529,18 @@ var _ = Describe("AddConfigs Beta", func() {
 			},
 		}
 		decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(configDefaultNamespace).Create(
-			context.Background(), decision, metav1.CreateOptions{})
+			ctx, decision, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		decision.Status.Decisions = []clusterv1beta1.ClusterDecision{
 			{ClusterName: managedClusterName},
 		}
 		_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(configDefaultNamespace).UpdateStatus(
-			context.Background(), decision, metav1.UpdateOptions{})
+			ctx, decision, metav1.UpdateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// CMA status: InstallProgressions should have both configs in spec order (config-first → config-second).
-		assertClusterManagementAddOnInstallProgressionBeta(testAddOnConfigsImpl.name, addonapiv1beta1.InstallProgression{
+		assertClusterManagementAddOnInstallProgressionBeta(ctx, testAddOnConfigsImpl.name, addonapiv1beta1.InstallProgression{
 			PlacementRef: addonapiv1beta1.PlacementRef{Name: "test-placement", Namespace: configDefaultNamespace},
 			ConfigReferences: []addonapiv1beta1.InstallConfigReference{
 				{
@@ -574,7 +573,7 @@ var _ = Describe("AddConfigs Beta", func() {
 		})
 
 		// MCA status: ConfigReferences should reflect the same order (config-first → config-second).
-		assertManagedClusterAddOnConfigReferencesBeta(testAddOnConfigsImpl.name, managedClusterName,
+		assertManagedClusterAddOnConfigReferencesBeta(ctx, testAddOnConfigsImpl.name, managedClusterName,
 			addonapiv1beta1.ConfigReference{
 				ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 					Group:    addOnDeploymentConfigGVR.Group,

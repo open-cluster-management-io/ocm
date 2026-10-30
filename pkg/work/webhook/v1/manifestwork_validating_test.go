@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -33,11 +32,11 @@ var manifestWorkSchema = metav1.GroupVersionResource{
 
 func TestValidateCreateUpdate(t *testing.T) {
 	w := ManifestWorkWebhook{}
-	_, err := w.ValidateUpdate(context.Background(), nil, &workv1.ManifestWork{})
+	_, err := w.ValidateUpdate(t.Context(), nil, &workv1.ManifestWork{})
 	if err == nil {
 		t.Errorf("Non work obj, Expect Error but got nil")
 	}
-	_, err = w.ValidateUpdate(context.Background(), &workv1.ManifestWork{}, nil)
+	_, err = w.ValidateUpdate(t.Context(), &workv1.ManifestWork{}, nil)
 	if err == nil {
 		t.Errorf("Non work obj, Expect Error but got nil")
 	}
@@ -370,7 +369,7 @@ func TestManifestWorkExecutorValidate(t *testing.T) {
 			mw := ManifestWorkWebhook{
 				kubeClient: kubeClient,
 			}
-			ctx := admission.NewContextWithRequest(context.Background(), c.request)
+			ctx := admission.NewContextWithRequest(t.Context(), c.request)
 			newWork, _ := spoketesting.NewManifestWork(0, c.manifests...)
 			var oldWork *workv1.ManifestWork
 			if c.request.Operation == "UPDATE" {

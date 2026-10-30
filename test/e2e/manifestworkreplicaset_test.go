@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -35,7 +34,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 	})
 
 	Context("Creating a ManifestWorkReplicaSet and check created resources", func() {
-		It("Should create ManifestWorkReplicaSet successfully", func() {
+		It("Should create ManifestWorkReplicaSet successfully", func(ctx SpecContext) {
 			By("create manifestworkreplicaset")
 			ns1 := fmt.Sprintf("ns1-%s", nameSuffix)
 			work := newManifestWork("", "",
@@ -64,7 +63,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 				},
 			}
 			manifestWorkReplicaSet, err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(metav1.NamespaceDefault).Create(
-				context.TODO(), manifestWorkReplicaSet, metav1.CreateOptions{})
+				ctx, manifestWorkReplicaSet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			csb := &clusterapiv1beta2.ManagedClusterSetBinding{
@@ -77,7 +76,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 				},
 			}
 			_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(metav1.NamespaceDefault).Create(
-				context.Background(), csb, metav1.CreateOptions{})
+				ctx, csb, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			placement := &clusterv1beta1.Placement{
@@ -90,29 +89,29 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 				},
 			}
 
-			placement, err = hub.ClusterClient.ClusterV1beta1().Placements(placement.Namespace).Create(context.TODO(), placement, metav1.CreateOptions{})
+			placement, err = hub.ClusterClient.ClusterV1beta1().Placements(placement.Namespace).Create(ctx, placement, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("check if resources are applied for manifests")
 			Eventually(func() error {
-				_, err := spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm1", metav1.GetOptions{})
+				_, err := spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(ctx, "cm1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm2", metav1.GetOptions{})
+				_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(ctx, "cm2", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				_, err = spoke.KubeClient.CoreV1().Namespaces().Get(context.Background(), ns1, metav1.GetOptions{})
+				_, err = spoke.KubeClient.CoreV1().Namespaces().Get(ctx, ns1, metav1.GetOptions{})
 				return err
 			}).ShouldNot(HaveOccurred())
 
 			By("check if manifestworkreplicaset status")
 			Eventually(func() error {
 				mwrs, err := hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(metav1.NamespaceDefault).Get(
-					context.TODO(), manifestWorkReplicaSet.Name, metav1.GetOptions{})
+					ctx, manifestWorkReplicaSet.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -137,10 +136,10 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 			// TODO we should also update manifestwork replicaset and test
 
 			err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(metav1.NamespaceDefault).Delete(
-				context.TODO(), manifestWorkReplicaSet.Name, metav1.DeleteOptions{})
+				ctx, manifestWorkReplicaSet.Name, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			err = hub.ClusterClient.ClusterV1beta1().Placements(placement.Namespace).Delete(context.TODO(), placement.Name, metav1.DeleteOptions{})
+			err = hub.ClusterClient.ClusterV1beta1().Placements(placement.Namespace).Delete(ctx, placement.Name, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -154,7 +153,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 		var mwReplicaSetName string
 		var numOfClusters = 3
 
-		JustBeforeEach(func() {
+		JustBeforeEach(func(ctx SpecContext) {
 			suffix = rand.String(6)
 			clusterNamePrefix = fmt.Sprintf("cls-%s", suffix)
 			clusterSetName = fmt.Sprintf("clusterset-%s", suffix)
@@ -168,7 +167,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 					Name: namespace,
 				},
 			}
-			_, err := hub.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+			_, err := hub.KubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("Create clusterset %s and clustersetbinding %s", clusterSetName, clusterSetName))
@@ -177,7 +176,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 					Name: clusterSetName,
 				},
 			}
-			_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+			_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, clusterset, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			csb := &clusterapiv1beta2.ManagedClusterSetBinding{
@@ -189,7 +188,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 					ClusterSet: clusterSetName,
 				},
 			}
-			_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+			_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(ctx, csb, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("Create %d clusters", numOfClusters))
@@ -203,7 +202,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 						},
 					},
 				}
-				_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
+				_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Create(ctx, cluster, metav1.CreateOptions{})
 				Expect(err).ToNot(HaveOccurred())
 
 				ns := &corev1.Namespace{
@@ -211,7 +210,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 						Name: clsName,
 					},
 				}
-				_, err = hub.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+				_, err = hub.KubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 				Expect(err).ToNot(HaveOccurred())
 			}
 
@@ -231,35 +230,35 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 				},
 			}
 
-			_, err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Create(context.TODO(), placement, metav1.CreateOptions{})
+			_, err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Create(ctx, placement, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		JustAfterEach(func() {
+		JustAfterEach(func(ctx SpecContext) {
 			// delete namespace
-			err := hub.KubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+			err := hub.KubeClient.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// delete clusters created
-			clusterList, err := hub.ClusterClient.ClusterV1().ManagedClusters().List(context.Background(), metav1.ListOptions{
+			clusterList, err := hub.ClusterClient.ClusterV1().ManagedClusters().List(ctx, metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s", clusterapiv1beta2.ClusterSetLabel, clusterSetName),
 			})
 			Expect(err).ToNot(HaveOccurred())
 			for _, cluster := range clusterList.Items {
-				err = hub.ClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), cluster.Name, metav1.DeleteOptions{})
+				err = hub.ClusterClient.ClusterV1().ManagedClusters().Delete(ctx, cluster.Name, metav1.DeleteOptions{})
 				Expect(err).ToNot(HaveOccurred())
 			}
 
 			// delete created clusterset
-			err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
+			err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Delete(ctx, clusterSetName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// delete placement
-			err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Delete(context.TODO(), placementName, metav1.DeleteOptions{})
+			err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Delete(ctx, placementName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("Create ManifestWorkReplicaSet and check the created manifestWorks", func() {
+		It("Create ManifestWorkReplicaSet and check the created manifestWorks", func(ctx SpecContext) {
 			By(fmt.Sprintf("Create manifestWorkReplicaSet %s", mwReplicaSetName))
 			manifest := workapiv1.Manifest{}
 			manifest.Object = util.NewConfigmap("default", "cm", map[string]string{"a": "b"}, nil)
@@ -290,12 +289,12 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 					PlacementRefs: []workapiv1alpha1.LocalPlacementReference{placementRef},
 				},
 			}
-			_, err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Create(context.TODO(), mwReplicaSet, metav1.CreateOptions{})
+			_, err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Create(ctx, mwReplicaSet, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Check manifestWork replicaSet status is updated")
 			Eventually(func() error {
-				mwrSet, err := hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Get(context.TODO(), mwReplicaSetName, metav1.GetOptions{})
+				mwrSet, err := hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Get(ctx, mwReplicaSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -312,7 +311,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 
 			By("Check manifestWorks are created")
 			Eventually(func() error {
-				manifestWorkList, err := hub.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
+				manifestWorkList, err := hub.WorkClient.WorkV1().ManifestWorks("").List(ctx, metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s.%s", mwrSetLabel, namespace, mwReplicaSetName),
 				})
 				if err != nil {
@@ -326,12 +325,12 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 			}).Should(Succeed())
 
 			By("Delete manifestWorkReplicaSet")
-			err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Delete(context.TODO(), mwReplicaSetName, metav1.DeleteOptions{})
+			err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Delete(ctx, mwReplicaSetName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Check manifestworks are deleted")
 			Eventually(func() error {
-				manifestWorkList, err := hub.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
+				manifestWorkList, err := hub.WorkClient.WorkV1().ManifestWorks("").List(ctx, metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s.%s", mwrSetLabel, namespace, mwReplicaSetName),
 				})
 				if err != nil {
@@ -345,7 +344,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 			}).Should(Succeed())
 		})
 
-		It("delete ManifestWorkReplicaSet Foreground", func() {
+		It("delete ManifestWorkReplicaSet Foreground", func(ctx SpecContext) {
 			By(fmt.Sprintf("Create manifestWorkReplicaSet %s with Foreground", mwReplicaSetName))
 			manifest := workapiv1.Manifest{}
 			manifest.Object = util.NewConfigmap("default", "cm", map[string]string{"a": "b"}, nil)
@@ -377,12 +376,12 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 					PlacementRefs:         []workapiv1alpha1.LocalPlacementReference{placementRef},
 				},
 			}
-			_, err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Create(context.TODO(), mwReplicaSet, metav1.CreateOptions{})
+			_, err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Create(ctx, mwReplicaSet, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Check manifestWork replicaSet status is updated")
 			Eventually(func() error {
-				mwrSet, err := hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Get(context.TODO(), mwReplicaSetName, metav1.GetOptions{})
+				mwrSet, err := hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Get(ctx, mwReplicaSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -400,7 +399,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 			By("Check manifestWorks are created")
 			manifestWorkList := &workapiv1.ManifestWorkList{}
 			Eventually(func() error {
-				manifestWorkList, err = hub.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
+				manifestWorkList, err = hub.WorkClient.WorkV1().ManifestWorks("").List(ctx, metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s.%s", mwrSetLabel, namespace, mwReplicaSetName),
 				})
 				if err != nil {
@@ -417,7 +416,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 			leftWork := manifestWorkList.Items[0].DeepCopy()
 			Eventually(func() error {
 				leftWork.Finalizers = append(leftWork.Finalizers, "test")
-				_, err = hub.WorkClient.WorkV1().ManifestWorks(leftWork.Namespace).Update(context.TODO(), leftWork, metav1.UpdateOptions{})
+				_, err = hub.WorkClient.WorkV1().ManifestWorks(leftWork.Namespace).Update(ctx, leftWork, metav1.UpdateOptions{})
 				if err != nil {
 					return fmt.Errorf("failed to update work %v, %v", leftWork.Name, err)
 				}
@@ -425,12 +424,12 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 			}).Should(Succeed())
 
 			By("Delete manifestWorkReplicaSet")
-			err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Delete(context.TODO(), mwReplicaSetName, metav1.DeleteOptions{})
+			err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Delete(ctx, mwReplicaSetName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Check manifestworks are deleted")
 			Eventually(func() error {
-				manifestWorkList, err := hub.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
+				manifestWorkList, err := hub.WorkClient.WorkV1().ManifestWorks("").List(ctx, metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s.%s", mwrSetLabel, namespace, mwReplicaSetName),
 				})
 				if err != nil {
@@ -450,7 +449,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 			By("Check manifestWorkReplicaSet is deleting")
 			Eventually(func() error {
 				workset, err := hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).
-					Get(context.TODO(), mwReplicaSetName, metav1.GetOptions{})
+					Get(ctx, mwReplicaSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -465,19 +464,19 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 
 			By("Remove finalizer from the manifestwork")
 			copyLeftWork, err := hub.WorkClient.WorkV1().ManifestWorks(leftWork.Namespace).
-				Get(context.TODO(), leftWork.Name, metav1.GetOptions{})
+				Get(ctx, leftWork.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
 				copyLeftWork.Finalizers = []string{}
 				_, err = hub.WorkClient.WorkV1().ManifestWorks(copyLeftWork.Namespace).
-					Update(context.TODO(), copyLeftWork, metav1.UpdateOptions{})
+					Update(ctx, copyLeftWork, metav1.UpdateOptions{})
 				return err
 			}).Should(Succeed())
 
 			By("The manifestworks and ManifestWorkReplicaSet should be deleted")
 			Eventually(func() error {
-				manifestWorkList, err = hub.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
+				manifestWorkList, err = hub.WorkClient.WorkV1().ManifestWorks("").List(ctx, metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s.%s", mwrSetLabel, namespace, mwReplicaSetName),
 				})
 				if err != nil {
@@ -489,7 +488,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 				}
 
 				_, err := hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).
-					Get(context.TODO(), mwReplicaSetName, metav1.GetOptions{})
+					Get(ctx, mwReplicaSetName, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
 					return nil
 				}

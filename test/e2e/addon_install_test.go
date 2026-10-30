@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -23,7 +22,7 @@ var _ = Describe("Addon install with install strategy (v1beta1)", Ordered, Label
 	var clusterNames []string
 	const globalSetNamespace = "open-cluster-management-global-set"
 
-	BeforeAll(func() {
+	BeforeAll(func(ctx SpecContext) {
 		suffix := rand.String(6)
 		addOnName = fmt.Sprintf("addon-%s", suffix)
 		clusterNames = nil
@@ -34,7 +33,7 @@ var _ = Describe("Addon install with install strategy (v1beta1)", Ordered, Label
 				Name: globalSetNamespace,
 			},
 		}
-		_, err := hub.KubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+		_, err := hub.KubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			Expect(err).ToNot(HaveOccurred())
 		}
@@ -66,7 +65,7 @@ var _ = Describe("Addon install with install strategy (v1beta1)", Ordered, Label
 			},
 		}
 		_, err = hub.ClusterClient.ClusterV1beta1().Placements(globalSetNamespace).Create(
-			context.TODO(), placement, metav1.CreateOptions{})
+			ctx, placement, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			Expect(err).ToNot(HaveOccurred())
 		}
@@ -82,7 +81,7 @@ var _ = Describe("Addon install with install strategy (v1beta1)", Ordered, Label
 			},
 		}
 		_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(globalSetNamespace).Create(
-			context.TODO(), binding, metav1.CreateOptions{})
+			ctx, binding, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			Expect(err).ToNot(HaveOccurred())
 		}
@@ -110,14 +109,14 @@ var _ = Describe("Addon install with install strategy (v1beta1)", Ordered, Label
 			},
 		}
 		_, err = hub.AddonClient.AddonV1beta1().ClusterManagementAddOns().Create(
-			context.TODO(), cma, metav1.CreateOptions{})
+			ctx, cma, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	AfterAll(func() {
+	AfterAll(func(ctx SpecContext) {
 		By(fmt.Sprintf("delete ClusterManagementAddOn %s", addOnName))
 		err := hub.AddonClient.AddonV1beta1().ClusterManagementAddOns().Delete(
-			context.TODO(), addOnName, metav1.DeleteOptions{})
+			ctx, addOnName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			Expect(err).ToNot(HaveOccurred())
 		}
@@ -125,7 +124,7 @@ var _ = Describe("Addon install with install strategy (v1beta1)", Ordered, Label
 		for _, clusterName := range clusterNames {
 			By(fmt.Sprintf("delete ManagedCluster %s", clusterName))
 			err := hub.ClusterClient.ClusterV1().ManagedClusters().Delete(
-				context.TODO(), clusterName, metav1.DeleteOptions{})
+				ctx, clusterName, metav1.DeleteOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				Expect(err).ToNot(HaveOccurred())
 			}
@@ -133,14 +132,14 @@ var _ = Describe("Addon install with install strategy (v1beta1)", Ordered, Label
 
 		By("delete namespace " + globalSetNamespace)
 		err = hub.KubeClient.CoreV1().Namespaces().Delete(
-			context.TODO(), globalSetNamespace, metav1.DeleteOptions{})
+			ctx, globalSetNamespace, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			Expect(err).ToNot(HaveOccurred())
 		}
 
 		Eventually(func() error {
 			_, err := hub.KubeClient.CoreV1().Namespaces().Get(
-				context.TODO(), globalSetNamespace, metav1.GetOptions{})
+				ctx, globalSetNamespace, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return nil
 			}
@@ -151,7 +150,7 @@ var _ = Describe("Addon install with install strategy (v1beta1)", Ordered, Label
 		}).Should(Succeed())
 	})
 
-	It("Should create addon without addon annotations when managed cluster has no addon annotations", func() {
+	It("Should create addon without addon annotations when managed cluster has no addon annotations", func(ctx SpecContext) {
 		clusterName := fmt.Sprintf("e2e-addon-install-%s", rand.String(6))
 		clusterNames = append(clusterNames, clusterName)
 
@@ -169,13 +168,13 @@ var _ = Describe("Addon install with install strategy (v1beta1)", Ordered, Label
 			},
 		}
 		_, err := hub.ClusterClient.ClusterV1().ManagedClusters().Create(
-			context.TODO(), managedCluster, metav1.CreateOptions{})
+			ctx, managedCluster, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("check ManagedClusterAddOn %s is created in cluster namespace %s", addOnName, clusterName))
 		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Get(
-				context.TODO(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -194,7 +193,7 @@ var _ = Describe("Addon install with install strategy (v1beta1)", Ordered, Label
 		}).Should(Succeed())
 	})
 
-	It("Should sync addon annotations from managed cluster to addon", func() {
+	It("Should sync addon annotations from managed cluster to addon", func(ctx SpecContext) {
 		clusterName := fmt.Sprintf("e2e-addon-install-%s", rand.String(6))
 		clusterNames = append(clusterNames, clusterName)
 
@@ -214,13 +213,13 @@ var _ = Describe("Addon install with install strategy (v1beta1)", Ordered, Label
 			},
 		}
 		_, err := hub.ClusterClient.ClusterV1().ManagedClusters().Create(
-			context.TODO(), managedCluster, metav1.CreateOptions{})
+			ctx, managedCluster, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("check ManagedClusterAddOn %s is created with synced annotations", addOnName))
 		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Get(
-				context.TODO(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -240,20 +239,20 @@ var _ = Describe("Addon install with install strategy (v1beta1)", Ordered, Label
 		By(fmt.Sprintf("update annotation on ManagedCluster %s", clusterName))
 		Eventually(func() error {
 			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
-				context.TODO(), clusterName, metav1.GetOptions{})
+				ctx, clusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			cluster.Annotations["addon.open-cluster-management.io/test-annotation"] = "updated-value"
 			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
-				context.TODO(), cluster, metav1.UpdateOptions{})
+				ctx, cluster, metav1.UpdateOptions{})
 			return err
 		}).Should(Succeed())
 
 		By(fmt.Sprintf("check updated annotation is synced to ManagedClusterAddOn %s", addOnName))
 		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Get(
-				context.TODO(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}

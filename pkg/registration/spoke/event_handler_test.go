@@ -127,7 +127,7 @@ func TestBootstrapKubeconfigEventHandler(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			secretName := defaultSecretName
 			bootstrapKubeconfigSecretName := &secretName
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 
 			hc := &bootstrapKubeconfigEventHandler{
 				bootstrapKubeconfigSecretName: bootstrapKubeconfigSecretName,

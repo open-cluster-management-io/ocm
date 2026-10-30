@@ -1,7 +1,6 @@
 package managedclusterset
 
 import (
-	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -237,7 +236,7 @@ func TestSyncClusterSet(t *testing.T) {
 				clusterSetLister: informerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
 			}
 
-			syncErr := ctrl.syncClusterSet(context.Background(), c.existingClusterSet)
+			syncErr := ctrl.syncClusterSet(t.Context(), c.existingClusterSet)
 			if c.expectErr {
 				if syncErr != nil {
 					return
@@ -248,7 +247,7 @@ func TestSyncClusterSet(t *testing.T) {
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}
-			updatedSet, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), c.existingClusterSet.Name, metav1.GetOptions{})
+			updatedSet, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(t.Context(), c.existingClusterSet.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("Failed to get clusterset: %v, error: %v", c.existingClusterSet.Name, err)
 			}

@@ -23,11 +23,11 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-func updateDeploymentsStatusSuccess(kubeClient kubernetes.Interface, namespace string, deployments ...string) {
+func updateDeploymentsStatusSuccess(ctx context.Context, kubeClient kubernetes.Interface, namespace string, deployments ...string) {
 	for _, deploymentName := range deployments {
 		Eventually(func() error {
 			deployment, err := kubeClient.AppsV1().Deployments(namespace).Get(
-				context.Background(), deploymentName, metav1.GetOptions{})
+				ctx, deploymentName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -36,36 +36,36 @@ func updateDeploymentsStatusSuccess(kubeClient kubernetes.Interface, namespace s
 			deployment.Status.AvailableReplicas = *deployment.Spec.Replicas
 			deployment.Status.ObservedGeneration = deployment.Generation
 			_, err = kubeClient.AppsV1().Deployments(namespace).UpdateStatus(
-				context.Background(), deployment, metav1.UpdateOptions{})
+				ctx, deployment, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 	}
 }
 
-func updateAllDeploymentsStatusSuccess(kubeClient kubernetes.Interface, namespace string) {
-	deployments, err := kubeClient.AppsV1().Deployments(namespace).List(context.Background(), metav1.ListOptions{})
+func updateAllDeploymentsStatusSuccess(ctx context.Context, kubeClient kubernetes.Interface, namespace string) {
+	deployments, err := kubeClient.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	var names []string
 	for _, d := range deployments.Items {
 		names = append(names, d.Name)
 	}
-	updateDeploymentsStatusSuccess(kubeClient, namespace, names...)
+	updateDeploymentsStatusSuccess(ctx, kubeClient, namespace, names...)
 }
 
-func updateAllDeploymentsStatusFail(kubeClient kubernetes.Interface, namespace string) {
-	deployments, err := kubeClient.AppsV1().Deployments(namespace).List(context.Background(), metav1.ListOptions{})
+func updateAllDeploymentsStatusFail(ctx context.Context, kubeClient kubernetes.Interface, namespace string) {
+	deployments, err := kubeClient.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	var names []string
 	for _, d := range deployments.Items {
 		names = append(names, d.Name)
 	}
-	updateDeploymentsStatusFail(kubeClient, namespace, names...)
+	updateDeploymentsStatusFail(ctx, kubeClient, namespace, names...)
 }
 
-func updateDeploymentsStatusFail(kubeClient kubernetes.Interface, namespace string, deployments ...string) {
+func updateDeploymentsStatusFail(ctx context.Context, kubeClient kubernetes.Interface, namespace string, deployments ...string) {
 	for _, deploymentName := range deployments {
 		Eventually(func() error {
-			deployment, err := kubeClient.AppsV1().Deployments(namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
+			deployment, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return nil
 			}
@@ -76,7 +76,7 @@ func updateDeploymentsStatusFail(kubeClient kubernetes.Interface, namespace stri
 			deployment.Status.ReadyReplicas = 0
 			deployment.Status.AvailableReplicas = 0
 			deployment.Status.ObservedGeneration = 0
-			_, err = kubeClient.AppsV1().Deployments(namespace).UpdateStatus(context.Background(), deployment, metav1.UpdateOptions{})
+			_, err = kubeClient.AppsV1().Deployments(namespace).UpdateStatus(ctx, deployment, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 	}
@@ -134,9 +134,9 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 		go startHubOperator(hostedCtx, operatorapiv1.InstallModeHosted)
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx SpecContext) {
 		// delete deployment for clustermanager here so tests are not impacted with each other
-		err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+		err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		if hostedCancel != nil {
 			hostedCancel()
@@ -144,7 +144,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 	})
 
 	Context("Deploy and clean hub component", func() {
-		It("should have expected resource created successfully", func() {
+		It("should have expected resource created successfully", func(ctx SpecContext) {
 			// Check namespace
 			Eventually(func() error {
 				if _, err := hostedKubeClient.CoreV1().Namespaces().Get(hostedCtx, hubNamespaceHosted, metav1.GetOptions{}); err != nil {
@@ -305,7 +305,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			By("Update the deployment status to fail to prevent other cases from interfering")
-			updateDeploymentsStatusFail(hostedKubeClient, hubNamespaceHosted,
+			updateDeploymentsStatusFail(ctx, hostedKubeClient, hubNamespaceHosted,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 
@@ -323,7 +323,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 				hostedCtx, workValidtingWebhook, metav1.GetOptions{})
 			Expect(err).To(HaveOccurred())
 
-			updateDeploymentsStatusSuccess(hostedKubeClient, hubNamespaceHosted,
+			updateDeploymentsStatusSuccess(ctx, hostedKubeClient, hubNamespaceHosted,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 
@@ -342,12 +342,12 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			util.AssertClusterManagerCondition(clusterManagerName, hostedOperatorClient, "Applied", "ClusterManagerApplied", metav1.ConditionTrue)
 		})
 
-		It("should have expected resource created/deleted when feature gates manifestwork replicaset enabled/disabled", func() {
+		It("should have expected resource created/deleted when feature gates manifestwork replicaset enabled/disabled", func(ctx SpecContext) {
 			By("Disable manifestwork replicaset feature gate")
 			// Check manifestwork replicaset disable
 			Eventually(func() error {
 				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
-					context.Background(), clusterManagerName, metav1.GetOptions{})
+					ctx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -368,14 +368,14 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 					FeatureGates: featureGate,
 				}
 				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(
-					context.Background(), clusterManager, metav1.UpdateOptions{})
+					ctx, clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check clusterrole/clusterrolebinding
 			Eventually(func() bool {
 				_, err := hostedKubeClient.RbacV1().ClusterRoles().Get(
-					context.Background(), hubWorkControllerClusterRole, metav1.GetOptions{})
+					ctx, hubWorkControllerClusterRole, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
@@ -383,7 +383,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
 				_, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(
-					context.Background(), hubWorkControllerClusterRole, metav1.GetOptions{})
+					ctx, hubWorkControllerClusterRole, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
@@ -393,7 +393,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			// Check service account
 			Eventually(func() bool {
 				_, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(
-					context.Background(), hubWorkControllerSA, metav1.GetOptions{})
+					ctx, hubWorkControllerSA, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
@@ -403,21 +403,21 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			// Check deployment
 			Eventually(func() bool {
 				_, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(
-					context.Background(), hubWorkControllerDeployment, metav1.GetOptions{})
+					ctx, hubWorkControllerDeployment, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
 				return errors.IsNotFound(err)
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-			updateDeploymentsStatusSuccess(hostedKubeClient, hubNamespaceHosted,
+			updateDeploymentsStatusSuccess(ctx, hostedKubeClient, hubNamespaceHosted,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 
 			// Check if relatedResources are correct
 			Eventually(func() error {
 				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
-					context.Background(), clusterManagerName, metav1.GetOptions{})
+					ctx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -431,7 +431,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			By("Revert manifestwork replicaset to enable mode")
 			Eventually(func() error {
 				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
-					context.Background(), clusterManagerName, metav1.GetOptions{})
+					ctx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -452,21 +452,21 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 					FeatureGates: featureGate,
 				}
 				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(
-					context.Background(), clusterManager, metav1.UpdateOptions{})
+					ctx, clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check clusterrole/clusterrolebinding
 			Eventually(func() error {
 				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(
-					context.Background(), hubWorkControllerClusterRole, metav1.GetOptions{}); err != nil {
+					ctx, hubWorkControllerClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 			Eventually(func() error {
 				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(
-					context.Background(), hubWorkControllerClusterRole, metav1.GetOptions{}); err != nil {
+					ctx, hubWorkControllerClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -475,7 +475,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			// Check service account
 			Eventually(func() error {
 				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(
-					context.Background(), hubWorkControllerSA, metav1.GetOptions{}); err != nil {
+					ctx, hubWorkControllerSA, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -484,19 +484,19 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			// Check deployment
 			Eventually(func() error {
 				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(
-					context.Background(), hubWorkControllerDeployment, metav1.GetOptions{}); err != nil {
+					ctx, hubWorkControllerDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			updateDeploymentsStatusSuccess(hostedKubeClient, hubNamespaceHosted,
+			updateDeploymentsStatusSuccess(ctx, hostedKubeClient, hubNamespaceHosted,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 			// Check if relatedResources are correct
 			Eventually(func() error {
 				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
-					context.Background(), clusterManagerName, metav1.GetOptions{})
+					ctx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -508,11 +508,11 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("should have expected work driver when work driver is updated", func() {
+		It("should have expected work driver when work driver is updated", func(ctx SpecContext) {
 			By("Update work driver to grpc")
 			Eventually(func() error {
 				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
-					context.Background(), clusterManagerName, metav1.GetOptions{})
+					ctx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -539,13 +539,13 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 					WorkDriver:   cloudeventsconstants.ConfigTypeGRPC,
 				}
 				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(
-					context.Background(), clusterManager, metav1.UpdateOptions{})
+					ctx, clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Eventually(func() error {
 			// 	actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
-			// 		context.Background(), clusterManagerName, metav1.GetOptions{})
+			// 		ctx, clusterManagerName, metav1.GetOptions{})
 			// 	if err != nil {
 			// 		return err
 			// 	}
@@ -555,7 +555,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			// 	return nil
 			// }, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-			_, err := hostedKubeClient.CoreV1().Secrets("default").Create(context.TODO(), &corev1.Secret{
+			_, err := hostedKubeClient.CoreV1().Secrets("default").Create(ctx, &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "work-driver-config",
 					Namespace: "default",
@@ -568,7 +568,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 
 			// Eventually(func() error {
 			// 	actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
-			// 		context.Background(), clusterManagerName, metav1.GetOptions{})
+			// 		ctx, clusterManagerName, metav1.GetOptions{})
 			// 	if err != nil {
 			// 		return err
 			// 	}
@@ -579,7 +579,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			// }, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			Eventually(func() error {
-				actual, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(context.Background(),
+				actual, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(ctx,
 					hubWorkControllerDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -606,7 +606,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			Eventually(func() error {
-				workConfigSecret, err := hostedKubeClient.CoreV1().Secrets(hubNamespaceHosted).Get(context.Background(),
+				workConfigSecret, err := hostedKubeClient.CoreV1().Secrets(hubNamespaceHosted).Get(ctx,
 					"work-driver-config", metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -620,18 +620,18 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			By("Revert work driver back to kube")
 			Eventually(func() error {
 				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
-					context.Background(), clusterManagerName, metav1.GetOptions{})
+					ctx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 				clusterManager.Spec.WorkConfiguration.WorkDriver = operatorapiv1.WorkDriverTypeKube
 				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(
-					context.Background(), clusterManager, metav1.UpdateOptions{})
+					ctx, clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			Eventually(func() error {
-				actual, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(context.Background(),
+				actual, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(ctx,
 					hubWorkControllerDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -644,16 +644,16 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			err = hostedKubeClient.CoreV1().Secrets("default").Delete(context.Background(),
+			err = hostedKubeClient.CoreV1().Secrets("default").Delete(ctx,
 				"work-driver-config", metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should have expected resource created/deleted successfully when feature gates AddOnManager enabled/disabled", func() {
+		It("should have expected resource created/deleted successfully when feature gates AddOnManager enabled/disabled", func(ctx SpecContext) {
 			By("Disable AddOnManager feature gate")
 			// Check addon manager disable mode
 			Eventually(func() error {
-				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(ctx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -666,20 +666,20 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 						},
 					},
 				}
-				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(ctx, clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check clusterrole/clusterrolebinding
 			Eventually(func() bool {
-				_, err := hostedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{})
+				_, err := hostedKubeClient.RbacV1().ClusterRoles().Get(ctx, hubAddOnManagerClusterRole, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
 				return errors.IsNotFound(err)
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				_, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{})
+				_, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(ctx, hubAddOnManagerClusterRole, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
@@ -688,7 +688,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 
 			// Check service account
 			Eventually(func() bool {
-				_, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(context.Background(), hubAddOnManagerSA, metav1.GetOptions{})
+				_, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(ctx, hubAddOnManagerSA, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
@@ -697,20 +697,20 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 
 			// Check deployment
 			Eventually(func() bool {
-				_, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(context.Background(), hubAddOnManagerDeployment, metav1.GetOptions{})
+				_, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(ctx, hubAddOnManagerDeployment, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
 				return errors.IsNotFound(err)
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-			updateDeploymentsStatusSuccess(hostedKubeClient, hubNamespaceHosted,
+			updateDeploymentsStatusSuccess(ctx, hostedKubeClient, hubNamespaceHosted,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment)
 
 			// Check if relatedResources are correct
 			Eventually(func() error {
-				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(ctx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -724,26 +724,26 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			By("Revert addon manager to enable mode")
 			Eventually(func() error {
 				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
-					context.Background(), clusterManagerName, metav1.GetOptions{})
+					ctx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
 				// Check addon manager enabled mode
 				clusterManager.Spec.AddOnManagerConfiguration = nil
-				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(ctx, clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check clusterrole/clusterrolebinding
 			Eventually(func() error {
-				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(ctx, hubAddOnManagerClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 			Eventually(func() error {
-				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(ctx, hubAddOnManagerClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -751,7 +751,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 
 			// Check service account
 			Eventually(func() error {
-				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(context.Background(), hubAddOnManagerSA, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(ctx, hubAddOnManagerSA, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -760,18 +760,18 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			// Check deployment
 			Eventually(func() error {
 				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(
-					context.Background(), hubAddOnManagerDeployment, metav1.GetOptions{}); err != nil {
+					ctx, hubAddOnManagerDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			updateDeploymentsStatusSuccess(hostedKubeClient, hubNamespaceHosted,
+			updateDeploymentsStatusSuccess(ctx, hostedKubeClient, hubNamespaceHosted,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 			// Check if relatedResources are correct
 			Eventually(func() error {
-				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(ctx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -782,7 +782,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("Deployment should be updated when clustermanager is changed", func() {
+		It("Deployment should be updated when clustermanager is changed", func(ctx SpecContext) {
 			Eventually(func() error {
 				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
 					return err
@@ -826,7 +826,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			updateDeploymentsStatusSuccess(hostedKubeClient, hubNamespaceHosted,
+			updateDeploymentsStatusSuccess(ctx, hostedKubeClient, hubNamespaceHosted,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 
@@ -845,7 +845,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 		})
 
-		It("Deployment should be added nodeSelector and toleration when add nodePlacement into clustermanager", func() {
+		It("Deployment should be added nodeSelector and toleration when add nodePlacement into clustermanager", func(ctx SpecContext) {
 			Eventually(func() error {
 				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -889,7 +889,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 				return fmt.Errorf("no key equals to node-role.kubernetes.io/infra")
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			updateDeploymentsStatusSuccess(hostedKubeClient, hubNamespaceHosted,
+			updateDeploymentsStatusSuccess(ctx, hostedKubeClient, hubNamespaceHosted,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 		})
@@ -947,7 +947,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 	})
 
 	Context("Cluster manager statuses", func() {
-		It("should have correct degraded conditions", func() {
+		It("should have correct degraded conditions", func(ctx SpecContext) {
 			Eventually(func() error {
 				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(
 					hostedCtx, hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
@@ -961,7 +961,7 @@ var _ = Describe("ClusterManager Hosted Mode", func() {
 				"HubRegistrationDegraded", "UnavailableRegistrationPod", metav1.ConditionTrue)
 
 			// Update replica of deployment
-			updateDeploymentsStatusSuccess(hostedKubeClient, hubNamespaceHosted,
+			updateDeploymentsStatusSuccess(ctx, hostedKubeClient, hubNamespaceHosted,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 

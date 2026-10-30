@@ -194,7 +194,7 @@ func TestReconcile(t *testing.T) {
 			workInformers,
 			runController,
 		)
-		ctx := context.TODO()
+		ctx := t.Context()
 		for _, syncKey := range c.syncKeys {
 			syncContext := testingcommon.NewFakeSyncContext(t, syncKey)
 			err := controller.Sync(ctx, syncContext, syncKey)
@@ -268,7 +268,7 @@ func TestRunController(t *testing.T) {
 			dynamicInformers:           dynamicInformerFactory,
 			workInformers:              workInformers,
 		}
-		ctx := context.TODO()
+		ctx := t.Context()
 
 		err := controller.runController(ctx, c.addonName)
 		if err == nil {
@@ -383,7 +383,7 @@ func TestStopUnusedManagers(t *testing.T) {
 			}
 
 			// Start informers and wait for cache sync
-			ctx := context.TODO()
+			ctx := t.Context()
 			addonInformers.Start(ctx.Done())
 			addonInformers.WaitForCacheSync(ctx.Done())
 

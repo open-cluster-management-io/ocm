@@ -123,7 +123,7 @@ func TestAccept(t *testing.T) {
 			isAccepted: true,
 		},
 	}
-	awsIrsaHubDriver, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+	awsIrsaHubDriver, err := NewAWSIRSAHubDriver(t.Context(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
 		[]string{
 			"arn:aws:eks:us-west-2:123456789012:cluster/.*",
 			"arn:aws:eks:us-west-1:123456789012:cluster/.*",
@@ -146,7 +146,7 @@ func TestAccept(t *testing.T) {
 
 func TestNewDriverValidation(t *testing.T) {
 	// Test with an invalid manager cluster approval pattern
-	_, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{
+	_, err := NewAWSIRSAHubDriver(t.Context(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{
 		"arn:(aws:eks:us-west-2:123456789012:cluster/.*", // bad pattern
 	}, []string{})
 	if err == nil {
@@ -257,7 +257,7 @@ func TestDeleteIAMRoleAndPolicy(t *testing.T) {
 		{
 			name: "test delete IAM Role",
 			args: args{
-				ctx:                context.Background(),
+				ctx:                t.Context(),
 				withAPIOptionsFunc: mockSuccessfulDeletionBehaviour,
 			},
 			managedClusterAnnotations: map[string]string{
@@ -270,7 +270,7 @@ func TestDeleteIAMRoleAndPolicy(t *testing.T) {
 		{
 			name: "test delete IAM Role with NoSuchEntity in DeleteRole",
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
 					err := mockSuccessfulDeletionBehaviour(stack)
 					if err != nil {
@@ -425,7 +425,7 @@ func TestDeleteAccessEntry(t *testing.T) {
 			name:           "test delete Access Entry",
 			hubClusterName: "hub",
 			args: args{
-				ctx:                context.Background(),
+				ctx:                t.Context(),
 				withAPIOptionsFunc: mockSuccessfulDeletionBehaviour,
 			},
 			want:    nil,
@@ -435,7 +435,7 @@ func TestDeleteAccessEntry(t *testing.T) {
 			name:           "test delete Access Entry error due to cluster name being an ARN",
 			hubClusterName: "arn:aws:eks:us-west-2:123456789012:cluster/hub", // Not a cluster name, it is an ARN
 			args: args{
-				ctx:                context.Background(),
+				ctx:                t.Context(),
 				withAPIOptionsFunc: mockSuccessfulDeletionBehaviour,
 			},
 			want:    fmt.Errorf("operation error EKS: DeleteAccessEntry, invalid cluster name"),
@@ -445,7 +445,7 @@ func TestDeleteAccessEntry(t *testing.T) {
 			name:           "test delete Access Entry error",
 			hubClusterName: "hub",
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
 					return stack.Finalize.Add(
 						middleware.FinalizeMiddlewareFunc(
@@ -518,7 +518,7 @@ func TestCleanup(t *testing.T) {
 				},
 			},
 			args: args{
-				ctx:                context.Background(),
+				ctx:                t.Context(),
 				withAPIOptionsFunc: mockSuccessfulDeletionBehaviour,
 			},
 			want:    nil,
@@ -535,7 +535,7 @@ func TestCleanup(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			awsIrsaHubDriver, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{}, []string{})
+			awsIrsaHubDriver, err := NewAWSIRSAHubDriver(t.Context(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{}, []string{})
 			if err != nil {
 				t.Errorf("error creating AWSIRSAHubDriver")
 				return
@@ -573,7 +573,7 @@ func TestCreateIAMRole(t *testing.T) {
 		{
 			name: "test create IAM Role",
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
 					return stack.Finalize.Add(
 						middleware.FinalizeMiddlewareFunc(
@@ -606,7 +606,7 @@ func TestCreateIAMRole(t *testing.T) {
 		{
 			name: "test invalid hubclusterarn passed during join.",
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
 					return stack.Finalize.Add(
 						middleware.FinalizeMiddlewareFunc(
@@ -639,7 +639,7 @@ func TestCreateIAMRole(t *testing.T) {
 		{
 			name: "test existing IAM Role with matching trust policy is left untouched",
 			args: args{
-				ctx:                context.Background(),
+				ctx:                t.Context(),
 				withAPIOptionsFunc: existingRoleMock(expectedTrustPolicyEncoded(t), nil, &iamCalls),
 			},
 			managedClusterAnnotations: map[string]string{
@@ -655,7 +655,7 @@ func TestCreateIAMRole(t *testing.T) {
 			// is deleted and recreated; the driver has to put the ARN back.
 			name: "test existing IAM Role with stale trust policy is updated",
 			args: args{
-				ctx:                context.Background(),
+				ctx:                t.Context(),
 				withAPIOptionsFunc: existingRoleMock(staleTrustPolicyEncoded, nil, &iamCalls),
 			},
 			managedClusterAnnotations: map[string]string{
@@ -669,7 +669,7 @@ func TestCreateIAMRole(t *testing.T) {
 		{
 			name: "test existing IAM Role with stale trust policy reports failed update",
 			args: args{
-				ctx:                context.Background(),
+				ctx:                t.Context(),
 				withAPIOptionsFunc: existingRoleMock(staleTrustPolicyEncoded, fmt.Errorf("AccessDenied"), &iamCalls),
 			},
 			managedClusterAnnotations: map[string]string{
@@ -684,7 +684,7 @@ func TestCreateIAMRole(t *testing.T) {
 		{
 			name: "test existing IAM Role reports failed GetRole",
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
 					return stack.Finalize.Add(
 						middleware.FinalizeMiddlewareFunc(
@@ -714,7 +714,7 @@ func TestCreateIAMRole(t *testing.T) {
 		{
 			name: "test create IAM Role with error in CreateRole",
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
 					return stack.Finalize.Add(
 						middleware.FinalizeMiddlewareFunc(
@@ -950,7 +950,7 @@ func TestCreateAccessEntries(t *testing.T) {
 		{
 			name: "test CreateAccessEntry successful",
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
 					return stack.Finalize.Add(
 						middleware.FinalizeMiddlewareFunc(
@@ -982,7 +982,7 @@ func TestCreateAccessEntries(t *testing.T) {
 		{
 			name: "test CreateAccessEntry error",
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
 					return stack.Finalize.Add(
 						middleware.FinalizeMiddlewareFunc(
@@ -1057,7 +1057,7 @@ func TestCreateTags(t *testing.T) {
 		{
 			name: "test create IAM Role and Policy with Tags",
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
 					return stack.Finalize.Add(
 						middleware.FinalizeMiddlewareFunc(
@@ -1125,7 +1125,7 @@ func TestCreateTags(t *testing.T) {
 		{
 			name: "test create IAM Role and Policy with invalid Tag with key beginning with aws",
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
 					return stack.Finalize.Add(
 						middleware.FinalizeMiddlewareFunc(
@@ -1155,7 +1155,7 @@ func TestCreateTags(t *testing.T) {
 		{
 			name: "test create IAM Role and Policy with invalid Tag with empty key",
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
 					return stack.Finalize.Add(
 						middleware.FinalizeMiddlewareFunc(

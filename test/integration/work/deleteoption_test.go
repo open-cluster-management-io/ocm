@@ -28,18 +28,18 @@ var _ = Describe("ManifestWork Delete Option", func() {
 
 	var err error
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		clusterName = rand.String(5)
 		workName = fmt.Sprintf("work-delete-option-%s", rand.String(5))
 
 		ns := &corev1.Namespace{}
 		ns.Name = clusterName
-		_, err := spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := spokeKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
-		go startWorkAgent(ctx, clusterName)
+		var runCtx context.Context
+		runCtx, cancel = context.WithCancel(context.Background())
+		go startWorkAgent(runCtx, clusterName)
 
 		// reset manifests
 		manifests = nil
@@ -49,11 +49,11 @@ var _ = Describe("ManifestWork Delete Option", func() {
 		work = util.NewManifestWork(clusterName, workName, manifests)
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx SpecContext) {
 		if cancel != nil {
 			cancel()
 		}
-		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
+		err := spokeKubeClient.CoreV1().Namespaces().Delete(ctx, clusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -69,8 +69,8 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			anotherWork = util.NewManifestWork(clusterName, "sharing-resource-work", []workapiv1.Manifest{manifests[0]})
 		})
 
-		JustBeforeEach(func() {
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+		JustBeforeEach(func(ctx SpecContext) {
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			appliedManifestWorkName = util.AppliedManifestWorkName(hubHash, work)
@@ -80,7 +80,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
-			anotherWork, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), anotherWork, metav1.CreateOptions{})
+			anotherWork, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, anotherWork, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			util.AssertWorkCondition(anotherWork.Namespace, anotherWork.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
@@ -90,16 +90,16 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			anotherAppliedManifestWorkName = util.AppliedManifestWorkName(hubHash, anotherWork)
 		})
 
-		It("shared resource between the manifestwork should be kept when one manifestwork is deleted", func() {
+		It("shared resource between the manifestwork should be kept when one manifestwork is deleted", func(ctx SpecContext) {
 			// ensure configmap exists and get its uid
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
-			currentConfigMap, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+			currentConfigMap, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			currentUID := currentConfigMap.UID
 
 			// Ensure that uid recorded in the appliedmanifestwork and anotherappliedmanifestwork is correct.
 			Eventually(func() error {
-				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(ctx, appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -115,7 +115,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 
 			Eventually(func() error {
 				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
-					context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
+					ctx, anotherAppliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -130,12 +130,12 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Delete one manifestwork
-			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(ctx, work.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Ensure the appliedmanifestwork of deleted manifestwork is removed so it won't try to delete shared resource
 			Eventually(func() error {
-				appliedWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+				appliedWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(ctx, appliedManifestWorkName, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
 					return nil
 				}
@@ -147,7 +147,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 
 			// Ensure the configmap is kept and tracked by anotherappliedmanifestwork.
 			Eventually(func() error {
-				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -157,7 +157,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 				}
 
 				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
-					context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
+					ctx, anotherAppliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -176,16 +176,16 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("shared resource between the manifestwork should be kept when the shared resource is removed from one manifestwork", func() {
+		It("shared resource between the manifestwork should be kept when the shared resource is removed from one manifestwork", func(ctx SpecContext) {
 			// ensure configmap exists and get its uid
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
-			curentConfigMap, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+			curentConfigMap, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			currentUID := curentConfigMap.UID
 
 			// Ensure that uid recorded in the appliedmanifestwork and anotherappliedmanifestwork is correct.
 			Eventually(func() error {
-				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(ctx, appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -201,7 +201,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 
 			Eventually(func() error {
 				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
-					context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
+					ctx, anotherAppliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -216,7 +216,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Update one manifestwork to remove the shared resource
-			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			newWork := updatedWork.DeepCopy()
@@ -226,12 +226,12 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Ensure the resource is not tracked by the appliedmanifestwork.
 			Eventually(func() error {
-				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(ctx, appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -248,7 +248,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			// Ensure the configmap is kept and tracked by anotherappliedmanifestwork
 			Consistently(func() error {
 				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(
-					context.Background(), cm1, metav1.GetOptions{})
+					ctx, cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -258,7 +258,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 				}
 
 				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
-					context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
+					ctx, anotherAppliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -287,12 +287,12 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			}
 		})
 
-		It("Orphan deletion of the whole manifestwork", func() {
+		It("Orphan deletion of the whole manifestwork", func(ctx SpecContext) {
 			work.Spec.DeleteOption = &workapiv1.DeleteOption{
 				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeOrphan,
 			}
 
-			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -305,7 +305,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 
 			// Ensure ownership of configmap is updated
 			Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -318,7 +318,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm2, metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm2, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -331,12 +331,12 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Delete the work
-			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(ctx, work.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for deletion of manifest work
 			Eventually(func() bool {
-				_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				return errors.IsNotFound(err)
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
@@ -344,7 +344,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("Selectively Orphan deletion of the manifestwork", func() {
+		It("Selectively Orphan deletion of the manifestwork", func(ctx SpecContext) {
 			work.Spec.DeleteOption = &workapiv1.DeleteOption{
 				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan,
 				SelectivelyOrphan: &workapiv1.SelectivelyOrphan{
@@ -359,7 +359,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -372,7 +372,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 
 			// Ensure ownership of configmap is updated
 			Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -385,25 +385,25 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Delete the work
-			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(ctx, work.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for deletion of manifest work
 			Eventually(func() bool {
-				_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				return errors.IsNotFound(err)
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// One of the resource should be deleted.
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm2, metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm2, metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 
 			// One of the resource should be kept
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("Keep the resource when remove it from manifests with orphan deletion option", func() {
+		It("Keep the resource when remove it from manifests with orphan deletion option", func(ctx SpecContext) {
 			work.Spec.DeleteOption = &workapiv1.DeleteOption{
 				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan,
 				SelectivelyOrphan: &workapiv1.SelectivelyOrphan{
@@ -418,7 +418,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -431,7 +431,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 
 			// Ensure ownership of configmap is updated
 			Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -445,7 +445,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 
 			// Remove the resource from the manifests
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -461,7 +461,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
@@ -472,12 +472,12 @@ var _ = Describe("ManifestWork Delete Option", func() {
 
 			// Wait for the resource to be observed
 			Eventually(func() error {
-				_, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+				_, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("Clean the resource when orphan deletion option is removed", func() {
+		It("Clean the resource when orphan deletion option is removed", func(ctx SpecContext) {
 			work.Spec.DeleteOption = &workapiv1.DeleteOption{
 				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan,
 				SelectivelyOrphan: &workapiv1.SelectivelyOrphan{
@@ -492,7 +492,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -505,7 +505,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 
 			// Ensure ownership of configmap is updated
 			Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -519,7 +519,7 @@ var _ = Describe("ManifestWork Delete Option", func() {
 
 			// Remove the delete option
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -533,13 +533,13 @@ var _ = Describe("ManifestWork Delete Option", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Ensure ownership of configmap is updated
 			Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -552,19 +552,19 @@ var _ = Describe("ManifestWork Delete Option", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Delete the work
-			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(ctx, work.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for deletion of manifest work
 			Eventually(func() bool {
-				_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				return errors.IsNotFound(err)
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// All the resources should be deleted.
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm2, metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm2, metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 	})

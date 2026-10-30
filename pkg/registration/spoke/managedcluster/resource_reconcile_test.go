@@ -1,7 +1,6 @@
 package managedcluster
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -196,7 +195,7 @@ func TestHealthCheck(t *testing.T) {
 				testingcommon.AssertActions(t, actions, "patch")
 
 				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(
-					context.TODO(), testinghelpers.TestManagedClusterName, metav1.GetOptions{})
+					t.Context(), testinghelpers.TestManagedClusterName, metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -232,7 +231,7 @@ func TestHealthCheck(t *testing.T) {
 
 			fakeHubClient := kubefake.NewSimpleClientset()
 
-			ctx := context.TODO()
+			ctx := t.Context()
 			hubEventRecorder, err := events.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
 			if err != nil {
@@ -253,7 +252,7 @@ func TestHealthCheck(t *testing.T) {
 				[]string{},
 				hubEventRecorder,
 			)
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), "")
+			syncErr := ctrl.sync(t.Context(), testingcommon.NewFakeSyncContext(t, ""), "")
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
 			// wait for the event to be sent

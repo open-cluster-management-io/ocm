@@ -27,8 +27,8 @@ var _ = Describe("Klusterlet Singleton mode", func() {
 	var workManagementRoleName string
 	var workManagedRoleName string
 
-	BeforeEach(func() {
-		var ctx context.Context
+	BeforeEach(func(ctx SpecContext) {
+		var runCtx context.Context
 		klusterlet = &operatorapiv1.Klusterlet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("klusterlet-%s", rand.String(6)),
@@ -60,15 +60,15 @@ var _ = Describe("Klusterlet Singleton mode", func() {
 				Name: agentNamespace,
 			},
 		}
-		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		ctx, cancel = context.WithCancel(context.Background())
-		go startKlusterletOperator(ctx)
+		runCtx, cancel = context.WithCancel(context.Background())
+		go startKlusterletOperator(runCtx)
 	})
 
-	AfterEach(func() {
-		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), agentNamespace, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err := kubeClient.CoreV1().Namespaces().Delete(ctx, agentNamespace, metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		if cancel != nil {
@@ -86,17 +86,17 @@ var _ = Describe("Klusterlet Singleton mode", func() {
 			saName = fmt.Sprintf("%s-work-sa", klusterlet.Name)
 		})
 
-		AfterEach(func() {
-			Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
+		AfterEach(func(ctx SpecContext) {
+			Expect(operatorClient.OperatorV1().Klusterlets().Delete(ctx, klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
 		})
 
-		It("should have expected resource created successfully", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("should have expected resource created successfully", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Check if relatedResources are correct
 			Eventually(func() error {
-				actual, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				actual, err := operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -111,14 +111,14 @@ var _ = Describe("Klusterlet Singleton mode", func() {
 			// Check CRDs
 			Eventually(func() bool {
 				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
-					context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+					ctx, "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
 				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
-					context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+					ctx, "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -126,25 +126,25 @@ var _ = Describe("Klusterlet Singleton mode", func() {
 
 			// Check clusterrole/clusterrolebinding
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().ClusterRoles().Get(ctx, registrationManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().ClusterRoles().Get(ctx, workManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(ctx, registrationManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(ctx, workManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -152,38 +152,38 @@ var _ = Describe("Klusterlet Singleton mode", func() {
 
 			// Check role/rolebinding
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().Roles(agentNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().Roles(agentNamespace).Get(ctx, registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().Roles(agentNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().Roles(agentNamespace).Get(ctx, workManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().RoleBindings(agentNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().RoleBindings(agentNamespace).Get(ctx, registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().RoleBindings(agentNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().RoleBindings(agentNamespace).Get(ctx, workManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			// Check extension apiserver rolebinding
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(ctx, registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(ctx, workManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -191,7 +191,7 @@ var _ = Describe("Klusterlet Singleton mode", func() {
 
 			// Check service account
 			Eventually(func() bool {
-				sa, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(context.Background(), saName, metav1.GetOptions{})
+				sa, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(ctx, saName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -201,7 +201,7 @@ var _ = Describe("Klusterlet Singleton mode", func() {
 
 			// Check deployment
 			Eventually(func() bool {
-				deployment, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
+				deployment, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(ctx, deploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -211,7 +211,7 @@ var _ = Describe("Klusterlet Singleton mode", func() {
 
 			// Check addon namespace
 			Eventually(func() bool {
-				if _, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), helpers.DefaultAddonNamespace, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.CoreV1().Namespaces().Get(ctx, helpers.DefaultAddonNamespace, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true

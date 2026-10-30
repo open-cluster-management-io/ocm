@@ -27,8 +27,8 @@ var _ = Describe("Klusterlet using aws auth", func() {
 	var workSAName string
 	var agentLabelSelector string
 
-	BeforeEach(func() {
-		var ctx context.Context
+	BeforeEach(func(ctx SpecContext) {
+		var runCtx context.Context
 
 		klusterletNamespace = fmt.Sprintf("open-cluster-management-aws-%s", rand.String(6))
 		ns := &corev1.Namespace{
@@ -36,7 +36,7 @@ var _ = Describe("Klusterlet using aws auth", func() {
 				Name: klusterletNamespace,
 			},
 		}
-		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		klusterlet = &operatorapiv1.Klusterlet{
@@ -85,15 +85,15 @@ var _ = Describe("Klusterlet using aws auth", func() {
 				"placeholder": []byte("placeholder"),
 			},
 		}
-		_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), hubKubeConfigSecret, metav1.CreateOptions{})
+		_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(ctx, hubKubeConfigSecret, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		ctx, cancel = context.WithCancel(context.Background())
-		go startKlusterletOperator(ctx)
+		runCtx, cancel = context.WithCancel(context.Background())
+		go startKlusterletOperator(runCtx)
 	})
 
-	AfterEach(func() {
-		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), klusterletNamespace, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err := kubeClient.CoreV1().Namespaces().Delete(ctx, klusterletNamespace, metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		if cancel != nil {
@@ -110,17 +110,17 @@ var _ = Describe("Klusterlet using aws auth", func() {
 			workSAName = fmt.Sprintf("%s-work-sa", klusterlet.Name)
 		})
 
-		AfterEach(func() {
-			Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
+		AfterEach(func(ctx SpecContext) {
+			Expect(operatorClient.OperatorV1().Klusterlets().Delete(ctx, klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
 		})
 
-		It("should have expected resource created successfully using aws auth", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("should have expected resource created successfully using aws auth", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Check service account
 			Eventually(func() bool {
-				serviceaccouts, err := kubeClient.CoreV1().ServiceAccounts(klusterletNamespace).List(context.Background(),
+				serviceaccouts, err := kubeClient.CoreV1().ServiceAccounts(klusterletNamespace).List(ctx,
 					metav1.ListOptions{LabelSelector: agentLabelSelector})
 				if err != nil {
 					return false
@@ -142,7 +142,7 @@ var _ = Describe("Klusterlet using aws auth", func() {
 
 			// Check deployment
 			Eventually(func() bool {
-				deployments, err := kubeClient.AppsV1().Deployments(klusterletNamespace).List(context.Background(),
+				deployments, err := kubeClient.AppsV1().Deployments(klusterletNamespace).List(ctx,
 					metav1.ListOptions{LabelSelector: agentLabelSelector})
 				if err != nil {
 					return false

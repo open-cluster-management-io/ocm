@@ -35,7 +35,7 @@ var _ = Describe("Joining Process", func() {
 	})
 
 	assertJoiningSucceed := func() {
-		It("managedcluster should join successfully", func() {
+		It("managedcluster should join successfully", func(ctx SpecContext) {
 			var err error
 
 			// run registration agent

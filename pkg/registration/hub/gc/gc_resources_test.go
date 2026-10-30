@@ -1,7 +1,6 @@
 package gc
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -63,7 +62,7 @@ func TestGCResourcesController(t *testing.T) {
 				resourceGVRList: []schema.GroupVersionResource{addonGvr, workGvr},
 			}
 
-			err := ctrl.reconcile(context.TODO(), c.cluster, c.clusterNamespace)
+			err := ctrl.reconcile(t.Context(), c.cluster, c.clusterNamespace)
 			assert.Equal(t, c.expectedError, err)
 			c.validateActions(t, metadataClient.Actions())
 		})

@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -148,7 +147,7 @@ func TestCELSelector(t *testing.T) {
 				assert.Nil(t, result.Error)
 			}
 
-			match, cost := selector.Validate(context.TODO(), test.cluster)
+			match, cost := selector.Validate(t.Context(), test.cluster)
 			assert.Equal(t, test.expectedMatch, match)
 			assert.Equal(t, test.expectedCost, cost)
 		})

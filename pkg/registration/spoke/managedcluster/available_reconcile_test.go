@@ -1,7 +1,6 @@
 package managedcluster
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -100,7 +99,7 @@ func TestAvailableReconcile(t *testing.T) {
 			}
 
 			cluster := testinghelpers.NewAcceptedManagedCluster()
-			updatedCluster, state, err := reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster)
+			updatedCluster, state, err := reconciler.reconcile(t.Context(), testingcommon.NewFakeSyncContext(t, ""), cluster)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -154,7 +153,7 @@ func TestAvailableReconcileFailureThreshold(t *testing.T) {
 
 	// First failure: condition should remain True (within threshold), and a fast requeue should be triggered
 	syncCtx := testingcommon.NewFakeSyncContext(t, "")
-	updatedCluster, state, err := reconciler.reconcile(context.TODO(), syncCtx, cluster.DeepCopy())
+	updatedCluster, state, err := reconciler.reconcile(t.Context(), syncCtx, cluster.DeepCopy())
 	if err != nil {
 		t.Fatalf("first failure: unexpected error: %v", err)
 	}
@@ -172,7 +171,7 @@ func TestAvailableReconcileFailureThreshold(t *testing.T) {
 	// Simulate failure persisting beyond threshold
 	reconciler.firstFailureTime = time.Now().Add(-failureThreshold)
 	syncCtx = testingcommon.NewFakeSyncContext(t, "")
-	updatedCluster, state, err = reconciler.reconcile(context.TODO(), syncCtx, cluster.DeepCopy())
+	updatedCluster, state, err = reconciler.reconcile(t.Context(), syncCtx, cluster.DeepCopy())
 	if err != nil {
 		t.Fatalf("threshold failure: unexpected error: %v", err)
 	}
@@ -210,7 +209,7 @@ func TestAvailableReconcileFailureReset(t *testing.T) {
 	})
 
 	// First failure: sets firstFailureTime
-	if _, _, err := reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy()); err != nil {
+	if _, _, err := reconciler.reconcile(t.Context(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy()); err != nil {
 		t.Fatal(err)
 	}
 	if reconciler.firstFailureTime.IsZero() {
@@ -219,7 +218,7 @@ func TestAvailableReconcileFailureReset(t *testing.T) {
 
 	// Recovery: API server becomes healthy, firstFailureTime should reset
 	livez.Store(int32(http.StatusOK))
-	updatedCluster, state, err := reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy())
+	updatedCluster, state, err := reconciler.reconcile(t.Context(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -236,13 +235,13 @@ func TestAvailableReconcileFailureReset(t *testing.T) {
 
 	// Fail again: should start fresh, not carry over previous failure time
 	livez.Store(int32(http.StatusInternalServerError))
-	if _, _, err = reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy()); err != nil {
+	if _, _, err = reconciler.reconcile(t.Context(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy()); err != nil {
 		t.Fatal(err)
 	}
 
 	// The failure just started, so even with many rapid calls it should not flip to False
 	for i := 0; i < 10; i++ {
-		updatedCluster, _, _ = reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy())
+		updatedCluster, _, _ = reconciler.reconcile(t.Context(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy())
 	}
 	condition = meta.FindStatusCondition(updatedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
 	if condition.Status != metav1.ConditionTrue {
@@ -271,12 +270,12 @@ func TestAvailableReconcileBurstEvents(t *testing.T) {
 	// Simulate a burst of watch events (node + cluster + namespace) firing together.
 	// All calls happen instantly, well within failureThreshold, so condition must stay True.
 	for i := 0; i < 20; i++ {
-		if _, _, err := reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy()); err != nil {
+		if _, _, err := reconciler.reconcile(t.Context(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy()); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	updatedCluster, _, _ := reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy())
+	updatedCluster, _, _ := reconciler.reconcile(t.Context(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy())
 	condition := meta.FindStatusCondition(updatedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
 	if condition.Status != metav1.ConditionTrue {
 		t.Errorf("expected condition to remain True during burst, got %v", condition.Status)

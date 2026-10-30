@@ -1,7 +1,6 @@
 package managedclustersetbinding
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -113,7 +112,7 @@ func TestSync(t *testing.T) {
 
 			key, _ := cache.MetaNamespaceKeyFunc(c.clusterSetBinding)
 
-			syncErr := ctrl.sync(context.Background(), testingcommon.NewFakeSyncContext(t, key), key)
+			syncErr := ctrl.sync(t.Context(), testingcommon.NewFakeSyncContext(t, key), key)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}
