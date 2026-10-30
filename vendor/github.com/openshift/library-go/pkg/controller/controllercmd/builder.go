@@ -3,11 +3,12 @@ package controllercmd
 import (
 	"context"
 	"fmt"
-	"k8s.io/utils/clock"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"k8s.io/utils/clock"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1alpha1 "github.com/openshift/api/operator/v1alpha1"
@@ -324,12 +325,15 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 		if err != nil {
 			return err
 		}
-		serverConfig.Authorization.Authorizer = union.New(
+		serverConfig.Authorization.Authorizer, err = union.New(
 			// prefix the authorizer with the permissions for metrics scraping which are well known.
 			// openshift RBAC policy will always allow this user to read metrics.
-			hardcodedauthorizer.NewHardCodedMetricsAuthorizer(),
-			serverConfig.Authorization.Authorizer,
+			union.NamedAuthorizer{AuthorizerName: "hardcoded-metrics", Authorizer: hardcodedauthorizer.NewHardCodedMetricsAuthorizer()},
+			union.NamedAuthorizer{AuthorizerName: "default", Authorizer: serverConfig.Authorization.Authorizer},
 		)
+		if err != nil {
+			return err
+		}
 		serverConfig.HealthzChecks = append(serverConfig.HealthzChecks, b.healthChecks...)
 
 		server, err = serverConfig.Complete(nil).New(b.componentName, genericapiserver.NewEmptyDelegate())
