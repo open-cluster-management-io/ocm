@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,55 +22,55 @@ import (
 
 // Test cases with lable "sanity-check" could be ran on an existing environment with validating webhook installed
 // and well configured as sanity check. Resource leftovers should be cleaned up on both hub and managed cluster.
-var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validating-webhook", "sanity-check"), func() {
+var _ = Describe("ManifestWork admission webhook", Label("validating-webhook", "sanity-check"), func() {
 	var nameSuffix string
 	var workName string
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		nameSuffix = rand.String(5)
 		workName = fmt.Sprintf("w1-%s", nameSuffix)
 	})
 
-	ginkgo.AfterEach(func() {
-		ginkgo.By(fmt.Sprintf("delete manifestwork %v/%v", universalClusterName, workName))
-		gomega.Expect(hub.CleanManifestWorks(universalClusterName, workName)).To(gomega.BeNil())
+	AfterEach(func() {
+		By(fmt.Sprintf("delete manifestwork %v/%v", universalClusterName, workName))
+		Expect(hub.CleanManifestWorks(universalClusterName, workName)).To(BeNil())
 	})
 
-	ginkgo.Context("Creating a manifestwork", func() {
-		ginkgo.It("Should respond bad request when creating a manifestwork with no manifests", func() {
+	Context("Creating a manifestwork", func() {
+		It("Should respond bad request when creating a manifestwork with no manifests", func() {
 			work := newManifestWork(universalClusterName, workName)
 			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsBadRequest(err)).Should(BeTrue())
 		})
 
-		ginkgo.It("Should respond bad request when creating a manifest with no name", func() {
+		It("Should respond bad request when creating a manifest with no name", func() {
 			work := newManifestWork(universalClusterName, workName, []runtime.Object{util.NewConfigmap("default", "", nil, nil)}...)
 			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsBadRequest(err)).Should(BeTrue())
 		})
 
-		ginkgo.It("Should respond bad request when creating a manifestwork with duplicate manifests", func() {
+		It("Should respond bad request when creating a manifestwork with duplicate manifests", func() {
 			work := newManifestWork(universalClusterName, workName, []runtime.Object{
 				util.NewConfigmap("default", "cm1", nil, nil),
 				util.NewConfigmap("default", "cm1", nil, nil), // duplicate
 			}...)
 			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsBadRequest(err)).Should(BeTrue())
 		})
 
-		ginkgo.Context("executor", func() {
+		Context("executor", func() {
 			var hubUser string
 			var roleName string
 
-			ginkgo.BeforeEach(func() {
+			BeforeEach(func() {
 				hubUser = fmt.Sprintf("sa-%s", nameSuffix)
 				roleName = fmt.Sprintf("role-%s", nameSuffix)
 
 				if !nilExecutorValidating {
-					ginkgo.Skip(fmt.Sprintf("feature gate %q is disabled", "NilExecutorValidating"))
+					Skip(fmt.Sprintf("feature gate %q is disabled", "NilExecutorValidating"))
 				}
 
 				// create a temporary role
@@ -88,7 +88,7 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 							},
 						},
 					}, metav1.CreateOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				// create a temporary rolebinding
 				_, err = hub.KubeClient.RbacV1().RoleBindings(universalClusterName).Create(
@@ -110,70 +110,70 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 							Name:     roleName,
 						},
 					}, metav1.CreateOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 			})
 
-			ginkgo.AfterEach(func() {
+			AfterEach(func() {
 				// delete the temporary role
 				err := hub.KubeClient.RbacV1().Roles(universalClusterName).Delete(context.TODO(), roleName, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
-					gomega.Expect(err).ToNot(gomega.HaveOccurred())
+					Expect(err).ToNot(HaveOccurred())
 				}
 
 				// delete the temporary rolebinding
 				err = hub.KubeClient.RbacV1().RoleBindings(universalClusterName).Delete(context.TODO(), roleName, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
-					gomega.Expect(err).ToNot(gomega.HaveOccurred())
+					Expect(err).ToNot(HaveOccurred())
 				}
 			})
 
-			ginkgo.It("Should respond bad request when no permission for nil executor", func() {
+			It("Should respond bad request when no permission for nil executor", func() {
 				work := newManifestWork(universalClusterName, workName, []runtime.Object{util.NewConfigmap("default", "cm1", nil, nil)}...)
 
 				// impersonate as a hub user without execute-as permission
 				hubClusterCfg, err := clientcmd.BuildConfigFromFlags("", hubKubeconfig)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 				impersonatedConfig := *hubClusterCfg
 				impersonatedConfig.Impersonate.UserName = fmt.Sprintf("system:serviceaccount:%s:%s", universalClusterName, hubUser)
 				impersonatedHubWorkClient, err := workclientset.NewForConfig(&impersonatedConfig)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 				_, err = impersonatedHubWorkClient.WorkV1().ManifestWorks(universalClusterName).Create(
 					context.Background(), work, metav1.CreateOptions{})
-				gomega.Expect(err).To(gomega.HaveOccurred())
+				Expect(err).To(HaveOccurred())
 				if !errors.IsBadRequest(err) {
 					// not bad request, assert true=false to show the error message
-					gomega.Expect(err).ToNot(gomega.HaveOccurred())
+					Expect(err).ToNot(HaveOccurred())
 				}
 			})
 		})
 	})
 
-	ginkgo.Context("Updating a manifestwork", func() {
+	Context("Updating a manifestwork", func() {
 		var err error
 
-		ginkgo.BeforeEach(func() {
+		BeforeEach(func() {
 			work := newManifestWork(universalClusterName, workName, []runtime.Object{util.NewConfigmap("default", "cm1", nil, nil)}...)
 			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 
-		ginkgo.It("Should respond bad request when a manifestwork with invalid manifests", func() {
+		It("Should respond bad request when a manifestwork with invalid manifests", func() {
 			manifest := workapiv1.Manifest{}
 			manifest.Object = util.NewConfigmap("default", "", nil, nil)
 			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, manifest)
 				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 				return err
 			})
 
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsBadRequest(err)).Should(BeTrue())
 		})
 
-		ginkgo.It("Should respond bad request when the size of manifests is more than the limit", func() {
+		It("Should respond bad request when the size of manifests is more than the limit", func() {
 			manifests := []workapiv1.Manifest{
 				{
 					RawExtension: runtime.RawExtension{
@@ -204,15 +204,15 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 
 			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, manifests...)
 				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 				return err
 			})
 
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsBadRequest(err)).Should(BeTrue())
 		})
 	})
 })

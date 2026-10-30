@@ -417,7 +417,9 @@ func TestNewApprover(t *testing.T) {
 		t.Error(err)
 	}
 
-	features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=true", ocmfeature.ManagedClusterAutoApproval))
+	if err := features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=true", ocmfeature.ManagedClusterAutoApproval)); err != nil {
+		t.Fatal(err)
+	}
 	_, err = NewCSRHubDriver(kubeClient, informerFactory, []string{})
 	if err != nil {
 		t.Error(err)

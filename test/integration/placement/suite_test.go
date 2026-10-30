@@ -3,8 +3,8 @@ package placement
 import (
 	"testing"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -37,15 +37,15 @@ var kubeClient kubernetes.Interface
 var clusterClient clusterv1client.Interface
 
 func TestIntegration(t *testing.T) {
-	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "Integration Suite")
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Integration Suite")
 }
 
-var _ = ginkgo.BeforeSuite(func() {
-	ginkgo.By("bootstrapping test environment")
+var _ = BeforeSuite(func() {
+	By("bootstrapping test environment")
 
 	err := features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubPlacementFeatureGates)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	// start a kube-apiserver
 	testEnv = &envtest.Environment{
@@ -54,20 +54,20 @@ var _ = ginkgo.BeforeSuite(func() {
 	}
 
 	cfg, err := testEnv.Start()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(cfg).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(cfg).ToNot(BeNil())
 
 	kubeClient, err = kubernetes.NewForConfig(cfg)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 	clusterClient, err = clusterv1client.NewForConfig(cfg)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	restConfig = cfg
 })
 
-var _ = ginkgo.AfterSuite(func() {
-	ginkgo.By("tearing down the test environment")
+var _ = AfterSuite(func() {
+	By("tearing down the test environment")
 
 	err := testEnv.Stop()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 })

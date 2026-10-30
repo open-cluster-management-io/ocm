@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -33,13 +33,13 @@ var CRDPaths = []string{
 }
 
 func TestWorkManager(t *testing.T) {
-	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "Work Manager Suite")
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Work Manager Suite")
 }
 
-var _ = ginkgo.BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
-	ginkgo.By("bootstrapping test environment")
+var _ = BeforeSuite(func() {
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	By("bootstrapping test environment")
 	var err error
 
 	// start a kube-apiserver
@@ -48,22 +48,22 @@ var _ = ginkgo.BeforeSuite(func() {
 		CRDDirectoryPaths:     CRDPaths,
 	}
 	cfg, err = testEnv.Start()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(cfg).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(cfg).ToNot(BeNil())
 
 	err = workapiv1.Install(scheme.Scheme)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 })
 
-var _ = ginkgo.AfterSuite(func() {
-	ginkgo.By("tearing down the test environment")
+var _ = AfterSuite(func() {
+	By("tearing down the test environment")
 
 	err := testEnv.Stop()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 })
 
-var _ = ginkgo.Describe("start hub manager", func() {
-	ginkgo.It("start hub manager", func() {
+var _ = Describe("start hub manager", func() {
+	It("start hub manager", func() {
 		ctx, stopHub := context.WithCancel(context.Background())
 		opts := NewWorkHubManagerOptions()
 		opts.WorkDriver = "kube"
@@ -71,7 +71,7 @@ var _ = ginkgo.Describe("start hub manager", func() {
 		hubConfig := NewWorkHubManagerConfig(opts)
 
 		err := features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubWorkFeatureGates)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// start hub controller
 		go func() {
@@ -79,7 +79,7 @@ var _ = ginkgo.Describe("start hub manager", func() {
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		}()
 		stopHub()
 	})

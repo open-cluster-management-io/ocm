@@ -222,15 +222,16 @@ func TestProxyDecorator(t *testing.T) {
 				for _, c := range pod.Spec.Containers {
 					if c.Env != nil {
 						for _, e := range c.Env {
-							if e.Name == "HTTP_PROXY" || e.Name == "http_proxy" { //nolint:gocritic
+							switch e.Name {
+							case "HTTP_PROXY", "http_proxy":
 								if e.Value != "http://proxy" {
 									t.Errorf("http proxy env is not correct, got %v", e)
 								}
-							} else if e.Name == "HTTPS_PROXY" || e.Name == "https_proxy" {
+							case "HTTPS_PROXY", "https_proxy":
 								if e.Value != "https://proxy" {
 									t.Errorf("https proxy env is not correct, got %v", e)
 								}
-							} else if e.Name == "NO_PROXY" || e.Name == "no_proxy" {
+							case "NO_PROXY", "no_proxy":
 								if e.Value != "no-proxy" {
 									t.Errorf("no proxy env is not correct, got %v", e)
 								}

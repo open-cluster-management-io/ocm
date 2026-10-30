@@ -80,7 +80,8 @@ func TestNewClients_ConfigValidation(t *testing.T) {
 
 func TestClientsRunMethodSignature(t *testing.T) {
 	t.Parallel()
-	// Compile-time assertion: (*Clients).Run must be func(*Clients, context.Context)
+	// Compile-time assertion: (*Clients).Run must be func(*Clients, context.Context).
+	//nolint:staticcheck // QF1011: the explicit type is the assertion.
 	var _ func(*Clients, context.Context) = (*Clients).Run
 }
 

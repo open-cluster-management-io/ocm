@@ -106,7 +106,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				lease := &coordinationv1.Lease{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-lease", Namespace: "test-lease-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, lease)
+				if err := evt.SetData(cloudevents.ApplicationJSON, lease); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -123,7 +125,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				lease := &coordinationv1.Lease{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-lease", Namespace: "test-lease-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, lease)
+				if err := evt.SetData(cloudevents.ApplicationJSON, lease); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -140,7 +144,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				lease := &coordinationv1.Lease{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-lease", Namespace: "test-lease-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, lease)
+				if err := evt.SetData(cloudevents.ApplicationJSON, lease); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -161,7 +167,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				lease := &coordinationv1.Lease{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-lease", Namespace: "test-lease-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, lease)
+				if err := evt.SetData(cloudevents.ApplicationJSON, lease); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {

@@ -17,31 +17,31 @@ build-work-integration:
 
 test-registration-integration: envtest-setup
 	go test -c ./test/integration/registration -o ./registration-integration.test -mod=vendor
-	./registration-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS} -v=5
+	./registration-integration.test -ginkgo.v -ginkgo.fail-fast ${ARGS} -v=5
 .PHONY: test-registration-integration
 
 test-work-integration: envtest-setup build-work-integration
-	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS}
+	./work-integration.test -ginkgo.v -ginkgo.fail-fast ${ARGS}
 .PHONY: test-work-integration
 
 test-placement-integration: envtest-setup
 	go test -c ./test/integration/placement -o ./placement-integration.test
-	./placement-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS}
+	./placement-integration.test -ginkgo.v -ginkgo.fail-fast ${ARGS}
 .PHONY: test-placement-integration
 
 test-registration-operator-integration: envtest-setup
 	go test -c ./test/integration/operator -o ./registration-operator-integration.test
-	./registration-operator-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS}
+	./registration-operator-integration.test -ginkgo.v -ginkgo.fail-fast ${ARGS}
 .PHONY: test-registration-operator-integration
 
 test-addon-integration: envtest-setup
 	go test -c ./test/integration/addon -o ./addon-integration.test
-	./addon-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS}
+	./addon-integration.test -ginkgo.v -ginkgo.fail-fast ${ARGS}
 .PHONY: test-addon-integration
 
 # In the cloud events scenario, skip the following tests
 test-cloudevents-work-grpc-integration: envtest-setup build-work-integration
-	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast \
+	./work-integration.test -ginkgo.v -ginkgo.fail-fast \
 		-test.driver=grpc \
 		-v=4 ${ARGS}
 .PHONY: test-cloudevents-work-grpc-integration

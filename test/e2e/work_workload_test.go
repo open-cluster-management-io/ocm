@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -145,26 +145,26 @@ const (
 
 // Test cases with lable "sanity-check" could be ran on an existing environment with work agent installed
 // and well configured as sanity check. Resource leftovers should be cleaned up on both hub and managed cluster.
-var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check"), func() {
+var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 	var workName string
 	var err error
 	var nameSuffix string
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		nameSuffix = rand.String(5)
 		workName = fmt.Sprintf("work-%s", nameSuffix)
 	})
 
-	ginkgo.AfterEach(func() {
-		ginkgo.By(fmt.Sprintf("delete manifestwork %v/%v", universalClusterName, workName))
-		gomega.Expect(hub.CleanManifestWorks(universalClusterName, workName)).To(gomega.BeNil())
+	AfterEach(func() {
+		By(fmt.Sprintf("delete manifestwork %v/%v", universalClusterName, workName))
+		Expect(hub.CleanManifestWorks(universalClusterName, workName)).To(BeNil())
 	})
 
-	ginkgo.Context("Work CRUD", func() {
+	Context("Work CRUD", func() {
 		var ns1 string
 		var ns2 string
 
-		ginkgo.BeforeEach(func() {
+		BeforeEach(func() {
 			ns1 = fmt.Sprintf("ns1-%s", nameSuffix)
 			ns2 = fmt.Sprintf("ns2-%s", nameSuffix)
 
@@ -172,11 +172,11 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 			ns := &corev1.Namespace{}
 			ns.Name = ns2
 			_, err = spoke.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 		})
 
-		ginkgo.AfterEach(func() {
+		AfterEach(func() {
 			// remove finalizer from cm3 if necessary
 			cm3, err := spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
 			if err == nil {
@@ -184,18 +184,18 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				err = spoke.KubeClient.CoreV1().ConfigMaps(ns2).Delete(context.Background(), "cm3", metav1.DeleteOptions{})
 			}
 			if err != nil {
-				gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+				Expect(errors.IsNotFound(err)).To(BeTrue())
 			}
 
 			// delete ns2
 			err = spoke.KubeClient.CoreV1().Namespaces().Delete(context.Background(), ns2, metav1.DeleteOptions{})
 			if err != nil {
-				gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+				Expect(errors.IsNotFound(err)).To(BeTrue())
 			}
 		})
 
-		ginkgo.It("Should create, update and delete manifestwork successfully", func() {
-			ginkgo.By("create manifestwork")
+		It("Should create, update and delete manifestwork successfully", func() {
+			By("create manifestwork")
 
 			cmFinalizers := []string{"cluster.open-cluster-management.io/testing"}
 			objects := []runtime.Object{
@@ -206,10 +206,10 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 			}
 			work := newManifestWork(universalClusterName, workName, objects...)
 			work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// check if resources are applied for manifests
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				_, err := spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm1", metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -227,19 +227,19 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 
 				_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
 				return err
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
 			// check status conditions in manifestwork status
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				// check manifest status conditions
 				expectedManifestStatuses := []metav1.ConditionStatus{
 					metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
 				return assertManifestWorkAppliedSuccessfully(universalClusterName, workName, expectedManifestStatuses)
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
 			// get the corresponding AppliedManifestWork
 			var appliedManifestWork *workapiv1.AppliedManifestWork
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				appliedManifestWorkList, err := spoke.WorkClient.WorkV1().AppliedManifestWorks().List(context.Background(), metav1.ListOptions{})
 				if err != nil {
 					return err
@@ -253,7 +253,7 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				}
 
 				return fmt.Errorf("not found the applied manifest work with suffix %s", workName)
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
 			// check applied resources in manifestwork status
 			expectedAppliedResources := []workapiv1.AppliedManifestResourceMeta{
@@ -274,9 +274,9 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					Version: appliedResource.Version,
 				})
 			}
-			gomega.Expect(reflect.DeepEqual(actualAppliedResources, expectedAppliedResources)).To(gomega.BeTrue())
+			Expect(reflect.DeepEqual(actualAppliedResources, expectedAppliedResources)).To(BeTrue())
 
-			ginkgo.By("update manifestwork")
+			By("update manifestwork")
 			cmData := map[string]string{"x": "y"}
 			newObjects := []runtime.Object{
 				objects[1],
@@ -284,7 +284,7 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				util.NewConfigmap(ns2, "cm3", cmData, cmFinalizers),
 			}
 			newWork := newManifestWork(universalClusterName, workName, newObjects...)
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -293,10 +293,10 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				work.Spec.Workload.Manifests = newWork.Spec.Workload.Manifests
 				work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 				return err
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
 			// check if cm1 is removed from applied resources list in status
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				appliedManifestWork, err = spoke.WorkClient.WorkV1().AppliedManifestWorks().Get(
 					context.Background(), appliedManifestWork.Name, metav1.GetOptions{})
 				if err != nil {
@@ -313,14 +313,14 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				expectedManifestStatuses := []metav1.ConditionStatus{
 					metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
 				return assertManifestWorkAppliedSuccessfully(universalClusterName, workName, expectedManifestStatuses)
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
 			// check if cm1 is deleted
 			_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm1", metav1.GetOptions{})
-			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+			Expect(errors.IsNotFound(err)).To(BeTrue())
 
 			// check if cm3 is updated
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				cm, err := spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -331,11 +331,11 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				}
 
 				return nil
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
-			ginkgo.By("delete manifestwork")
+			By("delete manifestwork")
 			err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Delete(context.Background(), workName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// remove finalizer from cm3 in 2 seconds
 			timer := time.NewTimer(2 * time.Second)
@@ -349,48 +349,48 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 			}()
 
 			// wait for deletion of manifest work
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
-			}).Should(gomega.BeTrue())
+			}).Should(BeTrue())
 
 			// Once manifest work is deleted, its corresponding appliedManifestWorks should be deleted as well
 			_, err = spoke.WorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWork.Name, metav1.GetOptions{})
-			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+			Expect(errors.IsNotFound(err)).To(BeTrue())
 
 			// Once manifest work is deleted, all applied resources should have already been deleted too
 			_, err = spoke.KubeClient.CoreV1().Namespaces().Get(context.Background(), ns1, metav1.GetOptions{})
-			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+			Expect(errors.IsNotFound(err)).To(BeTrue())
 
 			_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm2", metav1.GetOptions{})
-			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+			Expect(errors.IsNotFound(err)).To(BeTrue())
 
 			_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
-			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+			Expect(errors.IsNotFound(err)).To(BeTrue())
 
 			err = spoke.KubeClient.CoreV1().Namespaces().Delete(context.Background(), ns2, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
-	ginkgo.Context("With Job", func() {
+	Context("With Job", func() {
 		var jobName string
 
-		ginkgo.BeforeEach(func() {
+		BeforeEach(func() {
 			jobName = fmt.Sprintf("job1-%s", nameSuffix)
 		})
 
-		ginkgo.It("Should create, delete job in manifestwork successfully", func() {
-			ginkgo.By("create manifestwork")
+		It("Should create, delete job in manifestwork successfully", func() {
+			By("create manifestwork")
 			objects := []runtime.Object{
 				newJob(jobName),
 			}
 			work := newManifestWork(universalClusterName, workName, objects...)
 			work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// check status conditions in manifestwork status
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -404,10 +404,10 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return fmt.Errorf("condition %s is not true", workapiv1.WorkAvailable)
 				}
 				return nil
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
 			// Ensure pod is created
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				pods, err := spoke.KubeClient.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{})
 				if err != nil {
 					return err
@@ -418,14 +418,14 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				}
 
 				return nil
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
-			ginkgo.By("delete manifestwork")
+			By("delete manifestwork")
 			err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Delete(context.Background(), workName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// pods should be all cleaned.
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				pods, err := spoke.KubeClient.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{})
 				if err != nil {
 					return err
@@ -436,52 +436,52 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				}
 
 				return nil
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 		})
 	})
 
-	ginkgo.Context("With CRD/CR", func() {
+	Context("With CRD/CR", func() {
 		var crNamespace string
 
-		ginkgo.BeforeEach(func() {
+		BeforeEach(func() {
 			crNamespace = fmt.Sprintf("ns3-%s", nameSuffix)
 
 			// create namespace for cr
 			ns := &corev1.Namespace{}
 			ns.Name = crNamespace
 			_, err = spoke.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
-		ginkgo.AfterEach(func() {
+		AfterEach(func() {
 			// delete namespace for cr
 			err = spoke.KubeClient.CoreV1().Namespaces().Delete(context.Background(), crNamespace, metav1.DeleteOptions{})
 			if err != nil {
-				gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+				Expect(errors.IsNotFound(err)).To(BeTrue())
 			}
 		})
 
-		ginkgo.It("should create crd/cr with aggregated cluster role successfully", func() {
+		It("should create crd/cr with aggregated cluster role successfully", func() {
 			crd, err := newCrd(guestBookCRDJson)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			clusterRoleName := fmt.Sprintf("cr-%s", nameSuffix)
 			clusterRole := newAggregatedClusterRole(clusterRoleName, "my.domain", "guestbooks")
 
 			cr, err := newCr(guestbookCRJson, crNamespace, "cr1")
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			objects := []runtime.Object{crd, clusterRole, cr}
 			work := newManifestWork(universalClusterName, workName, objects...)
 			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// check status conditions in manifestwork status
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				expectedManifestStatuses := []metav1.ConditionStatus{
 					metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
 				return assertManifestWorkAppliedSuccessfully(universalClusterName, workName, expectedManifestStatuses)
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
 			// Upgrade crd/cr and check if cr resource is recreated.
 			// Get UID of cr resource at first.
@@ -490,24 +490,24 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				Version:  "v1",
 				Group:    "my.domain",
 			}).Namespace(crNamespace).Get(context.Background(), "cr1", metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			currentUID := guestbook.GetUID()
 
 			// Upgrade crd/cr in the work
 			cr, err = newCr(upgradedGuestBookCRJson, crNamespace, "cr1")
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			objects = []runtime.Object{crd, clusterRole, cr}
 			work = newManifestWork(universalClusterName, workName, objects...)
 
 			// Update work
 			existingWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			work.ResourceVersion = existingWork.ResourceVersion
 			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// check if v2 cr is applied
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				guestbook, err := spoke.DynamicClient.Resource(schema.GroupVersionResource{
 					Resource: "guestbooks",
 					Version:  "v2",
@@ -525,12 +525,12 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return fmt.Errorf("expect UID to be the same, expected: %q, actual %q", currentUID, guestbook.GetUID())
 				}
 				return nil
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 		})
 	})
 
-	ginkgo.Context("ManifestWork status feedback", func() {
-		ginkgo.It("should return wellkown status of deployment", func() {
+	Context("ManifestWork status feedback", func() {
+		It("should return wellkown status of deployment", func() {
 			deployment := newDeployment("busybox")
 			objects := []runtime.Object{deployment}
 			work := newManifestWork(universalClusterName, workName, objects...)
@@ -559,10 +559,10 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				},
 			}
 			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Check deployment status
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -612,21 +612,21 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return fmt.Errorf("statusFeedbackSynced condition should be True")
 				}
 				return nil
-			}).WithTimeout(2 * time.Minute).ShouldNot(gomega.HaveOccurred())
+			}).WithTimeout(2 * time.Minute).ShouldNot(HaveOccurred())
 		})
 	})
 
-	ginkgo.Context("Multiple owner references deletion", func() {
+	Context("Multiple owner references deletion", func() {
 		var nsName, cmName string
 		ctx := context.Background()
 
-		ginkgo.BeforeEach(func() {
+		BeforeEach(func() {
 			nsName = fmt.Sprintf("ns1-%s", rand.String(5))
 			cmName = "cm1"
 			ns := &corev1.Namespace{}
 			ns.Name = nsName
 			_, err := spoke.KubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			objects := []runtime.Object{
 				util.NewConfigmap(nsName, cmName, nil, nil),
@@ -634,27 +634,27 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 			work := newManifestWork(universalClusterName, workName, objects...)
 			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(
 				context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
-		ginkgo.AfterEach(func() {
+		AfterEach(func() {
 			err := spoke.KubeClient.CoreV1().Namespaces().Delete(ctx, nsName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 		})
 
-		ginkgo.It("Should keep the resource when there are other appliedManifestWork owners", func() {
+		It("Should keep the resource when there are other appliedManifestWork owners", func() {
 			work2Name := fmt.Sprintf("w2-%s", nameSuffix)
 			objects := []runtime.Object{
 				util.NewConfigmap(nsName, cmName, nil, nil),
 			}
 			work2 := newManifestWork(universalClusterName, work2Name, objects...)
 			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(ctx, work2, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			for _, name := range []string{workName, work2Name} {
 				// check status conditions in manifestwork status
-				gomega.Eventually(func() error {
+				Eventually(func() error {
 					work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(
 						ctx, name, metav1.GetOptions{})
 					if err != nil {
@@ -664,12 +664,12 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					// check manifest status conditions
 					expectedManifestStatuses := []metav1.ConditionStatus{metav1.ConditionTrue}
 					return assertManifestWorkAppliedSuccessfully(universalClusterName, work.Name, expectedManifestStatuses)
-				}).ShouldNot(gomega.HaveOccurred())
+				}).ShouldNot(HaveOccurred())
 			}
 
 			cmUID := types.UID("test")
 			// check if resources are applied for manifests
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				cm, err := spoke.KubeClient.CoreV1().ConfigMaps(nsName).Get(ctx, cmName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -680,53 +680,53 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return fmt.Errorf("expected 2 owners, but got %d", len(cm.OwnerReferences))
 				}
 				return nil
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
-			ginkgo.By("delete manifestwork mw1")
+			By("delete manifestwork mw1")
 			err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Delete(ctx, workName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// wait for deletion of manifest work
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
-			}).Should(gomega.BeTrue())
+			}).Should(BeTrue())
 
 			cm, err := spoke.KubeClient.CoreV1().ConfigMaps(nsName).Get(ctx, cmName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(cm.UID).To(gomega.Equal(cmUID))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cm.UID).To(Equal(cmUID))
 
-			ginkgo.By("delete manifestwork mw2")
+			By("delete manifestwork mw2")
 			err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Delete(ctx, work2Name, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// wait for deletion of manifest work
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, work2Name, metav1.GetOptions{})
 				return errors.IsNotFound(err)
-			}).Should(gomega.BeTrue())
+			}).Should(BeTrue())
 
 			_, err = spoke.KubeClient.CoreV1().ConfigMaps(nsName).Get(ctx, cmName, metav1.GetOptions{})
-			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 
-		ginkgo.It("Should delete the resource even if there are other non-appliedManifestWork owners", func() {
+		It("Should delete the resource even if there are other non-appliedManifestWork owners", func() {
 			// check status conditions in manifestwork status
-			gomega.Eventually(func() error { // check manifest status conditions
+			Eventually(func() error { // check manifest status conditions
 				expectedManifestStatuses := []metav1.ConditionStatus{metav1.ConditionTrue}
 				return assertManifestWorkAppliedSuccessfully(universalClusterName, workName, expectedManifestStatuses)
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
-			ginkgo.By("check if resources are applied for manifests")
+			By("check if resources are applied for manifests")
 			_, err := spoke.KubeClient.CoreV1().ConfigMaps(nsName).Get(ctx, cmName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			ginkgo.By("Add a non-appliedManifestWork owner to the applied resource")
+			By("Add a non-appliedManifestWork owner to the applied resource")
 			cmOwner, err := spoke.KubeClient.CoreV1().ConfigMaps(nsName).Create(ctx,
 				util.NewConfigmap(nsName, "owner", nil, nil), metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				cm, err := spoke.KubeClient.CoreV1().ConfigMaps(nsName).Get(ctx, cmName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -740,36 +740,36 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 
 				_, err = spoke.KubeClient.CoreV1().ConfigMaps(nsName).Update(ctx, cm, metav1.UpdateOptions{})
 				return err
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
 			cm, err := spoke.KubeClient.CoreV1().ConfigMaps(nsName).Get(ctx, cmName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(len(cm.OwnerReferences) == 2).To(gomega.BeTrue())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(cm.OwnerReferences) == 2).To(BeTrue())
 
-			ginkgo.By("delete manifestwork mw1")
+			By("delete manifestwork mw1")
 			err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Delete(ctx, workName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			ginkgo.By("wait for deletion of manifest work")
-			gomega.Eventually(func() bool {
+			By("wait for deletion of manifest work")
+			Eventually(func() bool {
 				_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
-			}).Should(gomega.BeTrue())
+			}).Should(BeTrue())
 
-			ginkgo.By("check the resource cm was deleted successfully")
-			gomega.Eventually(func() bool {
+			By("check the resource cm was deleted successfully")
+			Eventually(func() bool {
 				_, err := spoke.KubeClient.CoreV1().ConfigMaps(nsName).Get(ctx, cmName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
-			}).Should(gomega.BeTrue())
+			}).Should(BeTrue())
 
 			err = spoke.KubeClient.CoreV1().ConfigMaps(nsName).Delete(ctx, cmOwner.Name, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
-	ginkgo.Context("CleanUpCompletedManifestWork feature", func() {
-		ginkgo.It("Should cleanup manifestwork with TTL after job completion", func() {
-			ginkgo.By("Create manifestwork with job that sleeps 5 seconds")
+	Context("CleanUpCompletedManifestWork feature", func() {
+		It("Should cleanup manifestwork with TTL after job completion", func() {
+			By("Create manifestwork with job that sleeps 5 seconds")
 			jobName := fmt.Sprintf("sleep-job-%s", nameSuffix)
 			sleepJob := newSleepJob(jobName, 10)
 			objects := []runtime.Object{
@@ -806,11 +806,11 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				},
 			}
 
-			work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
 
-			ginkgo.By("Wait for job to be applied and running")
-			gomega.Eventually(func() error {
+			By("Wait for job to be applied and running")
+			Eventually(func() error {
 				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -822,10 +822,10 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return fmt.Errorf("work not available yet")
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
 			// Verify job pod was created
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				pods, err := spoke.KubeClient.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("job=%s", jobName),
 				})
@@ -836,10 +836,10 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return fmt.Errorf("job pod not found")
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
-			ginkgo.By("Wait for job to complete and manifestwork to be marked complete")
-			gomega.Eventually(func() error {
+			By("Wait for job to complete and manifestwork to be marked complete")
+			Eventually(func() error {
 				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -848,10 +848,10 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return fmt.Errorf("work not complete yet")
 				}
 				return nil
-			}, 90*time.Second, 1*time.Second).Should(gomega.Succeed())
+			}, 90*time.Second, 1*time.Second).Should(Succeed())
 
-			ginkgo.By("Wait for manifestwork to be deleted after TTL")
-			gomega.Eventually(func() error {
+			By("Wait for manifestwork to be deleted after TTL")
+			Eventually(func() error {
 				currentWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
 					return nil
@@ -860,18 +860,18 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return err
 				}
 				return fmt.Errorf("manifestwork still exists %v, %v", currentWork.DeletionTimestamp, currentWork.Status.Conditions)
-			}, 30*time.Second, 2*time.Second).Should(gomega.Succeed())
+			}, 30*time.Second, 2*time.Second).Should(Succeed())
 
-			ginkgo.By("Verify job resources are cleaned up")
-			gomega.Eventually(func() bool {
+			By("Verify job resources are cleaned up")
+			Eventually(func() bool {
 				_, err := spoke.KubeClient.BatchV1().Jobs("default").Get(context.Background(), jobName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
-			}).Should(gomega.BeTrue())
+			}).Should(BeTrue())
 		})
 	})
 
-	ginkgo.Context("ManifestWork server side apply", func() {
-		ginkgo.It("should ignore fields with certain field", func() {
+	Context("ManifestWork server side apply", func() {
+		It("should ignore fields with certain field", func() {
 			deployment := newDeployment("busybox-ssa")
 			deployment.Spec.Replicas = new(int32(2))
 			objects := []runtime.Object{deployment}
@@ -898,10 +898,10 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				},
 			}
 			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Check deployment status
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(context.Background(), deployment.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -913,10 +913,10 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return fmt.Errorf("expected owner references, got none")
 				}
 				return nil
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
-			ginkgo.By("update replicas in the manifestwork")
-			gomega.Eventually(func() error {
+			By("update replicas in the manifestwork")
+			Eventually(func() error {
 				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -927,10 +927,10 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				actualWork.Spec.Workload = newWork.Spec.Workload
 				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), actualWork, metav1.UpdateOptions{})
 				return err
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
 			// Check deployment status
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(context.Background(), deployment.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -939,19 +939,19 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return fmt.Errorf("expected 3 replicas, got %d", *deploy.Spec.Replicas)
 				}
 				return nil
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
-			ginkgo.By("update deployment with new replicas")
+			By("update deployment with new replicas")
 			specConfig := applyappsv1.DeploymentSpec().WithReplicas(5)
 			applyConfig := applyappsv1.Deployment(deployment.Name, deployment.Namespace).WithSpec(specConfig)
 			_, err = spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Apply(context.Background(), applyConfig, metav1.ApplyOptions{
 				FieldManager: "another-actor",
 				Force:        true,
 			})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			ginkgo.By("update work with new replicas and type to onSpokePresent")
-			gomega.Eventually(func() error {
+			By("update work with new replicas and type to onSpokePresent")
+			Eventually(func() error {
 				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -963,10 +963,10 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				actualWork.Spec.ManifestConfigs[0].UpdateStrategy.ServerSideApply.IgnoreFields[0].Condition = workapiv1.IgnoreFieldsConditionOnSpokePresent
 				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), actualWork, metav1.UpdateOptions{})
 				return err
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
 			// wait until the work has been applied
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -979,10 +979,10 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return fmt.Errorf("expect work is applied.")
 				}
 				return nil
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
 			// Check deployment status, it should not be changed
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(context.Background(), deployment.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -991,14 +991,14 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return fmt.Errorf("expected 5 replicas, got %d", *deploy.Spec.Replicas)
 				}
 				return nil
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
 			err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Delete(
 				context.Background(), work.Name, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Check deployment is removed
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				_, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(
 					context.Background(), deployment.Name, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
@@ -1008,7 +1008,7 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return err
 				}
 				return fmt.Errorf("resource still exists")
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 		})
 	})
 })

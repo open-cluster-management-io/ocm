@@ -302,7 +302,9 @@ func TestStatusControllerSync(t *testing.T) {
 
 			// Populate informers
 			for _, cluster := range c.clusters {
-				clusterInformers.Cluster().V1().ManagedClusters().Informer().GetStore().Add(cluster)
+				if err := clusterInformers.Cluster().V1().ManagedClusters().Informer().GetStore().Add(cluster); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			// Add indexer for profiles
@@ -315,7 +317,9 @@ func TestStatusControllerSync(t *testing.T) {
 			}
 
 			for _, profile := range c.existingProfiles {
-				cpInformer.Informer().GetStore().Add(profile)
+				if err := cpInformer.Informer().GetStore().Add(profile); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := &clusterProfileStatusController{

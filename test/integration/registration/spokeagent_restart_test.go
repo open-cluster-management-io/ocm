@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,9 +21,9 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Agent Restart", func() {
+var _ = Describe("Agent Restart", func() {
 
-	ginkgo.It("restart agent", func() {
+	It("restart agent", func() {
 		var err error
 		managedClusterName := "restart-test-cluster1"
 
@@ -32,11 +32,11 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 
 		bootstrapFile := path.Join(util.TestDir, "restart-test", "kubeconfig")
 
-		ginkgo.By("Create bootstrap kubeconfig")
+		By("Create bootstrap kubeconfig")
 		err = authn.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, serverCertFile, securePort, 20*time.Second)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
-		ginkgo.By("run registration agent")
+		By("run registration agent")
 		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
@@ -49,42 +49,42 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 
 		stopAgent := runAgent("restart-test", agentOptions, commOptions, spokeCfg)
 
-		ginkgo.By("Check existence of csr and ManagedCluster")
+		By("Check existence of csr and ManagedCluster")
 		// the csr should be created
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// the spoke cluster should be created
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			if _, err := util.GetManagedCluster(clusterClient, managedClusterName); err != nil {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-		ginkgo.By("Accept ManagedCluster and approve csr")
+		By("Accept ManagedCluster and approve csr")
 		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Second*20)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
-		ginkgo.By("Check if hub kubeconfig secret is updated")
+		By("Check if hub kubeconfig secret is updated")
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-		ginkgo.By("Check if ManagedCluster joins the hub")
+		By("Check if ManagedCluster joins the hub")
 		// the spoke cluster should have joined condition finally
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -93,15 +93,15 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 				return fmt.Errorf("cluster should be joined")
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Stop registration agent and wait for a grace period")
+		By("Stop registration agent and wait for a grace period")
 		stopAgent()
 		time.Sleep(5 * time.Second)
 
 		// remove the join condition. A new join condition will be added once the registration agent
 		// is restarted successfully
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -116,9 +116,9 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 			spokeCluster.Status.Conditions = conditions
 			_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.TODO(), spokeCluster, metav1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-		ginkgo.By("Restart registration agent")
+		By("Restart registration agent")
 		agentOptions = &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
@@ -131,9 +131,9 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 		stopAgent = runAgent("restart-test", agentOptions, commOptions, spokeCfg)
 		defer stopAgent()
 
-		ginkgo.By("Check if ManagedCluster joins the hub")
+		By("Check if ManagedCluster joins the hub")
 		// the spoke cluster should have joined condition finally
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -142,24 +142,24 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 				return fmt.Errorf("cluster should be joined")
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Check the existence of the renewal csr")
+		By("Check the existence of the renewal csr")
 		// The renewal csr is approved automaically on hub, which indicates the
 		// cluster/agent names keep the same
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			_, err = util.FindAutoApprovedSpokeCSR(kubeClient, managedClusterName)
 			if err != nil {
 				return err
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
 	// This case happens when registration agent is restarted with a new cluster name by specifying
 	// argument 'cluster-name' and the agent has already had a hub kubecofig with a different
 	// cluster name. A bootstrap process is expected.
-	ginkgo.It("restart agent with a different cluster name", func() {
+	It("restart agent with a different cluster name", func() {
 		var err error
 		managedClusterName := "restart-test-cluster2"
 
@@ -168,11 +168,11 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 
 		bootstrapFile := path.Join(util.TestDir, "restart-test", "kubeconfig")
 
-		ginkgo.By("Create bootstrap kubeconfig")
+		By("Create bootstrap kubeconfig")
 		err = authn.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, serverCertFile, securePort, 20*time.Second)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
-		ginkgo.By("run registration agent")
+		By("run registration agent")
 		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
@@ -184,36 +184,36 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 		commOptions.SpokeClusterName = managedClusterName
 		stopAgent := runAgent("restart-test", agentOptions, commOptions, spokeCfg)
 
-		ginkgo.By("Check existence of csr and ManagedCluster")
+		By("Check existence of csr and ManagedCluster")
 		// the csr should be created
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			_, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName)
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		// the spoke cluster should be created
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			_, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Accept ManagedCluster and approve csr")
+		By("Accept ManagedCluster and approve csr")
 		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Second*20)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
-		ginkgo.By("Check if hub kubeconfig secret is updated")
+		By("Check if hub kubeconfig secret is updated")
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			_, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret)
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Check if ManagedCluster joins the hub")
+		By("Check if ManagedCluster joins the hub")
 		// the spoke cluster should have joined condition finally
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -222,13 +222,13 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 				return fmt.Errorf("cluster should be joined")
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Stop registration agent and wait for a grace period")
+		By("Stop registration agent and wait for a grace period")
 		stopAgent()
 		time.Sleep(5 * time.Second)
 
-		ginkgo.By("Restart registration agent with a new cluster name")
+		By("Restart registration agent with a new cluster name")
 		managedClusterName = "restart-test-cluster3"
 		agentOptions = &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapFile,
@@ -242,36 +242,36 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 		stopAgent = runAgent("restart-test", agentOptions, commOptions, spokeCfg)
 		defer stopAgent()
 
-		ginkgo.By("Check the existence of csr and the new ManagedCluster")
+		By("Check the existence of csr and the new ManagedCluster")
 		// the csr should be created
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			_, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName)
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		// the spoke cluster should be created
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			_, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Accept the new ManagedCluster and approve csr")
+		By("Accept the new ManagedCluster and approve csr")
 		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Second*20)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
-		ginkgo.By("Check if hub kubeconfig secret is updated")
+		By("Check if hub kubeconfig secret is updated")
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			_, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret)
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Check if the new ManagedCluster joins the hub")
+		By("Check if the new ManagedCluster joins the hub")
 		// the spoke cluster should have joined condition finally
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -280,10 +280,10 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 				return fmt.Errorf("cluster should be joined")
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
-	ginkgo.It("agent rebootstrap when kubeconfig current context cluster name changes", func() {
+	It("agent rebootstrap when kubeconfig current context cluster name changes", func() {
 		var err error
 		spokeClusterName := "contextclusternamechanges-spokecluster"
 
@@ -292,10 +292,10 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 		hubKubeconfigDir := path.Join(util.TestDir, "contextclusternamechanges", "hub-kubeconfig")
 
 		bootstrapFile := path.Join(util.TestDir, "contextclusternamechanges-rebootstrap-test", "kubeconfig")
-		ginkgo.By("Create bootstrap kubeconfig")
+		By("Create bootstrap kubeconfig")
 		err = authn.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, serverCertFile, securePort, 20*time.Second,
 			"hub")
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// run registration agent
 		agentOptions := &spoke.SpokeAgentOptions{
@@ -312,70 +312,70 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 		defer stopAgent()
 
 		// after bootstrap the spokecluster and csr should be created
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			if _, err := util.GetManagedCluster(clusterClient, spokeClusterName); err != nil {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		var firstCSRName string
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			csr, err := util.FindUnapprovedSpokeCSR(kubeClient, spokeClusterName)
 			if err != nil {
 				return false
 			}
 			firstCSRName = csr.Name
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// simulate hub cluster admin accept the spoke cluster
 		err = util.AcceptManagedCluster(clusterClient, spokeClusterName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// approve the csr with a valid hub config
 		err = authn.ApproveSpokeClusterCSR(kubeClient, spokeClusterName, time.Hour*24)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		var firstHubKubeConfigSecret *corev1.Secret
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			firstHubKubeConfigSecret, err = util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret)
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Stop registration agent and wait for a grace period")
+		By("Stop registration agent and wait for a grace period")
 		stopAgent()
 		time.Sleep(5 * time.Second)
 
-		ginkgo.By("Regenerate a new bootstrap kubeconfig with a new cluster name")
+		By("Regenerate a new bootstrap kubeconfig with a new cluster name")
 		err = authn.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, serverCertFile, securePort, 20*time.Second,
 			"new-hub")
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
-		ginkgo.By("Restart registration agent")
+		By("Restart registration agent")
 		stopAgent = runAgent("contextclusternamechanges-rebootstraptest", agentOptions, commOptions, spokeCfg)
 		defer stopAgent()
 
 		// agent should bootstrap again due to the cluster name in the kubeconfig current context changes
 		var secondCSRName string
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			csr, err := util.FindUnapprovedSpokeCSR(kubeClient, spokeClusterName)
 			if err != nil {
 				return false
 			}
 			secondCSRName = csr.Name
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// a new csr should be recreated
-		gomega.Expect(firstCSRName).ShouldNot(gomega.BeEquivalentTo(secondCSRName))
+		Expect(firstCSRName).ShouldNot(BeEquivalentTo(secondCSRName))
 
 		// approve the new csr with a valid hub config
 		err = authn.ApproveSpokeClusterCSR(kubeClient, spokeClusterName, time.Hour*24)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			secondHubKubeConfigSecret, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret)
 			if err != nil {
 				return false
@@ -387,10 +387,10 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 			}
 
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// the spoke cluster should have joined condition
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, spokeClusterName)
 			if err != nil {
 				return err
@@ -399,6 +399,6 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 				return fmt.Errorf("cluster should be joined")
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 })

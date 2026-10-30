@@ -726,7 +726,7 @@ func TestSyncDeployWithoutCaBundle(t *testing.T) {
 func TestSyncDelete(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
 	now := metav1.Now()
-	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
+	clusterManager.SetDeletionTimestamp(&now)
 
 	assertDeletion(t, clusterManager, 32, 16)
 }
@@ -744,7 +744,7 @@ func TestSyncDeleteWithGRPCAuthEnabled(t *testing.T) {
 		},
 	}
 	now := metav1.Now()
-	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
+	clusterManager.SetDeletionTimestamp(&now)
 	assertDeletion(t, clusterManager, 36, 16)
 }
 
@@ -752,7 +752,7 @@ func TestSyncDeleteWithGRPCAuthEnabled(t *testing.T) {
 func TestDeleteCRD(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
 	now := metav1.Now()
-	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
+	clusterManager.SetDeletionTimestamp(&now)
 	crd := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "clustermanagementaddons.addon.open-cluster-management.io",

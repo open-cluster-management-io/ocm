@@ -299,10 +299,14 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 			sigPDInformers := cpinformers.NewSharedInformerFactory(cpClient, 0)
 
 			for _, pd := range c.ocmPDs {
-				clusterInformers.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(pd)
+				if err := clusterInformers.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(pd); err != nil {
+					t.Fatal(err)
+				}
 			}
 			for _, pd := range c.existingSIGPDs {
-				sigPDInformers.Apis().V1alpha2().PlacementDecisions().Informer().GetStore().Add(pd)
+				if err := sigPDInformers.Apis().V1alpha2().PlacementDecisions().Informer().GetStore().Add(pd); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := &sigPlacementDecisionController{
@@ -408,8 +412,8 @@ func TestBuildSIGPlacementDecision(t *testing.T) {
 	if ownerRef.Kind != "PlacementDecision" {
 		t.Errorf("expected owner reference kind PlacementDecision, got %s", ownerRef.Kind)
 	}
-	if ownerRef.APIVersion != v1beta1.SchemeGroupVersion.String() {
-		t.Errorf("expected owner reference apiVersion %s, got %s", v1beta1.SchemeGroupVersion.String(), ownerRef.APIVersion)
+	if ownerRef.APIVersion != v1beta1.GroupVersion.String() {
+		t.Errorf("expected owner reference apiVersion %s, got %s", v1beta1.GroupVersion.String(), ownerRef.APIVersion)
 	}
 	if ownerRef.Controller == nil || !*ownerRef.Controller {
 		t.Errorf("expected owner reference to be a controller reference")

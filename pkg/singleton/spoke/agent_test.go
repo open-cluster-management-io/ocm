@@ -54,15 +54,8 @@ func TestAgentConfigHealthCheckers(t *testing.T) {
 
 	config := NewAgentConfig(agentOption, registrationOption, workOption, cancel)
 
-	// Test that HealthCheckers method exists and can be called
-	healthCheckers := config.HealthCheckers()
-
-	// The result might be nil or empty, but the method should not panic
-	if healthCheckers == nil {
-		// This is acceptable - health checkers might not be set up
-	} else if len(healthCheckers) < 0 {
-		t.Error("Length should not be negative")
-	}
+	// HealthCheckers may return nil when none are configured. The call must not panic.
+	config.HealthCheckers()
 }
 
 func TestAgentConfigWithNilInputs(t *testing.T) {
@@ -78,8 +71,8 @@ func TestAgentConfigWithNilInputs(t *testing.T) {
 }
 
 func TestRunSpokeAgentSignature(t *testing.T) {
-	// Test that RunSpokeAgent has the correct signature and can be called
-	// This is a compile-time assertion that validates the method signature
+	// Compile-time assertion: (*AgentConfig).RunSpokeAgent must keep this signature.
+	//nolint:staticcheck // QF1011: the explicit type is the assertion.
 	var _ func(*AgentConfig, context.Context, *controllercmd.ControllerContext) error = (*AgentConfig).RunSpokeAgent
 
 	// Test that the config struct is properly set up for RunSpokeAgent

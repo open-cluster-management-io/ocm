@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -16,7 +16,7 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
+var _ = Describe("Klusterlet Hosted mode", func() {
 	var cancel context.CancelFunc
 	var klusterlet *operatorapiv1.Klusterlet
 	var klusterletNamespace string
@@ -30,7 +30,7 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 	var workDeploymentName string
 	var workSAName string
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		var ctx context.Context
 		klusterlet = &operatorapiv1.Klusterlet{
 			ObjectMeta: metav1.ObjectMeta{
@@ -66,7 +66,7 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 			},
 		}
 		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		// Create the external managed kubeconfig secret
 		managedKubeconfigSecret := &corev1.Secret{
@@ -79,23 +79,23 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 			},
 		}
 		_, err = kubeClient.CoreV1().Secrets(agentNamespace).Create(context.Background(), managedKubeconfigSecret, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		ctx, cancel = context.WithCancel(context.Background())
 		go startKlusterletOperator(ctx)
 	})
 
-	ginkgo.AfterEach(func() {
+	AfterEach(func() {
 		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), agentNamespace, metav1.DeleteOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		if cancel != nil {
 			cancel()
 		}
 	})
 
-	ginkgo.Context("Deploy and clean klusterlet component", func() {
-		ginkgo.BeforeEach(func() {
+	Context("Deploy and clean klusterlet component", func() {
+		BeforeEach(func() {
 			registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 			workDeploymentName = fmt.Sprintf("%s-work-agent", klusterlet.Name)
 			registrationManagementRoleName = fmt.Sprintf("open-cluster-management:management:%s-registration:agent", klusterlet.Name)
@@ -107,16 +107,16 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 
 		})
 
-		ginkgo.AfterEach(func() {
-			gomega.Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(gomega.BeNil())
+		AfterEach(func() {
+			Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
 		})
 
-		ginkgo.It("should have expected resource created successfully", func() {
+		It("should have expected resource created successfully", func() {
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			// Check if relatedResources are correct
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -128,142 +128,142 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 					return fmt.Errorf("should get 30 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check CRDs
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				if _, err := hostedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
 					context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				if _, err := hostedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
 					context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// Check clusterrole/clusterrolebinding
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(
 					context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// Check role/rolebinding
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				if _, err := kubeClient.RbacV1().Roles(agentNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				if _, err := kubeClient.RbacV1().Roles(agentNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				if _, err := kubeClient.RbacV1().RoleBindings(agentNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				if _, err := kubeClient.RbacV1().RoleBindings(agentNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			// Check extension apiserver rolebinding
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// Check service account
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				if _, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(context.Background(), registrationSAName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				if _, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(context.Background(), workSAName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), registrationSAName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), workSAName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// Check deployment
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				if _, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				if _, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// Check addon namespace
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				if _, err := hostedKubeClient.CoreV1().Namespaces().Get(context.Background(), helpers.DefaultAddonNamespace, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Applied", "KlusterletApplied", metav1.ConditionTrue)
 		})
 
-		ginkgo.It("should render self-report flags and RBAC when reportHostingCluster is enabled (KEP-188)", func() {
+		It("should render self-report flags and RBAC when reportHostingCluster is enabled (KEP-188)", func() {
 			// Unique namespace: the shared default may still be terminating from the prior spec.
 			klusterlet.Spec.Namespace = fmt.Sprintf("open-cluster-management-%s", klusterlet.Name)
 			klusterlet.Spec.DeployOption.ReportHostingCluster = operatorapiv1.ReportHostingClusterModeEnable
@@ -271,19 +271,19 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 				ManagementClusterName: "management-cluster-x",
 			}
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
-			gomega.Eventually(func() []string {
+			Eventually(func() []string {
 				deployment, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(
 					context.Background(), registrationDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return nil
 				}
 				return deployment.Spec.Template.Spec.Containers[0].Args
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.ContainElements(
+			}, eventuallyTimeout, eventuallyInterval).Should(ContainElements(
 				"--report-hosting-cluster=true", "--hosting-cluster-name=management-cluster-x"))
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				role, err := hostedKubeClient.RbacV1().ClusterRoles().Get(
 					context.Background(), registrationManagedRoleName, metav1.GetOptions{})
 				if err != nil {
@@ -295,7 +295,7 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 					}
 				}
 				return fmt.Errorf("no rule scoped to the reserved hosting-cluster claim: %+v", role.Rules)
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 	})
 })

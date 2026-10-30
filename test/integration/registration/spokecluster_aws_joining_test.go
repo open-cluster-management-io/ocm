@@ -6,8 +6,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
@@ -25,13 +25,13 @@ import (
 )
 
 // use ordered container since we need to run beforeAll to restart the hub with aws option
-var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
+var _ = Describe("Joining Process for aws flow", Ordered, func() {
 	var bootstrapKubeconfig string
 	var managedClusterName string
 	var hubKubeconfigSecret string
 	var hubKubeconfigDir string
 
-	ginkgo.BeforeAll(func() {
+	BeforeAll(func() {
 		// stop the hub and start new hub with the updated option
 		stopHub()
 
@@ -42,13 +42,13 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 		startHub(awsHubOption)
 
 		// stop hub with awsOption and restart hub with default option
-		ginkgo.DeferCleanup(func() {
+		DeferCleanup(func() {
 			stopHub()
 			startHub(hubOption)
 		})
 	})
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		postfix := rand.String(5)
 		managedClusterName = fmt.Sprintf("joiningtest-managedcluster-%s", postfix)
 		hubKubeconfigSecret = fmt.Sprintf("joiningtest-hub-kubeconfig-secret-%s", postfix)
@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 	})
 
 	assertJoiningSucceed := func() {
-		ginkgo.It("managedcluster should join successfully for aws flow", func() {
+		It("managedcluster should join successfully for aws flow", func() {
 			var err error
 
 			managedClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1"
@@ -85,32 +85,32 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 			defer cancel()
 
 			// the ManagedCluster CR should be created after bootstrap
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := util.GetManagedCluster(clusterClient, managedClusterName); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// the csr should not be created for aws flow after bootstrap
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).Should(HaveOccurred())
 
 			// simulate hub cluster admin to accept the managedcluster
 			err = util.AcceptManagedCluster(clusterClient, managedClusterName)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			Expect(err).To(HaveOccurred())
 
 			// Kubeconfig secret in integration test for AWS won't be able to connect to hub server, since it is not in the eks environment
 			// So we only  ensure that generated hub-kubeconfig-secret has a correct format
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				secret, err := util.GetHubKubeConfigFromSecret(kubeClient, testNamespace, hubKubeconfigSecret)
 				if err != nil {
 					return err
@@ -183,11 +183,11 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 				}
 
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		})
 
-		ginkgo.It("managedcluster should join successfully with auto approval of managed cluster in patterns for aws flow", func() {
+		It("managedcluster should join successfully with auto approval of managed cluster in patterns for aws flow", func() {
 
 			managedClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1"
 			managedClusterRoleSuffix := "7f8141296c75f2871e3d030f85c35692"
@@ -215,7 +215,7 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 			defer cancel()
 
 			// the ManagedCluster CR should be created after bootstrap
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return false
@@ -227,10 +227,10 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 					return cluster.Spec.HubAcceptsClient
 				}
 				return false
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 
-		ginkgo.It("managedcluster should not join successfully with auto approval rejected of managed cluster not in patterns for aws flow", func() {
+		It("managedcluster should not join successfully with auto approval rejected of managed cluster not in patterns for aws flow", func() {
 
 			managedClusterArn := "arn:aws:eks:us-west-1:123456789012:cluster/managed-cluster2"
 			managedClusterRoleSuffix := "7f8141296c75f2871e3d030f85c35692"
@@ -258,13 +258,13 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 			defer cancel()
 
 			// The ManagedCluster CR should be created
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				_, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				return err
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Wait for the managed cluster to have AWS IRSA annotations populated
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return false
@@ -273,19 +273,19 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 				_, hasArn := cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+awsirsa.ManagedClusterArn]
 				_, hasRole := cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+awsirsa.ManagedClusterIAMRoleSuffix]
 				return hasArn && hasRole
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue(), "ManagedCluster should have AWS IRSA annotations")
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue(), "ManagedCluster should have AWS IRSA annotations")
 
 			// The ManagedCluster CR should never be accepted
-			gomega.Consistently(func() bool {
+			Consistently(func() bool {
 				cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 				return cluster.Spec.HubAcceptsClient
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeFalse(), "HubAcceptsClient should never become true for ARN not matching auto-approval pattern")
+			}, eventuallyTimeout, eventuallyInterval).Should(BeFalse(), "HubAcceptsClient should never become true for ARN not matching auto-approval pattern")
 		})
 	}
 
-	ginkgo.Context("without proxy", func() {
-		ginkgo.BeforeEach(func() {
+	Context("without proxy", func() {
+		BeforeEach(func() {
 			bootstrapKubeconfig = bootstrapKubeConfigFile
 		})
 		assertJoiningSucceed()

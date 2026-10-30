@@ -331,7 +331,9 @@ func TestSyncManagedCluster(t *testing.T) {
 		},
 	}
 
-	features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates)
+	if err := features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates); err != nil {
+		t.Fatal(err)
+	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -363,7 +365,9 @@ func TestSyncManagedCluster(t *testing.T) {
 				}
 			}
 
-			features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=%v", ocmfeature.ManagedClusterAutoApproval, c.autoApprovalEnabled))
+			if err := features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=%v", ocmfeature.ManagedClusterAutoApproval, c.autoApprovalEnabled)); err != nil {
+				t.Fatal(err)
+			}
 			ctrl := managedClusterController{
 				kubeClient,
 				clusterClient,

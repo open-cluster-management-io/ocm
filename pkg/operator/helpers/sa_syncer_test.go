@@ -96,7 +96,7 @@ func TestSyncKubeConfigSecret_tlsServerNameDrift(t *testing.T) {
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"cluster": {
 				Server:                   tkc.Host,
-				CertificateAuthorityData: tkc.TLSClientConfig.CAData,
+				CertificateAuthorityData: tkc.CAData,
 			},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
@@ -134,11 +134,11 @@ func TestSyncKubeConfigSecret_tlsServerNameDrift(t *testing.T) {
 	var lastSecret *corev1.Secret
 	for i := len(actions) - 1; i >= 0; i-- {
 		switch a := actions[i].(type) {
-		case clienttesting.CreateAction:
+		case clienttesting.CreateActionImpl:
 			if s, ok := a.GetObject().(*corev1.Secret); ok {
 				lastSecret = s
 			}
-		case clienttesting.UpdateAction:
+		case clienttesting.UpdateActionImpl:
 			if s, ok := a.GetObject().(*corev1.Secret); ok {
 				lastSecret = s
 			}

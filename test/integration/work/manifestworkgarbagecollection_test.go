@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -18,7 +18,7 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
+var _ = Describe("ManifestWork TTL after completion", func() {
 	var cancel context.CancelFunc
 
 	var workName string
@@ -28,7 +28,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 
 	var err error
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		clusterName = rand.String(5)
 		workName = fmt.Sprintf("work-ttl-%s", rand.String(5))
 
@@ -36,7 +36,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
 		}
 		_, err := spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
@@ -48,16 +48,16 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 		}
 	})
 
-	ginkgo.AfterEach(func() {
+	AfterEach(func() {
 		if cancel != nil {
 			cancel()
 		}
 		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
-	ginkgo.Context("When ManifestWork has TTLSecondsAfterFinished configured", func() {
-		ginkgo.It("should delete the ManifestWork after TTL expires when Complete condition is true", func() {
+	Context("When ManifestWork has TTLSecondsAfterFinished configured", func() {
+		It("should delete the ManifestWork after TTL expires when Complete condition is true", func() {
 			// Create ManifestWork with short TTL
 			ttlSeconds := int64(5)
 			work = util.NewManifestWork(clusterName, workName, manifests)
@@ -89,7 +89,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 
 			// Create the ManifestWork
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for work to be applied and available
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -98,7 +98,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			// Wait for work to be marked as complete
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -107,17 +107,17 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 					return nil
 				}
 				return fmt.Errorf("ManifestWork %s is not complete", work.Name)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-			ginkgo.By("Verifying the ManifestWork is deleted after TTL expires")
+			By("Verifying the ManifestWork is deleted after TTL expires")
 			// Wait for the work to be deleted (TTL + buffer time)
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
-			}, time.Duration(ttlSeconds+10)*time.Second, eventuallyInterval).Should(gomega.BeTrue())
+			}, time.Duration(ttlSeconds+10)*time.Second, eventuallyInterval).Should(BeTrue())
 		})
 
-		ginkgo.It("should not delete the ManifestWork when TTL is not configured", func() {
+		It("should not delete the ManifestWork when TTL is not configured", func() {
 			// Create ManifestWork without TTL
 			work = util.NewManifestWork(clusterName, workName, manifests)
 
@@ -144,7 +144,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 
 			// Create the ManifestWork
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for work to be applied, available, and completed
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -153,7 +153,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			// Wait for work to be marked as complete
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -162,17 +162,17 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 					return nil
 				}
 				return fmt.Errorf("ManifestWork %s is not complete", work.Name)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-			ginkgo.By("Verifying the ManifestWork is NOT deleted without TTL configuration")
+			By("Verifying the ManifestWork is NOT deleted without TTL configuration")
 			// Wait some time and verify the work still exists
-			gomega.Consistently(func() error {
+			Consistently(func() error {
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				return err
-			}, 10*time.Second, eventuallyInterval).Should(gomega.Succeed())
+			}, 10*time.Second, eventuallyInterval).Should(Succeed())
 		})
 
-		ginkgo.It("should not delete the ManifestWork when it is not completed", func() {
+		It("should not delete the ManifestWork when it is not completed", func() {
 			// Create ManifestWork with TTL but without completion condition rule
 			ttlSeconds := int64(5)
 			work = util.NewManifestWork(clusterName, workName, manifests)
@@ -183,7 +183,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 
 			// Create the ManifestWork without completion rules
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for work to be applied and available
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -191,15 +191,15 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
-			ginkgo.By("Verifying the ManifestWork is NOT deleted when not completed")
+			By("Verifying the ManifestWork is NOT deleted when not completed")
 			// Wait and verify the work still exists (since it's not completed)
-			gomega.Consistently(func() error {
+			Consistently(func() error {
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				return err
-			}, time.Duration(ttlSeconds+5)*time.Second, eventuallyInterval).Should(gomega.Succeed())
+			}, time.Duration(ttlSeconds+5)*time.Second, eventuallyInterval).Should(Succeed())
 		})
 
-		ginkgo.It("should delete immediately when TTL is set to zero", func() {
+		It("should delete immediately when TTL is set to zero", func() {
 			// Create ManifestWork with zero TTL
 			ttlSeconds := int64(0)
 			work = util.NewManifestWork(clusterName, workName, manifests)
@@ -231,17 +231,17 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 
 			// Create the ManifestWork
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			ginkgo.By("Verifying the ManifestWork is deleted immediately with zero TTL")
+			By("Verifying the ManifestWork is deleted immediately with zero TTL")
 			// Should be deleted quickly since TTL is 0
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
-			}, 15*time.Second, eventuallyInterval).Should(gomega.BeTrue())
+			}, 15*time.Second, eventuallyInterval).Should(BeTrue())
 		})
 
-		ginkgo.It("should not delete the ManifestWork with ManifestWorkReplicaSet label even after TTL expires", func() {
+		It("should not delete the ManifestWork with ManifestWorkReplicaSet label even after TTL expires", func() {
 			// Create ManifestWork with TTL and ManifestWorkReplicaSet label
 			ttlSeconds := int64(5)
 			work = util.NewManifestWork(clusterName, workName, manifests)
@@ -278,7 +278,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 
 			// Create the ManifestWork
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for work to be applied, available, and completed
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -287,7 +287,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			// Wait for work to be marked as complete
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -296,14 +296,14 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 					return nil
 				}
 				return fmt.Errorf("ManifestWork %s is not complete", work.Name)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-			ginkgo.By("Verifying the ManifestWork is NOT deleted even after TTL expires due to ManifestWorkReplicaSet label")
+			By("Verifying the ManifestWork is NOT deleted even after TTL expires due to ManifestWorkReplicaSet label")
 			// Wait past TTL expiry and verify the work still exists
-			gomega.Consistently(func() error {
+			Consistently(func() error {
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				return err
-			}, time.Duration(ttlSeconds+5)*time.Second, eventuallyInterval).Should(gomega.Succeed())
+			}, time.Duration(ttlSeconds+5)*time.Second, eventuallyInterval).Should(Succeed())
 		})
 	})
 })

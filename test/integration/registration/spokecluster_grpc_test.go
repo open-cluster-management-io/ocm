@@ -7,8 +7,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +43,7 @@ import (
 
 const grpcTest = "grpctest"
 
-var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label("grpc-test"), func() {
+var _ = Describe("Registration using GRPC", Ordered, Label("grpc-test"), func() {
 	var err error
 
 	var postfix string
@@ -66,22 +66,22 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 	var grpcManagedClusterName string
 	var kubeManagedClusterName string
 
-	ginkgo.BeforeAll(func() {
+	BeforeAll(func() {
 		// stop the hub and start grpc server
 		stopHub()
 
 		tempDir, err := os.MkdirTemp("", fmt.Sprintf("registration-%s", grpcTest))
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		gomega.Expect(tempDir).ToNot(gomega.BeEmpty())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(tempDir).ToNot(BeEmpty())
 
 		bootstrapGRPCConfigFile = path.Join(tempDir, "grpcconfig")
 		_, gRPCServerOptions, gRPCCAKeyFile, err = util.CreateGRPCConfigs(bootstrapGRPCConfigFile, "8090")
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		var grpcServerCtx context.Context
 		grpcServerCtx, stopGRPCServer = context.WithCancel(context.Background())
 		hook, err := util.NewGRPCServerRegistrationHook(hubCfg)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		grpcEventServer := cloudeventsgrpc.NewGRPCBroker(cloudeventsgrpc.NewBrokerOptions())
 		grpcEventServer.RegisterService(grpcServerCtx, clusterce.ManagedClusterEventDataType,
@@ -96,7 +96,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 			lease.NewLeaseService(hook.KubeClient, hook.KubeInformers.Coordination().V1().Leases()))
 
 		go func() {
-			defer ginkgo.GinkgoRecover()
+			defer GinkgoRecover()
 			hook.Run(grpcServerCtx)
 		}()
 
@@ -112,18 +112,18 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 
 		go func() {
 			err := server.Run(grpcServerCtx)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		}()
 	})
 
-	ginkgo.AfterAll(func() {
+	AfterAll(func() {
 		stopGRPCServer()
 		// restart hub with default option
 		startHub(hubOption)
 	})
 
-	ginkgo.Context("ManagedCluster registration", func() {
-		ginkgo.BeforeEach(func() {
+	Context("ManagedCluster registration", func() {
+		BeforeEach(func() {
 			postfix = rand.String(5)
 			hubOptionWithGRPC = hub.NewHubManagerOptions()
 			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{operatorv1.CSRAuthType, operatorv1.GRPCAuthType}
@@ -168,46 +168,46 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 			stopKubeAgent = runAgent(fmt.Sprintf("%s-kube-agent", grpcTest), agentOptions, commOptions, spokeCfg)
 		})
 
-		ginkgo.AfterEach(func() {
+		AfterEach(func() {
 			stopGRPCAgent()
 			stopKubeAgent()
 			stopHub()
 		})
 
-		ginkgo.It("should register managedclusters with grpc/csr successfully", func() {
-			ginkgo.By("getting managedclusters and csrs after bootstrap", func() {
+		It("should register managedclusters with grpc/csr successfully", func() {
+			By("getting managedclusters and csrs after bootstrap", func() {
 				assertManagedCluster(grpcManagedClusterName)
 				assertManagedCluster(kubeManagedClusterName)
 			})
 
 			// simulate hub cluster admin to accept the managedcluster and approve the csr
-			ginkgo.By("accept managedclusters and approve csrs", func() {
+			By("accept managedclusters and approve csrs", func() {
 				err = util.AcceptManagedCluster(clusterClient, grpcManagedClusterName)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				err = util.AcceptManagedCluster(clusterClient, kubeManagedClusterName)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				// for gpc, the hub controller will sign the client certs, we just approve
 				// the csr here
 				csr, err := util.FindUnapprovedSpokeCSR(kubeClient, grpcManagedClusterName)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				err = util.ApproveCSR(kubeClient, csr)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				// for kube, we need to simulate the kube-controller-manager to sign the client
 				// certs in integration test
 				err = authn.ApproveSpokeClusterCSR(kubeClient, kubeManagedClusterName, time.Hour*24)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			})
 
-			ginkgo.By("getting managedclusters joined condition", func() {
+			By("getting managedclusters joined condition", func() {
 				assertManagedClusterJoined(grpcManagedClusterName, hubGRPCConfigSecret)
 				assertManagedClusterJoined(kubeManagedClusterName, hubKubeConfigSecret)
 			})
 
-			ginkgo.By("getting managedclusters available condition constantly", func() {
+			By("getting managedclusters available condition constantly", func() {
 				// after two short grace period, make sure the managed cluster is available
 				gracePeriod := 2 * 5 * util.TestLeaseDurationSeconds
 				assertAvailableCondition(grpcManagedClusterName, metav1.ConditionTrue, gracePeriod)
@@ -216,8 +216,8 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 		})
 	})
 
-	ginkgo.Context("Certificate rotation", func() {
-		ginkgo.BeforeEach(func() {
+	Context("Certificate rotation", func() {
+		BeforeEach(func() {
 			postfix = rand.String(5)
 			hubOptionWithGRPC = hub.NewHubManagerOptions()
 			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{operatorv1.GRPCAuthType}
@@ -248,53 +248,53 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 			stopGRPCAgent = runAgent(fmt.Sprintf("%s-cert-rotation-agent", grpcTest), grpcAgentOptions, grpcCommOptions, spokeCfg)
 		})
 
-		ginkgo.AfterEach(func() {
+		AfterEach(func() {
 			stopGRPCAgent()
 			stopHub()
 		})
 
-		ginkgo.It("should automatically rotate the certificate when it is about to expire", func() {
-			ginkgo.By("getting managedclusters and csrs after bootstrap", func() {
+		It("should automatically rotate the certificate when it is about to expire", func() {
+			By("getting managedclusters and csrs after bootstrap", func() {
 				assertManagedCluster(grpcManagedClusterName)
 			})
 
 			// simulate hub cluster admin to accept the managedcluster and approve the csr
-			ginkgo.By("accept managedclusters and approve csrs", func() {
+			By("accept managedclusters and approve csrs", func() {
 				err = util.AcceptManagedCluster(clusterClient, grpcManagedClusterName)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				// for gpc, the hub controller will sign the client certs, we just approve
 				// the csr here
 				csr, err := util.FindUnapprovedSpokeCSR(kubeClient, grpcManagedClusterName)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				err = util.ApproveCSR(kubeClient, csr)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			})
 
-			ginkgo.By("checking hub kubeconfig secret", func() {
+			By("checking hub kubeconfig secret", func() {
 				// the hub kubeconfig secret should be filled after the csr is approved
-				gomega.Eventually(func() error {
+				Eventually(func() error {
 					if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubGRPCConfigSecret); err != nil {
 						return err
 					}
 					return nil
-				}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+				}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 			})
 
 			// the agent should rotate the certificate because the certificate with a short valid time
 			// the hub controller should auto approve it
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := util.FindAutoApprovedSpokeCSR(kubeClient, grpcManagedClusterName); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 	})
 
-	ginkgo.Context("Auto approval", func() {
-		ginkgo.BeforeEach(func() {
+	Context("Auto approval", func() {
+		BeforeEach(func() {
 			postfix = rand.String(5)
 			hubOptionWithGRPC = hub.NewHubManagerOptions()
 			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{operatorv1.GRPCAuthType}
@@ -325,13 +325,13 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 			stopGRPCAgent = runAgent(fmt.Sprintf("%s-auto-approval-agent", grpcTest), grpcAgentOptions, grpcCommOptions, spokeCfg)
 		})
 
-		ginkgo.AfterEach(func() {
+		AfterEach(func() {
 			stopGRPCAgent()
 			stopHub()
 		})
 
-		ginkgo.It("should automatically approve managedcluster", func() {
-			ginkgo.By("getting managedclusters joined condition", func() {
+		It("should automatically approve managedcluster", func() {
+			By("getting managedclusters joined condition", func() {
 				assertManagedClusterJoined(grpcManagedClusterName, hubGRPCConfigSecret)
 			})
 		})
@@ -339,22 +339,22 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 })
 
 func assertManagedCluster(clusterName string) {
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		if _, err := util.GetManagedCluster(clusterClient, clusterName); err != nil {
 			return err
 		}
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		if _, err := util.FindUnapprovedSpokeCSR(kubeClient, clusterName); err != nil {
 			return err
 		}
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 	// the spoke cluster should has finalizer that is added by hub controller
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		spokeCluster, err := util.GetManagedCluster(clusterClient, clusterName)
 		if err != nil {
 			return err
@@ -365,12 +365,12 @@ func assertManagedCluster(clusterName string) {
 		}
 
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
 func assertManagedClusterJoined(clusterName, hubConfigSecret string) {
 	// the managed cluster should have accepted condition after it is accepted
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		spokeCluster, err := util.GetManagedCluster(clusterClient, clusterName)
 		if err != nil {
 			return err
@@ -379,16 +379,16 @@ func assertManagedClusterJoined(clusterName, hubConfigSecret string) {
 			return fmt.Errorf("cluster should be accepted")
 		}
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 	// the hub kubeconfig secret should be filled after the csr is approved
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		_, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubConfigSecret)
 		return err
-	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 	// the spoke cluster should have joined condition finally
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		spokeCluster, err := util.GetManagedCluster(clusterClient, clusterName)
 		if err != nil {
 			return err
@@ -397,5 +397,5 @@ func assertManagedClusterJoined(clusterName, hubConfigSecret string) {
 			return fmt.Errorf("cluster should be joined")
 		}
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }

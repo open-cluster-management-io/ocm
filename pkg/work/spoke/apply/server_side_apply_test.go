@@ -74,7 +74,7 @@ func TestServerSideApply(t *testing.T) {
 			// see issue: https://github.com/kubernetes/kubernetes/issues/103816
 			reactor := &reactor{}
 			reactors := []clienttesting.Reactor{reactor}
-			dynamicClient.Fake.ReactionChain = append(reactors, dynamicClient.Fake.ReactionChain...)
+			dynamicClient.ReactionChain = append(reactors, dynamicClient.ReactionChain...)
 
 			applier := NewServerSideApply(dynamicClient)
 
@@ -1013,7 +1013,7 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 					}
 				}
 				// Verify init containers are filtered out by JQ (should be 0, down from 1)
-				initContainers, exist, err := unstructured.NestedSlice(actual.Object, "spec", "initContainers")
+				initContainers, _, err := unstructured.NestedSlice(actual.Object, "spec", "initContainers")
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1083,7 +1083,7 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 			// see issue: https://github.com/kubernetes/kubernetes/issues/103816
 			reactor := &reactor{}
 			reactors := []clienttesting.Reactor{reactor}
-			dynamicClient.Fake.ReactionChain = append(reactors, dynamicClient.Fake.ReactionChain...)
+			dynamicClient.ReactionChain = append(reactors, dynamicClient.ReactionChain...)
 
 			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			option := &workapiv1.ManifestConfigOption{
@@ -1209,7 +1209,7 @@ func TestServerSideApplyWithIgnoreFieldErrors(t *testing.T) {
 
 			reactor := &reactor{}
 			reactors := []clienttesting.Reactor{reactor}
-			dynamicClient.Fake.ReactionChain = append(reactors, dynamicClient.Fake.ReactionChain...)
+			dynamicClient.ReactionChain = append(reactors, dynamicClient.ReactionChain...)
 
 			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			option := &workapiv1.ManifestConfigOption{

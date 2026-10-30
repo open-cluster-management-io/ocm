@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -21,7 +21,7 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.Ordered, ginkgo.Label("grpc-test"), func() {
+var _ = Describe("ClusterManager with GRPC registration enabled", Ordered, Label("grpc-test"), func() {
 	var cancel context.CancelFunc
 
 	var hubGRPCServerClusterRole = fmt.Sprintf("open-cluster-management:%s-grpc-server", clusterManagerName)
@@ -32,30 +32,30 @@ var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.
 	var hubGRPCServerSecret = "grpc-server-serving-cert" //#nosec G101
 	var hubRegistrationDeployment = fmt.Sprintf("%s-registration-controller", clusterManagerName)
 
-	ginkgo.Context("Deploy and clean hub component with default mode", func() {
-		ginkgo.BeforeEach(func() {
+	Context("Deploy and clean hub component with default mode", func() {
+		BeforeEach(func() {
 			var ctx context.Context
 			ctx, cancel = context.WithCancel(context.Background())
 			go startHubOperator(ctx, operatorapiv1.InstallModeDefault)
 		})
 
-		ginkgo.AfterEach(func() {
+		AfterEach(func() {
 			// delete deployment for clustermanager here so tests are not impacted with each other
 			err := kubeClient.AppsV1().Deployments(hubNamespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			if cancel != nil {
 				cancel()
 			}
 		})
 
-		ginkgo.It("should deploy and clean hub component successfully", func() {
-			ginkgo.By("Enable grpc auth for clustermanager", func() {
-				gomega.Eventually(func() error {
+		It("should deploy and clean hub component successfully", func() {
+			By("Enable grpc auth for clustermanager", func() {
+				Eventually(func() error {
 					return enableGRPCAuth(operatorClient, clusterManagerName, "user1", "user2")
-				}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+				}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 			})
 
-			ginkgo.By("Checking related resources created", func() {
+			By("Checking related resources created", func() {
 				assertGRPCServerResources(kubeClient, hubNamespace,
 					hubGRPCServerClusterRole, hubGRPCServerClusterRoleBinding, hubGRPCServerService,
 					hubGRPCServerServiceAccount, hubGRPCServerDeployment, hubGRPCServerSecret,
@@ -67,13 +67,13 @@ var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.
 					})
 			})
 
-			ginkgo.By("Remove grpc auth from clustermanager", func() {
-				gomega.Eventually(func() error {
+			By("Remove grpc auth from clustermanager", func() {
+				Eventually(func() error {
 					return disableGRPCAuth(operatorClient, clusterManagerName)
-				}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+				}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 			})
 
-			ginkgo.By("Checking related resources deleted", func() {
+			By("Checking related resources deleted", func() {
 				assertNoGRPCServerResources(kubeClient, hubNamespace,
 					hubGRPCServerClusterRole, hubGRPCServerClusterRoleBinding, hubGRPCServerService,
 					hubGRPCServerServiceAccount, hubGRPCServerDeployment, hubGRPCServerSecret,
@@ -82,8 +82,8 @@ var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.
 		})
 	})
 
-	ginkgo.Context("Deploy and clean hub component with hosted mode", func() {
-		ginkgo.BeforeEach(func() {
+	Context("Deploy and clean hub component with hosted mode", func() {
+		BeforeEach(func() {
 			var ctx context.Context
 			ctx, cancel = context.WithCancel(context.Background())
 
@@ -96,7 +96,7 @@ var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.
 				},
 			}
 			_, _, err := resourceapply.ApplyNamespace(ctx, hostedKubeClient.CoreV1(), recorder, ns)
-			gomega.Expect(err).To(gomega.BeNil())
+			Expect(err).To(BeNil())
 
 			// Create the external hub kubeconfig secret
 			// #nosec G101
@@ -110,28 +110,28 @@ var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.
 				},
 			}
 			_, _, err = resourceapply.ApplySecret(ctx, hostedKubeClient.CoreV1(), recorder, hubKubeconfigSecret)
-			gomega.Expect(err).To(gomega.BeNil())
+			Expect(err).To(BeNil())
 
 			go startHubOperator(ctx, operatorapiv1.InstallModeHosted)
 		})
 
-		ginkgo.AfterEach(func() {
+		AfterEach(func() {
 			// delete deployment for clustermanager here so tests are not impacted with each other
 			err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			if cancel != nil {
 				cancel()
 			}
 		})
 
-		ginkgo.It("should deploy and clean hub component successfully", func() {
-			ginkgo.By("Enable grpc auth for clustermanager", func() {
-				gomega.Eventually(func() error {
+		It("should deploy and clean hub component successfully", func() {
+			By("Enable grpc auth for clustermanager", func() {
+				Eventually(func() error {
 					return enableGRPCAuth(hostedOperatorClient, clusterManagerName)
-				}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+				}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 			})
 
-			ginkgo.By("Checking related resources created", func() {
+			By("Checking related resources created", func() {
 				assertGRPCServerResources(hostedKubeClient, hubNamespaceHosted,
 					hubGRPCServerClusterRole, hubGRPCServerClusterRoleBinding, hubGRPCServerService,
 					hubGRPCServerServiceAccount, hubGRPCServerDeployment, hubGRPCServerSecret,
@@ -142,13 +142,13 @@ var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.
 					})
 			})
 
-			ginkgo.By("Remove grpc auth from clustermanager", func() {
-				gomega.Eventually(func() error {
+			By("Remove grpc auth from clustermanager", func() {
+				Eventually(func() error {
 					return disableGRPCAuth(hostedOperatorClient, clusterManagerName)
-				}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+				}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 			})
 
-			ginkgo.By("Checking related resources deleted", func() {
+			By("Checking related resources deleted", func() {
 				assertNoGRPCServerResources(hostedKubeClient, hubNamespaceHosted,
 					hubGRPCServerClusterRole, hubGRPCServerClusterRoleBinding, hubGRPCServerService,
 					hubGRPCServerServiceAccount, hubGRPCServerDeployment, hubGRPCServerSecret,
@@ -163,57 +163,57 @@ func assertGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace str
 	hubGRPCServerServiceAccount, hubGRPCServerDeployment, hubGRPCServerSecret,
 	hubRegistrationDeployment string,
 	expectedArgs []string) {
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		if _, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), hubNamespace, metav1.GetOptions{}); err != nil {
 			return err
 		}
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubGRPCServerClusterRole, metav1.GetOptions{}); err != nil {
 			return err
 		}
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubGRPCServerClusterRoleBinding, metav1.GetOptions{}); err != nil {
 			return err
 		}
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		if _, err := kubeClient.CoreV1().Services(hubNamespace).Get(context.Background(), hubGRPCServerService, metav1.GetOptions{}); err != nil {
 			return err
 		}
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		if _, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubGRPCServerServiceAccount, metav1.GetOptions{}); err != nil {
 			return err
 		}
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubGRPCServerDeployment, metav1.GetOptions{}); err != nil {
 			return err
 		}
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		if _, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(), hubGRPCServerSecret, metav1.GetOptions{}); err != nil {
 			return err
 		}
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 	// ensure the grpc configuration was added to the registration controller
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		deploy, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -231,14 +231,14 @@ func assertGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace str
 		}
 
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 }
 
 func assertNoGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace string,
 	hubGRPCServerClusterRole, hubGRPCServerClusterRoleBinding, hubGRPCServerService,
 	hubGRPCServerServiceAccount, hubGRPCServerDeployment, hubGRPCServerSecret,
 	hubRegistrationDeployment string) {
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		_, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubGRPCServerClusterRole, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -247,9 +247,9 @@ func assertNoGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace s
 			return err
 		}
 		return fmt.Errorf("resource %s still exists", hubGRPCServerClusterRole)
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		_, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubGRPCServerClusterRoleBinding, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -258,9 +258,9 @@ func assertNoGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace s
 			return err
 		}
 		return fmt.Errorf("resource %s still exists", hubGRPCServerClusterRoleBinding)
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		_, err := kubeClient.CoreV1().Services(hubNamespace).Get(context.Background(), hubGRPCServerService, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -269,9 +269,9 @@ func assertNoGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace s
 			return err
 		}
 		return fmt.Errorf("resource %s still exists", hubGRPCServerService)
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		_, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubGRPCServerServiceAccount, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -280,9 +280,9 @@ func assertNoGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace s
 			return err
 		}
 		return fmt.Errorf("resource %s still exists", hubGRPCServerServiceAccount)
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		_, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubGRPCServerDeployment, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -291,9 +291,9 @@ func assertNoGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace s
 			return err
 		}
 		return fmt.Errorf("resource %s still exists", hubGRPCServerDeployment)
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		_, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(), hubGRPCServerSecret, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -302,10 +302,10 @@ func assertNoGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace s
 			return err
 		}
 		return fmt.Errorf("resource %s still exists", hubGRPCServerSecret)
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 	// ensure the grpc configuration was removed from the registration controller
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		deploy, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -316,7 +316,7 @@ func assertNoGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace s
 		}
 
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 }
 
 func enableGRPCAuth(operatorClient operatorclient.Interface, clusterManagerName string,

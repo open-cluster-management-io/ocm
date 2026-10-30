@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,7 +22,7 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
-var _ = ginkgo.Describe("Template deploy Alpha", func() {
+var _ = Describe("Template deploy Alpha", func() {
 	var (
 		clusterNames               []string
 		numberOfClusters           int
@@ -36,7 +36,7 @@ var _ = ginkgo.Describe("Template deploy Alpha", func() {
 		err                        error
 	)
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		suffix := rand.String(5)
 		numberOfClusters = 5
 		addonName = fmt.Sprintf("addon-%s", suffix)
@@ -57,7 +57,7 @@ var _ = ginkgo.Describe("Template deploy Alpha", func() {
 			managedClusterName := fmt.Sprintf("managedcluster-%s-%d", suffix, i)
 			clusterNames = append(clusterNames, managedClusterName)
 			err = createManagedCluster(hubClusterClient, managedClusterName)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		}
 
 		// Create the cma without template first to ensure mca exist before starting the testing.
@@ -82,22 +82,22 @@ var _ = ginkgo.Describe("Template deploy Alpha", func() {
 			},
 		}
 		_, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		assertClusterManagementAddOnAnnotationsAlpha(addonName)
 
 		// prepare addon template
 		addonTemplateData, err := os.ReadFile("./test/integration/addon/testmanifests/addontemplate.yaml")
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		addonTemplate := &addonapiv1alpha1.AddOnTemplate{
 			ObjectMeta: metav1.ObjectMeta{Name: addonTemplateName},
 		}
 		_, _, err = decoder.Decode(addonTemplateData, nil, addonTemplate)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		_, err = hubAddonClient.AddonV1alpha1().AddOnTemplates().Create(context.Background(), addonTemplate, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		// prepare addon deployment config
 		addonDeploymentConfig := &addonapiv1alpha1.AddOnDeploymentConfig{
@@ -123,39 +123,39 @@ var _ = ginkgo.Describe("Template deploy Alpha", func() {
 		}
 		_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(addonDeployConfigNamespace).Create(
 			context.Background(), addonDeploymentConfig, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		// prepare placement
 		pns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: placementNamespace}}
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), pns, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		placement := &clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: placementName, Namespace: placementNamespace}}
 		_, err = hubClusterClient.ClusterV1beta1().Placements(placementNamespace).Create(
 			context.Background(), placement, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		// prepare placement decisions
 		err = createPlacementDecision(hubClusterClient, placementNamespace, placementName, "0", clusterNames...)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
-	ginkgo.AfterEach(func() {
+	AfterEach(func() {
 		for _, managedClusterName := range clusterNames {
 			err = hubKubeClient.CoreV1().Namespaces().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		}
 
 		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
 			addonName, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
-	ginkgo.It("Should deploy agent for addon template", func() {
-		ginkgo.By("check mca created")
-		gomega.Eventually(func() error {
+	It("Should deploy agent for addon template", func() {
+		By("check mca created")
+		Eventually(func() error {
 			for i := 0; i < numberOfClusters; i++ {
 				_, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterNames[i]).Get(context.Background(), addonName, metav1.GetOptions{})
 				if err != nil {
@@ -163,16 +163,16 @@ var _ = ginkgo.Describe("Template deploy Alpha", func() {
 				}
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-		ginkgo.By("check no work rendered")
+		By("check no work rendered")
 		for i := 0; i < numberOfClusters; i++ {
 			checkWorkRendered(clusterNames[i], 0)
 		}
 
-		ginkgo.By("update cma")
+		By("update cma")
 		clusterManagementAddon, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), addonName, metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		clusterManagementAddon.Spec.InstallStrategy = addonapiv1alpha1.InstallStrategy{
 			Type: addonapiv1alpha1.AddonInstallStrategyPlacements,
@@ -207,9 +207,9 @@ var _ = ginkgo.Describe("Template deploy Alpha", func() {
 		}
 
 		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Update(context.Background(), clusterManagementAddon, metav1.UpdateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By("check mca condition")
+		By("check mca condition")
 		assertManagedClusterAddOnConditionsAlpha(addonName, clusterNames[0], metav1.Condition{
 			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
 			Status:  metav1.ConditionTrue,
@@ -225,16 +225,16 @@ var _ = ginkgo.Describe("Template deploy Alpha", func() {
 			})
 		}
 
-		ginkgo.By("check work rendered on the first cluster")
+		By("check work rendered on the first cluster")
 		checkWorkRendered(clusterNames[0], 1)
 		for i := 1; i < numberOfClusters; i++ {
 			checkWorkRendered(clusterNames[i], 0)
 		}
 
-		ginkgo.By("update work status to trigger addon status")
+		By("update work status to trigger addon status")
 		updateManifestWorkStatus(hubWorkClient, clusterNames[0], manifestWorkName, metav1.ConditionTrue)
 
-		ginkgo.By("check mca condition")
+		By("check mca condition")
 		assertManagedClusterAddOnConditionsAlpha(addonName, clusterNames[1], metav1.Condition{
 			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
 			Status:  metav1.ConditionTrue,
@@ -250,7 +250,7 @@ var _ = ginkgo.Describe("Template deploy Alpha", func() {
 			})
 		}
 
-		ginkgo.By("check work rendered on the second cluster")
+		By("check work rendered on the second cluster")
 		checkWorkRendered(clusterNames[1], 1)
 		for i := 2; i < numberOfClusters; i++ {
 			checkWorkRendered(clusterNames[i], 0)
@@ -259,7 +259,7 @@ var _ = ginkgo.Describe("Template deploy Alpha", func() {
 })
 
 func checkWorkRendered(clusterName string, expectedCount int) {
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		work, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			return err
@@ -268,5 +268,5 @@ func checkWorkRendered(clusterName string, expectedCount int) {
 			return fmt.Errorf("Expected %d work but got %v", expectedCount, work.Items)
 		}
 		return nil
-	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }

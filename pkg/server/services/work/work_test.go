@@ -127,7 +127,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 						},
 					},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, manifestBundleStatus)
+				if err := evt.SetData(cloudevents.ApplicationJSON, manifestBundleStatus); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -161,7 +163,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 						},
 					},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, manifestBundleStatus)
+				if err := evt.SetData(cloudevents.ApplicationJSON, manifestBundleStatus); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -195,7 +199,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 						},
 					},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, manifestBundleStatus)
+				if err := evt.SetData(cloudevents.ApplicationJSON, manifestBundleStatus); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -239,7 +245,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 						},
 					},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, manifestBundleStatus)
+				if err := evt.SetData(cloudevents.ApplicationJSON, manifestBundleStatus); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -278,7 +286,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 						},
 					},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, manifestBundleStatus)
+				if err := evt.SetData(cloudevents.ApplicationJSON, manifestBundleStatus); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {

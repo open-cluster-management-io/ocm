@@ -5,8 +5,8 @@ import (
 
 	certificates "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/dump"
 
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 

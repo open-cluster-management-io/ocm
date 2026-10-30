@@ -201,7 +201,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				cluster := &clusterv1.ManagedCluster{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, cluster)
+				if err := evt.SetData(cloudevents.ApplicationJSON, cluster); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -218,7 +220,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				cluster := &clusterv1.ManagedCluster{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, cluster)
+				if err := evt.SetData(cloudevents.ApplicationJSON, cluster); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -241,7 +245,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				cluster := &clusterv1.ManagedCluster{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, cluster)
+				if err := evt.SetData(cloudevents.ApplicationJSON, cluster); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -267,7 +273,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				cluster := &clusterv1.ManagedCluster{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, cluster)
+				if err := evt.SetData(cloudevents.ApplicationJSON, cluster); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {

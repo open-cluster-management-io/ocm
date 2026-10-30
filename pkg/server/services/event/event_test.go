@@ -53,7 +53,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				event := &eventsv1.Event{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-event", Namespace: "test-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, event)
+				if err := evt.SetData(cloudevents.ApplicationJSON, event); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -70,7 +72,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				event := &eventsv1.Event{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-event", Namespace: "test-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, event)
+				if err := evt.SetData(cloudevents.ApplicationJSON, event); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -87,7 +91,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				event := &eventsv1.Event{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-event", Namespace: "test-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, event)
+				if err := evt.SetData(cloudevents.ApplicationJSON, event); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -104,7 +110,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				event := &eventsv1.Event{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-event", Namespace: "test-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, event)
+				if err := evt.SetData(cloudevents.ApplicationJSON, event); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -127,7 +135,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				event := &eventsv1.Event{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-event", Namespace: "test-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, event)
+				if err := evt.SetData(cloudevents.ApplicationJSON, event); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
