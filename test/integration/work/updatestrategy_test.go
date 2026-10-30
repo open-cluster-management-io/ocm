@@ -10,6 +10,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/ptr"
@@ -808,6 +809,102 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 				if *deploy.Spec.Replicas != 2 {
 					return fmt.Errorf("replicas should be updated to 2 but got %d", *deploy.Spec.Replicas)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
+		})
+
+		It("IgnoreField does not delete a spoke-managed field when the work is updated", func() {
+			// reproducer for https://github.com/open-cluster-management-io/ocm/issues/1785:
+			// a field applied and owned by the work agent must survive a manifest update
+			// when the field is ignored. With the removal-based implementation, server
+			// side apply deleted the field because the payload omitted it while the work
+			// agent owned it.
+			//
+			// Note: the field must remain solely owned by the work agent for the bug to
+			// fire, so the test does not edit the object on the spoke — any spoke-side
+			// write would make the writer a co-owner of the field and mask the deletion.
+			cm := util.NewConfigmap(clusterName, "cm1", map[string]string{
+				"managed-key":          "a",
+				"controller-owned-key": "1",
+			}, nil)
+			cmObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cm)
+			Expect(err).ToNot(HaveOccurred())
+
+			work.Spec.Workload.Manifests = []workapiv1.Manifest{
+				util.ToManifest(&unstructured.Unstructured{Object: cmObject}),
+			}
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Resource:  "configmaps",
+						Namespace: clusterName,
+						Name:      "cm1",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeServerSideApply,
+						ServerSideApply: &workapiv1.ServerSideApplyConfig{
+							Force: true,
+							IgnoreFields: []workapiv1.IgnoreField{
+								{
+									Condition:    workapiv1.IgnoreFieldsConditionOnSpokePresent,
+									JSONPointers: []string{"/data/controller-owned-key"},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
+				context.Background(), work, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
+				metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue},
+				eventuallyTimeout, eventuallyInterval)
+
+			By("updating the managed key in the manifestwork")
+			cmObject["data"].(map[string]interface{})["managed-key"] = "b"
+			Eventually(func() error {
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(
+					context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				newWork := updatedWork.DeepCopy()
+				newWork.Spec.Workload.Manifests[0] = util.ToManifest(&unstructured.Unstructured{Object: cmObject})
+
+				pathBytes, err := util.NewWorkPatch(updatedWork, newWork)
+				if err != nil {
+					return err
+				}
+
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
+					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
+				metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue},
+				eventuallyTimeout, eventuallyInterval)
+
+			By("the ignored field must survive and the managed key must be updated")
+			Eventually(func() error {
+				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(
+					context.Background(), "cm1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if _, ok := configMap.Data["controller-owned-key"]; !ok {
+					return fmt.Errorf("controller-owned-key must survive the manifest update, data: %v",
+						configMap.Data)
+				}
+				if configMap.Data["managed-key"] != "b" {
+					return fmt.Errorf("managed-key should be updated to b, got %q", configMap.Data["managed-key"])
 				}
 
 				return nil
