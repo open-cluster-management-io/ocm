@@ -105,6 +105,35 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 		},
 		{
+			name:                       "clear evictionStartTime while ManifestWork informer has not synced",
+			appliedManifestWorkName:    "hubhash-test",
+			hubHash:                    "hubhash",
+			agentID:                    "test-agent",
+			manifestWorkInformerSynced: func() bool { return false },
+			works:                      []runtime.Object{},
+			appliedWorks: []runtime.Object{
+				&workapiv1.AppliedManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hubhash-test",
+					},
+					Spec: workapiv1.AppliedManifestWorkSpec{
+						ManifestWorkName: "test",
+						HubHash:          "hubhash",
+						AgentID:          "test-agent",
+					},
+					Status: workapiv1.AppliedManifestWorkStatus{
+						EvictionStartTime: &metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+					},
+				},
+			},
+			expectedQueueLen: 0, // requeued via AddAfter, not the main queue
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+			},
+		},
+		{
 			name:                    "evict appliedmanifestwork after the hub switched",
 			appliedManifestWorkName: "hubhash-test",
 			hubHash:                 "hubhash-new",

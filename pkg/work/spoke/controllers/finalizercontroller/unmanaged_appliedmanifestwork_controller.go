@@ -121,10 +121,12 @@ func (m *unmanagedAppliedWorkController) sync(ctx context.Context, controllerCon
 	// completed its initial sync. An unsynced/partial local store (common during
 	// cloudevents resubscribe replay) would otherwise stamp evictionStartTime on
 	// every AppliedManifestWork whose ManifestWork has not been replayed yet.
+	// Also clear any eviction timer already stamped so a later sync does not inherit
+	// time spent waiting for the store to fill.
 	if m.manifestWorkInformerSynced != nil && !m.manifestWorkInformerSynced() {
 		logger.V(4).Info("Skipping AppliedManifestWork eviction until ManifestWork informer has synced")
 		controllerContext.Queue().AddAfter(appliedManifestWorkName, time.Second)
-		return nil
+		return m.stopToEvictAppliedManifestWork(ctx, appliedManifestWork)
 	}
 
 	_, err = m.manifestWorkLister.Get(appliedManifestWork.Spec.ManifestWorkName)
