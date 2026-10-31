@@ -131,6 +131,8 @@ func isClusterTolerated(cluster *clusterapiv1.ManagedCluster, tolerations []clus
 // isTaintTolerated returns true if a taint is tolerated by the given toleration array
 func isTaintTolerated(taint clusterapiv1.Taint, tolerations []clusterapiv1beta1.Toleration, inDecision bool) (bool, *plugins.PluginRequeueResult, string) {
 	message := ""
+	// PreferNoSelect is a soft scheduling preference, not a hard filter. TaintToleration
+	// functions as a Filter plugin, so clusters with PreferNoSelect taints are not excluded.
 	if taint.Effect == clusterapiv1.TaintEffectPreferNoSelect {
 		return true, nil, message
 	}
