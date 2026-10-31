@@ -45,6 +45,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedcluster"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclusterset"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclustersetbinding"
+	"open-cluster-management.io/ocm/pkg/registration/hub/metrics"
 	"open-cluster-management.io/ocm/pkg/registration/hub/taint"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	awsirsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
@@ -238,6 +239,8 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 			return err
 		}
 	}
+	metrics.RegisterClusterMetrics(clusterInformers.Cluster().V1().ManagedClusters().Lister())
+
 	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,
 		clusterClient,
