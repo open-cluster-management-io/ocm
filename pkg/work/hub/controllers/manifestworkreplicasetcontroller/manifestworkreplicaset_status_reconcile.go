@@ -18,10 +18,16 @@ type statusReconciler struct {
 
 func (d *statusReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha1.ManifestWorkReplicaSet,
 ) (*workapiv1alpha1.ManifestWorkReplicaSet, reconcileState, error) {
-	// The logic for update manifestWorkReplicaSet status
+	// Missing placements are absent from work summaries, so use deploy's condition
+	// to prevent the valid subset of works from reporting overall success.
+	verified := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
+	hasMissingPlacement := verified != nil && verified.ObservedGeneration == mwrSet.Generation &&
+		verified.Reason == workapiv1alpha1.ReasonPlacementDecisionNotFound
+
 	if mwrSet.Status.Summary.Total == 0 {
-		condition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
-		if condition != nil && condition.Reason == workapiv1alpha1.ReasonPlacementDecisionEmpty {
+		if hasMissingPlacement {
+			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getManifestworkApplied(mwrSet.Generation, workapiv1alpha1.ReasonNotAsExpected, verified.Message))
+		} else if verified != nil && verified.Reason == workapiv1alpha1.ReasonPlacementDecisionEmpty {
 			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getManifestworkApplied(mwrSet.Generation, workapiv1alpha1.ReasonPlacementDecisionEmpty, ""))
 		} else {
 			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getManifestworkApplied(mwrSet.Generation, workapiv1alpha1.ReasonNotAsExpected, ""))
@@ -105,7 +111,9 @@ func (d *statusReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	mwrSet.Status.Summary.Progressing = processingCount
 	mwrSet.Status.Summary.Applied = appliedCount
 
-	if mwrSet.Status.Summary.Applied == mwrSet.Status.Summary.Total && //nolint:gocritic
+	if hasMissingPlacement {
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getManifestworkApplied(mwrSet.Generation, workapiv1alpha1.ReasonNotAsExpected, verified.Message))
+	} else if mwrSet.Status.Summary.Applied == mwrSet.Status.Summary.Total && //nolint:gocritic
 		mwrSet.Status.Summary.Available == mwrSet.Status.Summary.Total &&
 		mwrSet.Status.Summary.Progressing == 0 && mwrSet.Status.Summary.Degraded == 0 {
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getManifestworkApplied(mwrSet.Generation, workapiv1alpha1.ReasonAsExpected, ""))
