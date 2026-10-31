@@ -71,6 +71,9 @@ for result in "$dir" "$dir"/e2e-result-*; do
   [ -z "$specs" ] || failures+=$specs$'\n\n'
 done
 
+echo
+echo "Each mode runs as an addon and a core job, so Skipped also counts the specs that run in the other job."
+
 if [ -n "$failures" ]; then
   echo
   echo "**Failed specs** (agent logs are in the \`diagnostics-<job>\` artifact)"

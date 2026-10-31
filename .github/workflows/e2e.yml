@@ -74,20 +74,28 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    # The job names match the jobs this workflow had before, so required checks stay the same.
-    name: ${{ matrix.name }}
+    name: e2e-${{ matrix.mode }}-${{ matrix.shard }}
     strategy:
       fail-fast: false
       matrix:
+        mode: [default, hosted, singleton, grpc]
+        # Each mode runs as two jobs with their own kind cluster, because specs share cluster-wide state.
+        shard: [addon, core]
         include:
-          - name: e2e
-            make_vars: ''
-          - name: e2e-hosted
+          - mode: hosted
             make_vars: KLUSTERLET_DEPLOY_MODE=SingletonHosted
-          - name: e2e-singleton
+          - mode: singleton
             make_vars: KLUSTERLET_DEPLOY_MODE=Singleton
-          - name: e2e-grpc
+          - mode: grpc
             make_vars: REGISTRATION_DRIVER=grpc
+          # The addon management and addon lease specs take about half of the suite's time.
+          # Ginkgo matches each value as a regexp against the spec's file path.
+          - shard: addon
+            ginkgo_args: --ginkgo.focus-file=addonmanagement --ginkgo.focus-file=addon_lease
+          - shard: core
+            ginkgo_args: --ginkgo.skip-file=addonmanagement --ginkgo.skip-file=addon_lease
+    env:
+      JOB_NAME: e2e-${{ matrix.mode }}-${{ matrix.shard }}
     steps:
       - name: Check build
         if: ${{ needs.e2e-build.result != 'success' }}
@@ -145,7 +153,7 @@ jobs:
       - name: Test E2E
         run: |
           make test-e2e SKIP_IMAGE_BUILD=true SKIP_E2E_BUILD=true ${{ matrix.make_vars }} \
-            ARGS="--ginkgo.junit-report=${GITHUB_WORKSPACE}/e2e-result/junit.xml"
+            ARGS="${{ matrix.ginkgo_args }} --ginkgo.junit-report=${GITHUB_WORKSPACE}/e2e-result/junit.xml"
         env:
           KUBECONFIG: /home/runner/.kube/config
           # Failed specs and AfterSuite save agent logs here before cleanup removes the agents.
@@ -168,7 +176,7 @@ jobs:
         if: ${{ failure() && (steps.setup-kind.outcome == 'success' || steps.set-kubeconfig.outcome == 'success') }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: diagnostics-${{ matrix.name }}
+          name: diagnostics-${{ env.JOB_NAME }}
           path: diagnostics
           retention-days: 7
           overwrite: true
@@ -177,12 +185,12 @@ jobs:
         run: |
           mkdir -p e2e-result
           echo "${{ job.status }}" > e2e-result/status
-          echo "${{ matrix.name }}" > e2e-result/job
+          echo "${JOB_NAME}" > e2e-result/job
       - name: Upload result
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: e2e-result-${{ matrix.name }}
+          name: e2e-result-${{ env.JOB_NAME }}
           path: e2e-result
           retention-days: 7
           # "Re-run failed jobs" uploads again under the same name.
