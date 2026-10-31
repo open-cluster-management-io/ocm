@@ -1,7 +1,6 @@
 package templateagent
 
 import (
-	"context"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -249,7 +248,7 @@ func TestProxyDecorator(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx := context.TODO()
+			ctx := t.Context()
 			logger := klog.FromContext(ctx)
 			d := newProxyHandler(logger, "addon1", values)
 			err = d.decorate("", tc.pod)
@@ -419,7 +418,7 @@ func TestResourceRequirementsDecorator(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx := context.TODO()
+			ctx := t.Context()
 			logger := klog.FromContext(ctx)
 			d := newResourceRequirementsDecorator(logger, tc.supportResource, values)
 			err = d.decorate(tc.resourceName, tc.pod)

@@ -96,7 +96,7 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths:     CRDPaths,
 	}
-	envCtx, envCancel = context.WithCancel(context.TODO())
+	envCtx, envCancel = context.WithCancel(context.Background())
 	cfg, err := testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())

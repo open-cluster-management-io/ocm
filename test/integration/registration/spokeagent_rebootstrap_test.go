@@ -111,7 +111,7 @@ var _ = Describe("Rebootstrap", func() {
 		return bootstrapKubeConfigFile, kubeClient, clusterClient, addOnClient, env, newAuthn
 	}
 
-	assertSuccessClusterBootstrap := func(testNamespace, managedClusterName, hubKubeconfigSecret string,
+	assertSuccessClusterBootstrap := func(ctx context.Context, testNamespace, managedClusterName, hubKubeconfigSecret string,
 		hubKubeClient, spokeKubeClient kubernetes.Interface, hubClusterClient clusterclientset.Interface,
 		auth *util.TestAuthn, certAget time.Duration) {
 		// the spoke cluster and csr should be created after bootstrap
@@ -188,7 +188,7 @@ var _ = Describe("Rebootstrap", func() {
 
 		// ensure cluster namespace is in place
 		Eventually(func() error {
-			_, err := hubKubeClient.CoreV1().Namespaces().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
+			_, err := hubKubeClient.CoreV1().Namespaces().Get(ctx, managedClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -213,10 +213,11 @@ var _ = Describe("Rebootstrap", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	assertValidClientCertificate := func(registrationType addonv1beta1.RegistrationType, secretNamespace, secretName string, spokeKubeClient kubernetes.Interface) {
+	assertValidClientCertificate := func(ctx context.Context, registrationType addonv1beta1.RegistrationType,
+		secretNamespace, secretName string, spokeKubeClient kubernetes.Interface) {
 		By("Check client certificate in secret")
 		Eventually(func() bool {
-			secret, err := spokeKubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+			secret, err := spokeKubeClient.CoreV1().Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -252,7 +253,7 @@ var _ = Describe("Rebootstrap", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	}
 
-	assertSuccessAddOnBootstrap := func(
+	assertSuccessAddOnBootstrap := func(ctx context.Context,
 		managedClusterName, addOnName string,
 		hubKubeClient, spokeKubeClient kubernetes.Interface,
 		hubClusterClient clusterclientset.Interface, hubAddOnClient addonclientset.Interface) {
@@ -263,7 +264,7 @@ var _ = Describe("Rebootstrap", func() {
 				Name: addOnName,
 			},
 		}
-		_, err := hubKubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+		_, err := hubKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		// create addon
@@ -274,11 +275,11 @@ var _ = Describe("Rebootstrap", func() {
 			},
 			Spec: addonv1beta1.ManagedClusterAddOnSpec{},
 		}
-		_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
+		_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(ctx, addOn, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() error {
-			created, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			created, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -296,12 +297,12 @@ var _ = Describe("Rebootstrap", func() {
 				},
 			}
 			created.Status.Namespace = addOnName
-			_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
+			_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).UpdateStatus(ctx, created, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		assertSuccessCSRApproval(managedClusterName, addOnName, hubKubeClient)
-		assertValidClientCertificate(addonv1beta1.KubeClient, addOnName, getSecretName(addonv1beta1.KubeClient, addOnName, ""), spokeKubeClient)
+		assertValidClientCertificate(ctx, addonv1beta1.KubeClient, addOnName, getSecretName(addonv1beta1.KubeClient, addOnName, ""), spokeKubeClient)
 		assertAddonLabel(managedClusterName, addOnName, "unreachable", hubClusterClient)
 	}
 
@@ -319,13 +320,13 @@ var _ = Describe("Rebootstrap", func() {
 		return agentCtx, stopAgent, agentConfig
 	}
 
-	JustBeforeEach(func() {
+	JustBeforeEach(func(ctx SpecContext) {
 		var spokeCtx, agentCtx context.Context
 		var agentConfig *spoke.SpokeAgentConfig
 		var stopAgent context.CancelFunc
 
 		// ensure there is no remaining bootstrap-hub-kubeconfig secret
-		err := kubeClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), "bootstrap-hub-kubeconfig", metav1.DeleteOptions{})
+		err := kubeClient.CoreV1().Secrets(testNamespace).Delete(ctx, "bootstrap-hub-kubeconfig", metav1.DeleteOptions{})
 		if err != nil {
 			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		}
@@ -381,7 +382,7 @@ var _ = Describe("Rebootstrap", func() {
 		}()
 
 		// update the bootstrap kubeconfig secret once the bootstrap kubeconfig file changes
-		syncBootstrapKubeconfig := func() error {
+		syncBootstrapKubeconfig := func(ctx context.Context) error {
 			bootstrapKubeconfigDir := path.Dir(bootstrapFile)
 			files, err := os.ReadDir(bootstrapKubeconfigDir)
 			if err != nil {
@@ -402,7 +403,7 @@ var _ = Describe("Rebootstrap", func() {
 				data[key] = value
 			}
 
-			secret, err := kubeClient.CoreV1().Secrets(testNamespace).Get(context.Background(), "bootstrap-hub-kubeconfig", metav1.GetOptions{})
+			secret, err := kubeClient.CoreV1().Secrets(testNamespace).Get(ctx, "bootstrap-hub-kubeconfig", metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				secret = &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -411,7 +412,7 @@ var _ = Describe("Rebootstrap", func() {
 					},
 					Data: data,
 				}
-				_, err = kubeClient.CoreV1().Secrets(testNamespace).Create(context.Background(), secret, metav1.CreateOptions{})
+				_, err = kubeClient.CoreV1().Secrets(testNamespace).Create(ctx, secret, metav1.CreateOptions{})
 				if err == nil {
 					fmt.Println("[bootstrap-kubeconfig-syncer] - bootstrap kubeconfig secret created")
 				}
@@ -427,7 +428,7 @@ var _ = Describe("Rebootstrap", func() {
 			}
 			secretCopy := secret.DeepCopy()
 			secretCopy.Data = data
-			_, err = kubeClient.CoreV1().Secrets(testNamespace).Update(context.Background(), secretCopy, metav1.UpdateOptions{})
+			_, err = kubeClient.CoreV1().Secrets(testNamespace).Update(ctx, secretCopy, metav1.UpdateOptions{})
 			if err == nil {
 				fmt.Println("[bootstrap-kubeconfig-syncer] - bootstrap kubeconfig secret updated")
 			}
@@ -441,7 +442,7 @@ var _ = Describe("Rebootstrap", func() {
 				select {
 				case <-ticker.C:
 					fmt.Println("[bootstrap-kubeconfig-syncer] - start file->secret syncing...")
-					if err := syncBootstrapKubeconfig(); err != nil {
+					if err := syncBootstrapKubeconfig(ctx); err != nil {
 						fmt.Printf("[bootstrap-kubeconfig-syncer] - failed to sync file to secret: %v\n", err)
 					}
 				case <-spokeCtx.Done():
@@ -472,7 +473,7 @@ var _ = Describe("Rebootstrap", func() {
 			}
 		})
 
-		It("should join the hub once the bootstrap kubeconfig becomes valid", func() {
+		It("should join the hub once the bootstrap kubeconfig becomes valid", func(ctx SpecContext) {
 			// the spoke cluster should not be created
 			Consistently(func() error {
 				if _, err := util.GetManagedCluster(clusterClient, managedClusterName); apierrors.IsNotFound(err) {
@@ -485,8 +486,8 @@ var _ = Describe("Rebootstrap", func() {
 			err := authn.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, serverCertFile, securePort, 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
-			assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, time.Hour*24)
-			assertSuccessAddOnBootstrap(managedClusterName, addOnName, kubeClient, kubeClient, clusterClient, addOnClient)
+			assertSuccessClusterBootstrap(ctx, testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, time.Hour*24)
+			assertSuccessAddOnBootstrap(ctx, managedClusterName, addOnName, kubeClient, kubeClient, clusterClient, addOnClient)
 		})
 	})
 
@@ -499,13 +500,13 @@ var _ = Describe("Rebootstrap", func() {
 			}
 		})
 
-		It("should switch to the new hub successfully", decorators.Label("disaster recovery"), func() {
-			assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, time.Hour*24)
-			assertSuccessAddOnBootstrap(managedClusterName, addOnName, kubeClient, kubeClient, clusterClient, addOnClient)
+		It("should switch to the new hub successfully", decorators.Label("disaster recovery"), func(ctx SpecContext) {
+			assertSuccessClusterBootstrap(ctx, testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, time.Hour*24)
+			assertSuccessAddOnBootstrap(ctx, managedClusterName, addOnName, kubeClient, kubeClient, clusterClient, addOnClient)
 
 			By("start a new hub")
-			ctx, stopHub := context.WithCancel(context.Background())
-			hubBootstrapKubeConfigFile, hubKubeClient, hubClusterClient, hubAddOnClient, testHubEnv, testAuthn := startNewHub(ctx)
+			runCtx, stopHub := context.WithCancel(context.Background())
+			hubBootstrapKubeConfigFile, hubKubeClient, hubClusterClient, hubAddOnClient, testHubEnv, testAuthn := startNewHub(runCtx)
 
 			stopNewHub = func() {
 				By("Stop the new hub")
@@ -520,19 +521,20 @@ var _ = Describe("Rebootstrap", func() {
 			err = os.WriteFile(bootstrapFile, input, 0600)
 			Expect(err).NotTo(HaveOccurred())
 
-			assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, hubKubeClient, kubeClient, hubClusterClient, testAuthn, time.Hour*24)
-			assertSuccessAddOnBootstrap(managedClusterName, addOnName, hubKubeClient, kubeClient, hubClusterClient, hubAddOnClient)
+			assertSuccessClusterBootstrap(ctx, testNamespace, managedClusterName, hubKubeconfigSecret,
+				hubKubeClient, kubeClient, hubClusterClient, testAuthn, time.Hour*24)
+			assertSuccessAddOnBootstrap(ctx, managedClusterName, addOnName, hubKubeClient, kubeClient, hubClusterClient, hubAddOnClient)
 		})
 
-		It("should rebootstrap once the client certificate expires", func() {
-			assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, 10*time.Second)
+		It("should rebootstrap once the client certificate expires", func(ctx SpecContext) {
+			assertSuccessClusterBootstrap(ctx, testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, 10*time.Second)
 
 			By("stop the hub")
 			stopHub()
 
 			By("wait until the client cert expires")
 			Eventually(func() bool {
-				secret, err := kubeClient.CoreV1().Secrets(testNamespace).Get(context.Background(), hubKubeconfigSecret, metav1.GetOptions{})
+				secret, err := kubeClient.CoreV1().Secrets(testNamespace).Get(ctx, hubKubeconfigSecret, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -554,9 +556,9 @@ var _ = Describe("Rebootstrap", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			By("start the hub again")
-			startHub(hubOption)
+			startHub(ctx, hubOption)
 
-			assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, time.Hour*24)
+			assertSuccessClusterBootstrap(ctx, testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, time.Hour*24)
 		})
 	})
 })

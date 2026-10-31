@@ -45,7 +45,7 @@ var _ = Describe("ManifestWork", func() {
 
 	var err error
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		expectedFinalizer = workapiv1.ManifestWorkFinalizer
 		workName = fmt.Sprintf("work-%s", rand.String(5))
 		clusterName = rand.String(5)
@@ -53,36 +53,36 @@ var _ = Describe("ManifestWork", func() {
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
 		}
-		_, err := spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := spokeKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
-		go startWorkAgent(ctx, clusterName, appliedManifestWorkGracePeriodDecorator(5*time.Second))
+		var runCtx context.Context
+		runCtx, cancel = context.WithCancel(context.Background())
+		go startWorkAgent(runCtx, clusterName, appliedManifestWorkGracePeriodDecorator(5*time.Second))
 
 		// reset manifests and workOpts
 		manifests = nil
 		workOpts = nil
 	})
 
-	JustBeforeEach(func() {
+	JustBeforeEach(func(ctx SpecContext) {
 		work = util.NewManifestWork(clusterName, workName, manifests)
 		for _, opt := range workOpts {
 			opt(work)
 		}
-		work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+		work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		appliedManifestWorkName = util.AppliedManifestWorkName(hubHash, work)
 	})
 
-	AfterEach(func() {
-		err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(ctx, work.Name, metav1.DeleteOptions{})
 		if !errors.IsNotFound(err) {
 			Expect(err).ToNot(HaveOccurred())
 		}
 
 		Eventually(func() error {
-			_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return nil
 			}
@@ -92,7 +92,7 @@ var _ = Describe("ManifestWork", func() {
 			return fmt.Errorf("work %s in namespace %s still exists", work.Name, clusterName)
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
+		err := spokeKubeClient.CoreV1().Namespaces().Delete(ctx, clusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		if cancel != nil {
@@ -107,11 +107,11 @@ var _ = Describe("ManifestWork", func() {
 			}
 		})
 
-		It("should create work and then apply it successfully", func() {
+		It("should create work and then apply it successfully", func(ctx SpecContext) {
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
 			By("field manager should be work-agent")
-			cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+			cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			for _, entry := range cm.ManagedFields {
 				Expect(entry.Manager).To(Equal("work-agent"))
@@ -123,7 +123,7 @@ var _ = Describe("ManifestWork", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("should update work and then apply it successfully", func() {
+		It("should update work and then apply it successfully", func(ctx SpecContext) {
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
@@ -132,7 +132,7 @@ var _ = Describe("ManifestWork", func() {
 			newManifests := []workapiv1.Manifest{
 				util.ToManifest(util.NewConfigmap(clusterName, cm2, map[string]string{"x": "y"}, nil)),
 			}
-			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			newWork := updatedWork.DeepCopy()
@@ -142,7 +142,7 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertExistenceOfConfigMaps(newManifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
@@ -150,7 +150,7 @@ var _ = Describe("ManifestWork", func() {
 			// check if resource created by stale manifest is deleted once it is removed from applied resource list
 			Eventually(func() error {
 				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
-					context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+					ctx, appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -164,14 +164,14 @@ var _ = Describe("ManifestWork", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 
-		It("should delete work successfully", func() {
+		It("should delete work successfully", func(ctx SpecContext) {
 			util.AssertFinalizerAdded(work.Namespace, work.Name, expectedFinalizer, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 
-			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(ctx, work.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkDeleted(work.Namespace, work.Name, fmt.Sprintf("%s-%s", hubHash, work.Name),
@@ -197,7 +197,7 @@ var _ = Describe("ManifestWork", func() {
 				[]metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("should update work and then apply it successfully", func() {
+		It("should update work and then apply it successfully", func(ctx SpecContext) {
 			util.AssertExistenceOfConfigMaps(manifests[1:], spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionFalse,
@@ -211,7 +211,7 @@ var _ = Describe("ManifestWork", func() {
 				util.ToManifest(util.NewConfigmap(clusterName, "cm4", map[string]string{"e": "f"}, nil)),
 			}
 
-			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			newWork := updatedWork.DeepCopy()
@@ -221,7 +221,7 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertExistenceOfConfigMaps(newManifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
@@ -232,7 +232,7 @@ var _ = Describe("ManifestWork", func() {
 
 			// check if resource created by stale manifest is deleted once it is removed from applied resource list
 			Eventually(func() error {
-				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(ctx, appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -246,14 +246,14 @@ var _ = Describe("ManifestWork", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), "cm3", metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, "cm3", metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 
-		It("should delete work successfully", func() {
+		It("should delete work successfully", func(ctx SpecContext) {
 			util.AssertFinalizerAdded(work.Namespace, work.Name, expectedFinalizer, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 
-			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(ctx, work.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkDeleted(work.Namespace, work.Name, fmt.Sprintf("%s-%s", hubHash, work.Name),
@@ -304,7 +304,7 @@ var _ = Describe("ManifestWork", func() {
 			util.AssertAppliedResources(appliedManifestWorkName, gvrs, namespaces, names, spokeWorkClient, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("should merge annotation of existing CR", func() {
+		It("should merge annotation of existing CR", func(ctx SpecContext) {
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
@@ -327,12 +327,12 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			cr.SetAnnotations(map[string]string{"foo": "bar"})
-			_, err = spokeDynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Update(context.TODO(), cr, metav1.UpdateOptions{})
+			_, err = spokeDynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Update(ctx, cr, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Update manifestwork
 			obj.SetAnnotations(map[string]string{"foo1": "bar1"})
-			work, err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.TODO(), work.Name, metav1.GetOptions{})
+			work, err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			newWork := work.DeepCopy()
@@ -342,7 +342,7 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), work.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, work.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// wait for annotation merge
@@ -361,7 +361,7 @@ var _ = Describe("ManifestWork", func() {
 
 		})
 
-		It("should keep the finalizer unchanged of existing CR", func() {
+		It("should keep the finalizer unchanged of existing CR", func(ctx SpecContext) {
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
@@ -384,7 +384,7 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			cr.SetFinalizers([]string{"foo"})
-			updated, err := spokeDynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Update(context.TODO(), cr, metav1.UpdateOptions{})
+			updated, err := spokeDynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Update(ctx, cr, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			rsvBefore := updated.GetResourceVersion()
 
@@ -393,7 +393,7 @@ var _ = Describe("ManifestWork", func() {
 			// set an annotation to make sure the cr will be updated, so that we can check whether the finalizer changest.
 			obj.SetAnnotations(map[string]string{"foo": "bar"})
 
-			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.TODO(), work.Name, metav1.GetOptions{})
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			newWork := updatedWork.DeepCopy()
@@ -403,7 +403,7 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// wait for annotation merge
@@ -429,11 +429,11 @@ var _ = Describe("ManifestWork", func() {
 
 			// remove the finalizer
 			cr.SetFinalizers(nil)
-			_, err = spokeDynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Update(context.TODO(), cr, metav1.UpdateOptions{})
+			_, err = spokeDynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Update(ctx, cr, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should delete CRD and CR successfully", func() {
+		It("should delete CRD and CR successfully", func(ctx SpecContext) {
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
@@ -449,12 +449,12 @@ var _ = Describe("ManifestWork", func() {
 			util.AssertAppliedResources(appliedManifestWorkName, gvrs, namespaces, names, spokeWorkClient, eventuallyTimeout, eventuallyInterval)
 
 			// delete manifest work
-			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(ctx, work.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// wait for deletion of manifest work
 			Eventually(func() bool {
-				_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				return errors.IsNotFound(err)
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
@@ -569,7 +569,7 @@ var _ = Describe("ManifestWork", func() {
 			util.AssertAppliedResources(appliedManifestWorkName, gvrs, namespaces, names, spokeWorkClient, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("should update Service Account and Deployment successfully", func() {
+		It("should update Service Account and Deployment successfully", func(ctx SpecContext) {
 			By("check condition status in work status")
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue},
@@ -612,7 +612,7 @@ var _ = Describe("ManifestWork", func() {
 			updateTime := metav1.Now()
 			time.Sleep(1 * time.Second)
 
-			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			newWork := updatedWork.DeepCopy()
@@ -622,7 +622,7 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("check existence of all maintained resources")
@@ -650,7 +650,7 @@ var _ = Describe("ManifestWork", func() {
 
 			By("check if LastTransitionTime is updated")
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -706,7 +706,7 @@ var _ = Describe("ManifestWork", func() {
 			}
 		})
 
-		It("should update work and verify observedGeneration and lastTransitionTime are updated", func() {
+		It("should update work and verify observedGeneration and lastTransitionTime are updated", func(ctx SpecContext) {
 			By("check initial condition status")
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
@@ -719,7 +719,7 @@ var _ = Describe("ManifestWork", func() {
 
 			By("capture initial lastTransitionTime")
 			var initialAppliedTime, initialAvailableTime metav1.Time
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			appliedCondition := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkApplied)
@@ -736,7 +736,7 @@ var _ = Describe("ManifestWork", func() {
 			// Sleep to ensure time difference for lastTransitionTime
 			time.Sleep(1 * time.Second)
 
-			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			newWork := updatedWork.DeepCopy()
@@ -748,12 +748,12 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("verify observedGeneration is updated")
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -784,7 +784,7 @@ var _ = Describe("ManifestWork", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 			By("verify lastTransitionTime is updated for Applied condition")
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			updatedAppliedCondition := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkApplied)
@@ -799,7 +799,7 @@ var _ = Describe("ManifestWork", func() {
 				updatedAvailableCondition.LastTransitionTime.Equal(&initialAvailableTime)).To(BeTrue())
 		})
 
-		It("should verify manifest conditions remain stable when resource is modified directly", func() {
+		It("should verify manifest conditions remain stable when resource is modified directly", func(ctx SpecContext) {
 			By("check initial condition status")
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
@@ -814,7 +814,7 @@ var _ = Describe("ManifestWork", func() {
 
 			By("capture initial manifest condition lastTransitionTime")
 			var initialManifestConditionTime metav1.Time
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(work.Status.ResourceStatus.Manifests)).To(Equal(1))
 			Expect(len(work.Status.ResourceStatus.Manifests[0].Conditions)).To(BeNumerically(">", 0))
@@ -822,7 +822,7 @@ var _ = Describe("ManifestWork", func() {
 
 			By("update the applied resource directly on the cluster")
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				cm, err := spokeDynamicClient.Resource(cmGVR).Namespace(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+				cm, err := spokeDynamicClient.Resource(cmGVR).Namespace(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -836,7 +836,7 @@ var _ = Describe("ManifestWork", func() {
 					return err
 				}
 
-				_, err = spokeDynamicClient.Resource(cmGVR).Namespace(clusterName).Update(context.Background(), cm, metav1.UpdateOptions{})
+				_, err = spokeDynamicClient.Resource(cmGVR).Namespace(clusterName).Update(ctx, cm, metav1.UpdateOptions{})
 				return err
 			})
 			Expect(err).ToNot(HaveOccurred())
@@ -845,7 +845,7 @@ var _ = Describe("ManifestWork", func() {
 			// Note: LastTransitionTime only updates when condition Status changes (True<->False),
 			// not when a resource is reapplied with the same status. Since drift correction
 			// keeps Applied=True, LastTransitionTime should remain stable.
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(work.Status.ResourceStatus.Manifests)).To(Equal(1))
 			Expect(len(work.Status.ResourceStatus.Manifests[0].Conditions)).To(BeNumerically(">", 0))
@@ -856,12 +856,12 @@ var _ = Describe("ManifestWork", func() {
 				currentManifestConditionTime.Equal(&initialManifestConditionTime)).To(BeTrue())
 		})
 
-		It("should update lastTransitionTime when status feedback values change", func() {
+		It("should update lastTransitionTime when status feedback values change", func(ctx SpecContext) {
 			By("update work to add status feedback rules")
 			u, _, err := util.NewDeployment(clusterName, "deploy1", "default")
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			newWork := updatedWork.DeepCopy()
@@ -886,7 +886,7 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for deployment to be applied")
@@ -895,21 +895,21 @@ var _ = Describe("ManifestWork", func() {
 
 			By("manually set deployment status to provide initial feedback values")
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 				deploy.Status.Replicas = 1
 				deploy.Status.AvailableReplicas = 1
 				deploy.Status.ReadyReplicas = 1
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(ctx, deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 			By("wait for initial status feedback and capture lastTransitionTime")
 			var initialFeedbackConditionTime metav1.Time
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -942,7 +942,7 @@ var _ = Describe("ManifestWork", func() {
 			time.Sleep(1 * time.Second)
 
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -952,13 +952,13 @@ var _ = Describe("ManifestWork", func() {
 				deploy.Status.Replicas = 5
 				deploy.Status.ReadyReplicas = 5
 
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(ctx, deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 			By("verify status feedback values are updated")
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -987,7 +987,7 @@ var _ = Describe("ManifestWork", func() {
 
 			By("verify lastTransitionTime is updated for StatusFeedbackSynced condition")
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1027,8 +1027,8 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should remove applied resource immediately when work is updated", func() {
-			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+		It("should remove applied resource immediately when work is updated", func(ctx SpecContext) {
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			newWork := updatedWork.DeepCopy()
@@ -1038,7 +1038,7 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// remove finalizer from the applied resources for stale manifest after 2 seconds
@@ -1050,7 +1050,7 @@ var _ = Describe("ManifestWork", func() {
 
 			// check if resource created by stale manifest is deleted once it is removed from applied resource list
 			Eventually(func() error {
-				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(ctx, appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1064,14 +1064,14 @@ var _ = Describe("ManifestWork", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 
-			err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(ctx, work.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should remove applied resource for stale manifest from list once the resource is gone", func() {
+		It("should remove applied resource for stale manifest from list once the resource is gone", func(ctx SpecContext) {
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -1079,7 +1079,7 @@ var _ = Describe("ManifestWork", func() {
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
-			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			newWork := updatedWork.DeepCopy()
@@ -1089,12 +1089,12 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertExistenceOfConfigMaps(manifests[1:], spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(ctx, work.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// remove finalizer from the applied resources for stale manifest after 2 seconds
@@ -1106,7 +1106,7 @@ var _ = Describe("ManifestWork", func() {
 
 			// check if resource created by stale manifest is deleted once it is removed from applied resource list
 			Eventually(func() error {
-				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(ctx, appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1120,11 +1120,11 @@ var _ = Describe("ManifestWork", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 
-		It("should delete manifest work eventually after all applied resources are gone", func() {
+		It("should delete manifest work eventually after all applied resources are gone", func(ctx SpecContext) {
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -1132,7 +1132,7 @@ var _ = Describe("ManifestWork", func() {
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
-			err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(ctx, work.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkDeleting, metav1.ConditionTrue,
@@ -1148,13 +1148,13 @@ var _ = Describe("ManifestWork", func() {
 							return err != nil
 						},
 						func() error {
-							cm, err := spokeKubeClient.CoreV1().ConfigMaps(cm.Namespace).Get(context.Background(), cm.Name, metav1.GetOptions{})
+							cm, err := spokeKubeClient.CoreV1().ConfigMaps(cm.Namespace).Get(ctx, cm.Name, metav1.GetOptions{})
 							if err != nil {
 								return err
 							}
 
 							cm.Finalizers = nil
-							_, err = spokeKubeClient.CoreV1().ConfigMaps(cm.Namespace).Update(context.Background(), cm, metav1.UpdateOptions{})
+							_, err = spokeKubeClient.CoreV1().ConfigMaps(cm.Namespace).Update(ctx, cm, metav1.UpdateOptions{})
 							return err
 						})
 					Expect(err).ToNot(HaveOccurred())
@@ -1166,7 +1166,7 @@ var _ = Describe("ManifestWork", func() {
 				hubWorkClient, spokeWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("should delete applied manifest work if it is orphan", func() {
+		It("should delete applied manifest work if it is orphan", func(ctx SpecContext) {
 			appliedManifestWork := &workapiv1.AppliedManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("%s-fakework", hubHash),
@@ -1177,7 +1177,7 @@ var _ = Describe("ManifestWork", func() {
 					ManifestWorkName: "fakework",
 				},
 			}
-			_, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Create(context.Background(), appliedManifestWork, metav1.CreateOptions{})
+			_, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Create(ctx, appliedManifestWork, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertAppliedManifestWorkDeleted(appliedManifestWork.Name, spokeWorkClient, eventuallyTimeout, eventuallyInterval)
@@ -1213,7 +1213,7 @@ var _ = Describe("ManifestWork", func() {
 			})
 		})
 
-		It("should update work and be completed", func() {
+		It("should update work and be completed", func(ctx SpecContext) {
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -1226,7 +1226,7 @@ var _ = Describe("ManifestWork", func() {
 				util.ToManifest(util.NewConfigmap(clusterName, cm2, map[string]string{"c": "d"}, nil)),
 			}
 
-			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			newWork := updatedWork.DeepCopy()
@@ -1236,12 +1236,12 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// ManifestWork should be marked completed
 			Eventually(func() error {
-				work, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1257,19 +1257,19 @@ var _ = Describe("ManifestWork", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 		})
 
-		It("should propagate labels from ManifestWork to AppliedManifestWork", func() {
+		It("should propagate labels from ManifestWork to AppliedManifestWork", func(ctx SpecContext) {
 			// Add labels to the work using Patch instead of Update
 			patchData := `{"metadata":{"labels":{"test-label":"test-value","test-label-2":"test-value-2"}}}`
 
 			_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), work.Name, types.MergePatchType,
+				ctx, work.Name, types.MergePatchType,
 				[]byte(patchData), metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Verify AppliedManifestWork has the same labels
 			Eventually(func() bool {
 				appliedWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
-					context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+					ctx, appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -1292,7 +1292,7 @@ var _ = Describe("ManifestWork", func() {
 			}
 		})
 
-		It("should update conditions correctly when RoleRef changes", func() {
+		It("should update conditions correctly when RoleRef changes", func(ctx SpecContext) {
 			By("verify initial conditions are True")
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
@@ -1304,7 +1304,7 @@ var _ = Describe("ManifestWork", func() {
 			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, eventuallyTimeout, eventuallyInterval)
 
 			By("change RoleRef of the first rolebinding to a non-existent role")
-			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Update first rolebinding to reference a non-existent role
@@ -1317,12 +1317,12 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("verify Applied condition is False, Available condition is True, and ObservedGeneration matches")
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1357,7 +1357,7 @@ var _ = Describe("ManifestWork", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 			By("change RoleRef of the second rolebinding to a non-existent role")
-			updatedWork, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			updatedWork, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Update second rolebinding to reference a non-existent role
@@ -1370,12 +1370,12 @@ var _ = Describe("ManifestWork", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("verify Applied condition is still False, Available condition is True, and ObservedGeneration matches")
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

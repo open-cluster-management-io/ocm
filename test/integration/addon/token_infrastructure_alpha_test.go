@@ -21,7 +21,7 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 	var managedClusterName, addOnName string
 	var err error
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("cluster-%s", suffix)
 		addOnName = fmt.Sprintf("addon-%s", suffix)
@@ -35,7 +35,7 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 				HubAcceptsClient: true,
 			},
 		}
-		_, err = hubClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
+		_, err = hubClusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// Create cluster namespace
@@ -44,19 +44,19 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 				Name: managedClusterName,
 			},
 		}
-		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err = hubKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	AfterEach(func() {
-		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(ctx, managedClusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		err = hubKubeClient.CoreV1().Namespaces().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
+		err = hubKubeClient.CoreV1().Namespaces().Delete(ctx, managedClusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	assertTokenInfrastructureReady := func(clusterName, addonName string) {
+	assertTokenInfrastructureReady := func(ctx context.Context, clusterName, addonName string) {
 		By("Verify token infrastructure resources are created")
 		serviceAccountName := fmt.Sprintf("%s-agent", addonName)
 		roleName := fmt.Sprintf("%s-token-role", addonName)
@@ -64,7 +64,7 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 
 		// Check ServiceAccount exists with correct labels
 		Eventually(func() error {
-			sa, err := hubKubeClient.CoreV1().ServiceAccounts(clusterName).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
+			sa, err := hubKubeClient.CoreV1().ServiceAccounts(clusterName).Get(ctx, serviceAccountName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -79,7 +79,7 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 
 		// Check Role exists with correct labels
 		Eventually(func() error {
-			role, err := hubKubeClient.RbacV1().Roles(clusterName).Get(context.Background(), roleName, metav1.GetOptions{})
+			role, err := hubKubeClient.RbacV1().Roles(clusterName).Get(ctx, roleName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -94,7 +94,7 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 
 		// Check RoleBinding exists with correct labels
 		Eventually(func() error {
-			rb, err := hubKubeClient.RbacV1().RoleBindings(clusterName).Get(context.Background(), roleBindingName, metav1.GetOptions{})
+			rb, err := hubKubeClient.RbacV1().RoleBindings(clusterName).Get(ctx, roleBindingName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -109,7 +109,7 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 
 		By("Verify TokenInfrastructureReady condition is set to True")
 		Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(ctx, addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -125,7 +125,7 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 	}
 
-	assertTokenInfrastructureCleanedUp := func(clusterName, addonName string) {
+	assertTokenInfrastructureCleanedUp := func(ctx context.Context, clusterName, addonName string) {
 		By("Verify token infrastructure resources are deleted")
 		serviceAccountName := fmt.Sprintf("%s-agent", addonName)
 		roleName := fmt.Sprintf("%s-token-role", addonName)
@@ -133,24 +133,24 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 
 		// Check ServiceAccount is deleted
 		Eventually(func() bool {
-			_, err := hubKubeClient.CoreV1().ServiceAccounts(clusterName).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
+			_, err := hubKubeClient.CoreV1().ServiceAccounts(clusterName).Get(ctx, serviceAccountName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// Check Role is deleted
 		Eventually(func() bool {
-			_, err := hubKubeClient.RbacV1().Roles(clusterName).Get(context.Background(), roleName, metav1.GetOptions{})
+			_, err := hubKubeClient.RbacV1().Roles(clusterName).Get(ctx, roleName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// Check RoleBinding is deleted
 		Eventually(func() bool {
-			_, err := hubKubeClient.RbacV1().RoleBindings(clusterName).Get(context.Background(), roleBindingName, metav1.GetOptions{})
+			_, err := hubKubeClient.RbacV1().RoleBindings(clusterName).Get(ctx, roleBindingName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	}
 
-	It("should create token infrastructure when addon uses token driver", func() {
+	It("should create token infrastructure when addon uses token driver", func(ctx SpecContext) {
 		By("Create ManagedClusterAddOn")
 		addOn := &addonapiv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
@@ -161,12 +161,12 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 				InstallNamespace: addOnName,
 			},
 		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addOn, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(ctx, addOn, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Update addon status with kubeClient registration and token driver")
 		Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addOnName, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -177,14 +177,14 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 				},
 			}
 			addon.Status.KubeClientDriver = "token"
-			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.Background(), addon, metav1.UpdateOptions{})
+			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(ctx, addon, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-		assertTokenInfrastructureReady(managedClusterName, addOnName)
+		assertTokenInfrastructureReady(ctx, managedClusterName, addOnName)
 	})
 
-	It("should cleanup token infrastructure when addon switches from token to CSR driver", func() {
+	It("should cleanup token infrastructure when addon switches from token to CSR driver", func(ctx SpecContext) {
 		By("Create ManagedClusterAddOn with token driver")
 		addOn := &addonapiv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
@@ -195,11 +195,11 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 				InstallNamespace: addOnName,
 			},
 		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addOn, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(ctx, addOn, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addOnName, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -210,30 +210,30 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 				},
 			}
 			addon.Status.KubeClientDriver = "token"
-			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.Background(), addon, metav1.UpdateOptions{})
+			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(ctx, addon, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-		assertTokenInfrastructureReady(managedClusterName, addOnName)
+		assertTokenInfrastructureReady(ctx, managedClusterName, addOnName)
 
 		By("Switch addon to CSR driver")
 		Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addOnName, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 
 			// Update kubeClientDriver to switch to CSR driver
 			addon.Status.KubeClientDriver = "csr"
-			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.Background(), addon, metav1.UpdateOptions{})
+			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(ctx, addon, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-		assertTokenInfrastructureCleanedUp(managedClusterName, addOnName)
+		assertTokenInfrastructureCleanedUp(ctx, managedClusterName, addOnName)
 
 		By("Verify TokenInfrastructureReady condition is removed")
 		Eventually(func() bool {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addOnName, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -243,7 +243,7 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	})
 
-	It("should cleanup token infrastructure when addon is deleted", func() {
+	It("should cleanup token infrastructure when addon is deleted", func(ctx SpecContext) {
 		By("Create ManagedClusterAddOn with token driver")
 		addOn := &addonapiv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
@@ -254,11 +254,11 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 				InstallNamespace: addOnName,
 			},
 		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addOn, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(ctx, addOn, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addOnName, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -269,20 +269,20 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 				},
 			}
 			addon.Status.KubeClientDriver = "token"
-			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.Background(), addon, metav1.UpdateOptions{})
+			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(ctx, addon, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-		assertTokenInfrastructureReady(managedClusterName, addOnName)
+		assertTokenInfrastructureReady(ctx, managedClusterName, addOnName)
 
 		By("Delete the addon")
-		err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addOnName, metav1.DeleteOptions{})
+		err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(ctx, addOnName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		assertTokenInfrastructureCleanedUp(managedClusterName, addOnName)
+		assertTokenInfrastructureCleanedUp(ctx, managedClusterName, addOnName)
 	})
 
-	It("should handle addon with multiple registrations where only one is token-based", func() {
+	It("should handle addon with multiple registrations where only one is token-based", func(ctx SpecContext) {
 		By("Create ManagedClusterAddOn with multiple registrations including token driver")
 		addOn := &addonapiv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
@@ -293,11 +293,11 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 				InstallNamespace: addOnName,
 			},
 		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addOn, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(ctx, addOn, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addOnName, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -311,10 +311,10 @@ var _ = Describe("Token Infrastructure Controller Alpha", func() {
 				},
 			}
 			addon.Status.KubeClientDriver = "token"
-			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.Background(), addon, metav1.UpdateOptions{})
+			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(ctx, addon, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-		assertTokenInfrastructureReady(managedClusterName, addOnName)
+		assertTokenInfrastructureReady(ctx, managedClusterName, addOnName)
 	})
 })

@@ -1,7 +1,6 @@
 package registration_test
 
 import (
-	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -51,7 +50,7 @@ var _ = Describe("Cluster Auto Importer", func() {
 	var managedClusterName string
 	var dynamicClient dynamic.Interface
 	var operatorClient operatorclient.Interface
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
 
@@ -59,26 +58,26 @@ var _ = Describe("Cluster Auto Importer", func() {
 		clusterManagerConfig := chart.NewDefaultClusterManagerChartConfig()
 		clusterManagerConfig.CreateBootstrapSA = true
 		clusterManagerConfig.CreateNamespace = true
-		crdObjs, rawObjs, err := chart.RenderClusterManagerChart(context.Background(), clusterManagerConfig, "open-cluster-management")
+		crdObjs, rawObjs, err := chart.RenderClusterManagerChart(ctx, clusterManagerConfig, "open-cluster-management")
 		manifests := append(crdObjs, rawObjs...)
 		Expect(err).NotTo(HaveOccurred())
-		recorder := commonrecorder.NewEventsRecorderWrapper(context.TODO(),
+		recorder := commonrecorder.NewEventsRecorderWrapper(ctx,
 			events.NewContextualLoggingEventRecorder("importer-test"))
 		for _, manifest := range manifests {
 			requiredObj, _, err := genericCodec.Decode(manifest, nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 			switch t := requiredObj.(type) {
 			case *corev1.Namespace:
-				_, _, err = resourceapply.ApplyNamespace(context.TODO(), kubeClient.CoreV1(), recorder, t)
+				_, _, err = resourceapply.ApplyNamespace(ctx, kubeClient.CoreV1(), recorder, t)
 				Expect(err).NotTo(HaveOccurred())
 			case *corev1.ServiceAccount:
-				_, _, err = resourceapply.ApplyServiceAccount(context.TODO(), kubeClient.CoreV1(), recorder, t)
+				_, _, err = resourceapply.ApplyServiceAccount(ctx, kubeClient.CoreV1(), recorder, t)
 				Expect(err).NotTo(HaveOccurred())
 			case *rbacv1.ClusterRole:
-				_, _, err = resourceapply.ApplyClusterRole(context.TODO(), kubeClient.RbacV1(), recorder, t)
+				_, _, err = resourceapply.ApplyClusterRole(ctx, kubeClient.RbacV1(), recorder, t)
 				Expect(err).NotTo(HaveOccurred())
 			case *rbacv1.ClusterRoleBinding:
-				_, _, err = resourceapply.ApplyClusterRoleBinding(context.TODO(), kubeClient.RbacV1(), recorder, t)
+				_, _, err = resourceapply.ApplyClusterRoleBinding(ctx, kubeClient.RbacV1(), recorder, t)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}
@@ -91,7 +90,7 @@ var _ = Describe("Cluster Auto Importer", func() {
 	})
 
 	Context("Cluster API importer", func() {
-		JustBeforeEach(func() {
+		JustBeforeEach(func(ctx SpecContext) {
 			cluster := &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: managedClusterName,
@@ -100,35 +99,35 @@ var _ = Describe("Cluster Auto Importer", func() {
 					HubAcceptsClient: true,
 				},
 			}
-			_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), cluster, metav1.CreateOptions{})
+			_, err := clusterClient.ClusterV1().ManagedClusters().Create(ctx, cluster, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Wait for managed cluster namespace to be created
 			namespaceGVR := schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}
 			Eventually(func() error {
-				_, err := dynamicClient.Resource(namespaceGVR).Get(context.TODO(), managedClusterName, metav1.GetOptions{})
+				_, err := dynamicClient.Resource(namespaceGVR).Get(ctx, managedClusterName, metav1.GetOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		JustAfterEach(func() {
-			err := clusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), managedClusterName, metav1.DeleteOptions{})
+		JustAfterEach(func(ctx SpecContext) {
+			err := clusterClient.ClusterV1().ManagedClusters().Delete(ctx, managedClusterName, metav1.DeleteOptions{})
 			if !errors.IsNotFound(err) {
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
-		It("Should import CAPI cluster", func() {
+		It("Should import CAPI cluster", func(ctx SpecContext) {
 			By("create cluster import config secret")
 			configSecret := util.GetClusterImportConfigSecret(managedClusterName)
-			_, err := kubeClient.CoreV1().Secrets(managedClusterName).Create(context.TODO(), configSecret, metav1.CreateOptions{})
+			_, err := kubeClient.CoreV1().Secrets(managedClusterName).Create(ctx, configSecret, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Create CAPI cluster")
 			capiCluster := testingcommon.NewUnstructured(
 				"cluster.x-k8s.io/v1beta1", "Cluster", managedClusterName, managedClusterName)
 			_, err = dynamicClient.Resource(capi.ClusterAPIGVR).Namespace(managedClusterName).Create(
-				context.TODO(), capiCluster, metav1.CreateOptions{})
+				ctx, capiCluster, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() error {
@@ -153,13 +152,13 @@ var _ = Describe("Cluster Auto Importer", func() {
 					"value": util.NewKubeConfig(spokeCfg),
 				},
 			}
-			_, err = kubeClient.CoreV1().Secrets(managedClusterName).Create(context.TODO(), capiSecret, metav1.CreateOptions{})
+			_, err = kubeClient.CoreV1().Secrets(managedClusterName).Create(ctx, capiSecret, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// trigger the capi cluster resource to reconcile again
 			Eventually(func() error {
 				capiCluster, err := dynamicClient.Resource(capi.ClusterAPIGVR).Namespace(managedClusterName).Get(
-					context.TODO(), managedClusterName, metav1.GetOptions{})
+					ctx, managedClusterName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -169,7 +168,7 @@ var _ = Describe("Cluster Auto Importer", func() {
 					return err
 				}
 				_, err = dynamicClient.Resource(capi.ClusterAPIGVR).Namespace(managedClusterName).UpdateStatus(
-					context.TODO(), capiCluster, metav1.UpdateOptions{})
+					ctx, capiCluster, metav1.UpdateOptions{})
 				if err != nil {
 					return err
 				}
@@ -187,7 +186,7 @@ var _ = Describe("Cluster Auto Importer", func() {
 					return fmt.Errorf("cluster should have imported")
 				}
 				_, err = operatorClient.OperatorV1().Klusterlets().Get(
-					context.TODO(), "klusterlet", metav1.GetOptions{})
+					ctx, "klusterlet", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -195,10 +194,10 @@ var _ = Describe("Cluster Auto Importer", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			err = dynamicClient.Resource(capi.ClusterAPIGVR).Namespace(managedClusterName).Delete(
-				context.TODO(), managedClusterName, metav1.DeleteOptions{})
+				ctx, managedClusterName, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			err = kubeClient.CoreV1().Secrets(managedClusterName).Delete(
-				context.TODO(), managedClusterName+"-kubeconfig", metav1.DeleteOptions{})
+				ctx, managedClusterName+"-kubeconfig", metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

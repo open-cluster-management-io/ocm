@@ -97,7 +97,7 @@ func TestWebhookOptions_RunWebhookServer(t *testing.T) {
 	initializer := &testWebhookInitializer{}
 	opts.InstallWebhook(initializer)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
 	var wg sync.WaitGroup

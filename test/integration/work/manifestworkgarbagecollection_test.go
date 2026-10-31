@@ -28,19 +28,19 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 
 	var err error
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		clusterName = rand.String(5)
 		workName = fmt.Sprintf("work-ttl-%s", rand.String(5))
 
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
 		}
-		_, err := spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := spokeKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
-		go startWorkAgent(ctx, clusterName)
+		var runCtx context.Context
+		runCtx, cancel = context.WithCancel(context.Background())
+		go startWorkAgent(runCtx, clusterName)
 
 		// Setup manifests - using a simple configmap that can be easily completed
 		manifests = []workapiv1.Manifest{
@@ -48,16 +48,16 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 		}
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx SpecContext) {
 		if cancel != nil {
 			cancel()
 		}
-		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
+		err := spokeKubeClient.CoreV1().Namespaces().Delete(ctx, clusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	Context("When ManifestWork has TTLSecondsAfterFinished configured", func() {
-		It("should delete the ManifestWork after TTL expires when Complete condition is true", func() {
+		It("should delete the ManifestWork after TTL expires when Complete condition is true", func(ctx SpecContext) {
 			// Create ManifestWork with short TTL
 			ttlSeconds := int64(5)
 			work = util.NewManifestWork(clusterName, workName, manifests)
@@ -88,7 +88,7 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 			}
 
 			// Create the ManifestWork
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for work to be applied and available
@@ -99,7 +99,7 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 
 			// Wait for work to be marked as complete
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, workName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -112,12 +112,12 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 			By("Verifying the ManifestWork is deleted after TTL expires")
 			// Wait for the work to be deleted (TTL + buffer time)
 			Eventually(func() bool {
-				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, workName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
 			}, time.Duration(ttlSeconds+10)*time.Second, eventuallyInterval).Should(BeTrue())
 		})
 
-		It("should not delete the ManifestWork when TTL is not configured", func() {
+		It("should not delete the ManifestWork when TTL is not configured", func(ctx SpecContext) {
 			// Create ManifestWork without TTL
 			work = util.NewManifestWork(clusterName, workName, manifests)
 
@@ -143,7 +143,7 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 			}
 
 			// Create the ManifestWork
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for work to be applied, available, and completed
@@ -154,7 +154,7 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 
 			// Wait for work to be marked as complete
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, workName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -167,12 +167,12 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 			By("Verifying the ManifestWork is NOT deleted without TTL configuration")
 			// Wait some time and verify the work still exists
 			Consistently(func() error {
-				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, workName, metav1.GetOptions{})
 				return err
 			}, 10*time.Second, eventuallyInterval).Should(Succeed())
 		})
 
-		It("should not delete the ManifestWork when it is not completed", func() {
+		It("should not delete the ManifestWork when it is not completed", func(ctx SpecContext) {
 			// Create ManifestWork with TTL but without completion condition rule
 			ttlSeconds := int64(5)
 			work = util.NewManifestWork(clusterName, workName, manifests)
@@ -182,7 +182,7 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 			}
 
 			// Create the ManifestWork without completion rules
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for work to be applied and available
@@ -194,12 +194,12 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 			By("Verifying the ManifestWork is NOT deleted when not completed")
 			// Wait and verify the work still exists (since it's not completed)
 			Consistently(func() error {
-				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, workName, metav1.GetOptions{})
 				return err
 			}, time.Duration(ttlSeconds+5)*time.Second, eventuallyInterval).Should(Succeed())
 		})
 
-		It("should delete immediately when TTL is set to zero", func() {
+		It("should delete immediately when TTL is set to zero", func(ctx SpecContext) {
 			// Create ManifestWork with zero TTL
 			ttlSeconds := int64(0)
 			work = util.NewManifestWork(clusterName, workName, manifests)
@@ -230,18 +230,18 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 			}
 
 			// Create the ManifestWork
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Verifying the ManifestWork is deleted immediately with zero TTL")
 			// Should be deleted quickly since TTL is 0
 			Eventually(func() bool {
-				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, workName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
 			}, 15*time.Second, eventuallyInterval).Should(BeTrue())
 		})
 
-		It("should not delete the ManifestWork with ManifestWorkReplicaSet label even after TTL expires", func() {
+		It("should not delete the ManifestWork with ManifestWorkReplicaSet label even after TTL expires", func(ctx SpecContext) {
 			// Create ManifestWork with TTL and ManifestWorkReplicaSet label
 			ttlSeconds := int64(5)
 			work = util.NewManifestWork(clusterName, workName, manifests)
@@ -277,7 +277,7 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 			}
 
 			// Create the ManifestWork
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for work to be applied, available, and completed
@@ -288,7 +288,7 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 
 			// Wait for work to be marked as complete
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, workName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -301,7 +301,7 @@ var _ = Describe("ManifestWork TTL after completion", func() {
 			By("Verifying the ManifestWork is NOT deleted even after TTL expires due to ManifestWorkReplicaSet label")
 			// Wait past TTL expiry and verify the work still exists
 			Consistently(func() error {
-				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, workName, metav1.GetOptions{})
 				return err
 			}, time.Duration(ttlSeconds+5)*time.Second, eventuallyInterval).Should(Succeed())
 		})

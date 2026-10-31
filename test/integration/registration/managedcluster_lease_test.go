@@ -32,7 +32,7 @@ var _ = Describe("Cluster Lease Update", func() {
 		hubKubeconfigDir = path.Join(util.TestDir, "leasetest", fmt.Sprintf("%s-config", managedClusterName))
 	})
 
-	It("managed cluster lease should be updated constantly", func() {
+	It("managed cluster lease should be updated constantly", func(ctx SpecContext) {
 		// run registration agent
 		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
@@ -52,7 +52,7 @@ var _ = Describe("Cluster Lease Update", func() {
 		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, gracePeriod)
 	})
 
-	It("managed cluster available condition should be recovered after its lease update is recovered", func() {
+	It("managed cluster available condition should be recovered after its lease update is recovered", func(ctx SpecContext) {
 		// run registration agent
 		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
@@ -92,7 +92,7 @@ var _ = Describe("Cluster Lease Update", func() {
 		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, gracePeriod)
 	})
 
-	It("managed cluster available condition should be recovered after the cluster is restored", func() {
+	It("managed cluster available condition should be recovered after the cluster is restored", func(ctx SpecContext) {
 		// run registration agent
 		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
@@ -111,7 +111,7 @@ var _ = Describe("Cluster Lease Update", func() {
 
 		// remove the cluster
 		Eventually(func() error {
-			if err := clusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), managedClusterName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			if err := clusterClient.ClusterV1().ManagedClusters().Delete(ctx, managedClusterName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 				return err
 			}
 			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
@@ -119,14 +119,14 @@ var _ = Describe("Cluster Lease Update", func() {
 				return nil
 			}
 			managedCluster.Finalizers = []string{}
-			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
+			_, err = clusterClient.ClusterV1().ManagedClusters().Update(ctx, managedCluster, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		// restore the cluster
 		Eventually(func() error {
 			_, err := clusterClient.ClusterV1().ManagedClusters().Create(
-				context.TODO(),
+				ctx,
 				&clusterv1.ManagedCluster{
 					ObjectMeta: metav1.ObjectMeta{Name: managedClusterName},
 					Spec: clusterv1.ManagedClusterSpec{
@@ -144,7 +144,7 @@ var _ = Describe("Cluster Lease Update", func() {
 		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, gracePeriod)
 	})
 
-	It("should use a short lease duration", func() {
+	It("should use a short lease duration", func(ctx SpecContext) {
 		// run registration agent
 		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
@@ -161,7 +161,7 @@ var _ = Describe("Cluster Lease Update", func() {
 		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, 0)
 
 		// update the lease duration with a short duration (1s)
-		err := updateManagedClusterLeaseDuration(managedClusterName, util.TestLeaseDurationSeconds)
+		err := updateManagedClusterLeaseDuration(ctx, managedClusterName, util.TestLeaseDurationSeconds)
 		Expect(err).NotTo(HaveOccurred())
 
 		// stop the agent
@@ -172,7 +172,7 @@ var _ = Describe("Cluster Lease Update", func() {
 		assertAvailableCondition(managedClusterName, metav1.ConditionUnknown, gracePeriod)
 	})
 
-	It("clock sync condition should work", func() {
+	It("clock sync condition should work", func(ctx SpecContext) {
 		// run registration agent
 		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
@@ -205,7 +205,7 @@ var _ = Describe("Cluster Lease Update", func() {
 			// * the clock should be out of sync
 			// * the available condition should be true
 			lease.Spec.RenewTime = &metav1.MicroTime{Time: now.Add(-301 * time.Second)}
-			_, err = kubeClient.CoordinationV1().Leases(managedClusterName).Update(context.TODO(), lease, metav1.UpdateOptions{})
+			_, err = kubeClient.CoordinationV1().Leases(managedClusterName).Update(ctx, lease, metav1.UpdateOptions{})
 			return err
 		}, eventuallyInterval, eventuallyTimeout).ShouldNot(HaveOccurred())
 
@@ -256,15 +256,15 @@ func assertAvailableCondition(managedClusterName string, status metav1.Condition
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
-func updateManagedClusterLeaseDuration(clusterName string, leaseDuration int32) error {
-	cluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+func updateManagedClusterLeaseDuration(ctx context.Context, clusterName string, leaseDuration int32) error {
+	cluster, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, clusterName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
 	cluster.Spec.LeaseDurationSeconds = leaseDuration
 
-	_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), cluster, metav1.UpdateOptions{})
+	_, err = clusterClient.ClusterV1().ManagedClusters().Update(ctx, cluster, metav1.UpdateOptions{})
 	return err
 }
 

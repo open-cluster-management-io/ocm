@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -257,7 +256,7 @@ func TestApplyDirectly(t *testing.T) {
 			switch {
 			case c.nilapiExtensionClient:
 				results = ApplyDirectly(
-					context.TODO(),
+					t.Context(),
 					fakeKubeClient, nil,
 					events.NewContextualLoggingEventRecorder(t.Name()),
 					cache,
@@ -266,7 +265,7 @@ func TestApplyDirectly(t *testing.T) {
 				)
 			default:
 				results = ApplyDirectly(
-					context.TODO(),
+					t.Context(),
 					fakeKubeClient, fakeExtensionClient,
 					events.NewContextualLoggingEventRecorder(t.Name()),
 					cache,
@@ -363,14 +362,14 @@ func TestDeleteStaticObject(t *testing.T) {
 			switch {
 			case c.nilapiExtensionClient:
 				err = CleanUpStaticObject(
-					context.TODO(),
+					t.Context(),
 					fakeKubeClient, nil, fakeResgistrationClient,
 					fakeAssetFunc,
 					c.applyFileName,
 				)
 			default:
 				err = CleanUpStaticObject(
-					context.TODO(),
+					t.Context(),
 					fakeKubeClient, fakeExtensionClient, fakeResgistrationClient,
 					fakeAssetFunc,
 					c.applyFileName,
@@ -519,7 +518,7 @@ func TestDeterminReplica(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewClientset(c.existingNodes...)
-			replica := DetermineReplica(context.Background(), fakeKubeClient, c.mode, "node-role.kubernetes.io/master=")
+			replica := DetermineReplica(t.Context(), fakeKubeClient, c.mode, "node-role.kubernetes.io/master=")
 			if replica != c.expectedReplica {
 				t.Errorf("Unexpected replica, actual: %d, expected: %d", replica, c.expectedReplica)
 			}
@@ -588,7 +587,7 @@ func TestAgentPriorityClassName(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			priorityClassName := AgentPriorityClassName(context.Background(), c.klusterlet, c.kubeVersion)
+			priorityClassName := AgentPriorityClassName(t.Context(), c.klusterlet, c.kubeVersion)
 			if priorityClassName != c.expectedPriorityClassName {
 				t.Errorf("Unexpected priorityClassName, actual: %s, expected: %s", priorityClassName, c.expectedPriorityClassName)
 			}
@@ -659,7 +658,7 @@ func TestApplyDeployment(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewSimpleClientset()
 			_, _, err := ApplyDeployment(
-				context.TODO(),
+				t.Context(),
 				fakeKubeClient, []operatorapiv1.GenerationStatus{}, c.nodePlacement,
 				func(name string) ([]byte, error) {
 					return json.Marshal(newDeploymentUnstructured(c.deploymentName, c.deploymentNamespace))
@@ -671,7 +670,7 @@ func TestApplyDeployment(t *testing.T) {
 				t.Errorf("Expect an apply error")
 			}
 
-			deployment, err := fakeKubeClient.AppsV1().Deployments(c.deploymentNamespace).Get(context.TODO(), c.deploymentName, metav1.GetOptions{})
+			deployment, err := fakeKubeClient.AppsV1().Deployments(c.deploymentNamespace).Get(t.Context(), c.deploymentName, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("Expect an get error")
 			}
@@ -858,7 +857,7 @@ func TestApplyEndpoints(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := fakekube.NewSimpleClientset(test.existing...)
-			_, actualModified, err := ApplyEndpoints(context.TODO(), client.CoreV1(), test.input)
+			_, actualModified, err := ApplyEndpoints(t.Context(), client.CoreV1(), test.input)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1061,7 +1060,7 @@ func TestSetRelatedResourcesStatusesWithObj(t *testing.T) {
 			objData := assets.MustCreateAssetFromTemplate(c.manifestFile, template, c.config).Data
 
 			relatedResources := c.relatedResources
-			SetRelatedResourcesStatusesWithObj(context.Background(), &relatedResources, objData)
+			SetRelatedResourcesStatusesWithObj(t.Context(), &relatedResources, objData)
 			c.relatedResources = relatedResources
 			if !reflect.DeepEqual(c.relatedResources, c.expectedRelatedResource) {
 				t.Errorf("Expect to get %v, but got %v", c.expectedRelatedResource, c.relatedResources)
@@ -1168,7 +1167,7 @@ func TestRemoveRelatedResourcesStatusesWithObj(t *testing.T) {
 			objData := assets.MustCreateAssetFromTemplate(c.manifestFile, template, c.config).Data
 
 			relatedResources := c.relatedResources
-			RemoveRelatedResourcesStatusesWithObj(context.Background(), &relatedResources, objData)
+			RemoveRelatedResourcesStatusesWithObj(t.Context(), &relatedResources, objData)
 			c.relatedResources = relatedResources
 			if !reflect.DeepEqual(c.relatedResources, c.expectedRelatedResource) {
 				t.Errorf("Expect to get %v, but got %v", c.expectedRelatedResource, c.relatedResources)
@@ -1461,7 +1460,7 @@ func TestSyncSecret(t *testing.T) {
 			client := fakekube.NewSimpleClientset(tc.existingObjects...)
 			clientTarget := fakekube.NewSimpleClientset()
 			secret, changed, err := SyncSecret(
-				context.TODO(), client.CoreV1(), clientTarget.CoreV1(),
+				t.Context(), client.CoreV1(), clientTarget.CoreV1(),
 				events.NewContextualLoggingEventRecorder(t.Name()), tc.sourceNamespace, tc.sourceName,
 				tc.targetNamespace, tc.targetName, tc.ownerRefs, nil)
 
@@ -1530,7 +1529,7 @@ func TestGetHubKubeconfig(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			client := fakekube.NewSimpleClientset(tc.secret...)
-			config, err := GetHubKubeconfig(context.TODO(), managemengConfig, client, tc.namespace, tc.mode)
+			config, err := GetHubKubeconfig(t.Context(), managemengConfig, client, tc.namespace, tc.mode)
 			if tc.expectedErr && err == nil {
 				t.Error("Expect to get err, but got nil")
 			}

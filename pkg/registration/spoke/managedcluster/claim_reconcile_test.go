@@ -1,7 +1,6 @@
 package managedcluster
 
 import (
-	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -197,7 +196,7 @@ func TestSync(t *testing.T) {
 			}
 
 			fakeHubClient := kubefake.NewClientset()
-			ctx := context.TODO()
+			ctx := t.Context()
 			hubEventRecorder, err := events.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
 			if err != nil {
@@ -575,7 +574,7 @@ func TestExposeClaims(t *testing.T) {
 			}
 
 			fakeHubClient := kubefake.NewClientset()
-			ctx := context.TODO()
+			ctx := t.Context()
 			hubEventRecorder, err := events.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
 			if err != nil {

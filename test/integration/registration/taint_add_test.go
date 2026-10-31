@@ -34,8 +34,8 @@ var _ = Describe("ManagedCluster Taints Update", func() {
 		hubKubeconfigDir = path.Join(util.TestDir, "leasetest", fmt.Sprintf("%s-config", managedClusterName))
 	})
 
-	It("ManagedCluster taint should be updated automatically", func() {
-		ctx, stop := context.WithCancel(context.Background())
+	It("ManagedCluster taint should be updated automatically", func(ctx SpecContext) {
+		runCtx, stop := context.WithCancel(context.Background())
 		// run registration agent
 		go func() {
 			agentOptions := &spoke.SpokeAgentOptions{
@@ -49,7 +49,7 @@ var _ = Describe("ManagedCluster Taints Update", func() {
 			commOptions.SpokeClusterName = managedClusterName
 
 			agentCfg := spoke.NewSpokeAgentConfig(commOptions, agentOptions, stop)
-			err := agentCfg.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
+			err := agentCfg.RunSpokeAgent(runCtx, &controllercmd.ControllerContext{
 				KubeConfig:    spokeCfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("cluster-tainttest"),
 			})
@@ -62,7 +62,7 @@ var _ = Describe("ManagedCluster Taints Update", func() {
 				return err
 			}
 			spokeCluster.Spec.HubAcceptsClient = true
-			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), spokeCluster, metav1.UpdateOptions{})
+			_, err = clusterClient.ClusterV1().ManagedClusters().Update(ctx, spokeCluster, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
@@ -112,7 +112,7 @@ var _ = Describe("ManagedCluster Taints Update", func() {
 				Reason: "ForTest",
 			}
 			meta.SetStatusCondition(&(managedCluster.Status.Conditions), condition)
-			_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.Background(), managedCluster, metav1.UpdateOptions{})
+			_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(ctx, managedCluster, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
@@ -136,7 +136,7 @@ var _ = Describe("ManagedCluster Taints Update", func() {
 				return err
 			}
 			spokeCluster.Spec.LeaseDurationSeconds = 1
-			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), spokeCluster, metav1.UpdateOptions{})
+			_, err = clusterClient.ClusterV1().ManagedClusters().Update(ctx, spokeCluster, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 

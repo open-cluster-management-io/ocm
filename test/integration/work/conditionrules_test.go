@@ -27,13 +27,13 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 
 	var err error
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		workName = fmt.Sprintf("condition-rules-work-%s", rand.String(5))
 		clusterName = rand.String(5)
 
 		ns := &corev1.Namespace{}
 		ns.Name = clusterName
-		_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err = spokeKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// reset manifests
@@ -45,8 +45,8 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	AfterEach(func() {
-		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err := spokeKubeClient.CoreV1().Namespaces().Delete(ctx, clusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -56,9 +56,9 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 			Expect(err).ToNot(HaveOccurred())
 			manifests = append(manifests, util.ToManifest(u))
 
-			var ctx context.Context
-			ctx, cancel = context.WithCancel(context.Background())
-			go startWorkAgent(ctx, clusterName)
+			var runCtx context.Context
+			runCtx, cancel = context.WithCancel(context.Background())
+			go startWorkAgent(runCtx, clusterName)
 		})
 
 		AfterEach(func() {
@@ -67,7 +67,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 			}
 		})
 
-		It("should return well known completed condition rule", func() {
+		It("should return well known completed condition rule", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -88,7 +88,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -99,7 +99,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 			// Update Job status on spoke
 			now := metav1.Now()
 			Eventually(func() error {
-				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(ctx, "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -108,13 +108,13 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 				job.Status.Ready = new(int32(1))
 				job.Status.StartTime = &now
 
-				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(ctx, job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check completed condition
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -133,7 +133,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 			// Update complete condition on job
 			completionTime := metav1.NewTime(now.Add(time.Second))
 			Eventually(func() error {
-				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(ctx, "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -158,13 +158,13 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 					},
 				}
 
-				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(ctx, job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if the condition is updated on work api
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -181,7 +181,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("should return custom conditions by CEL rules", func() {
+		It("should return custom conditions by CEL rules", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -206,7 +206,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -215,7 +215,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			Eventually(func() error {
-				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(ctx, "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -223,13 +223,13 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 				job.Status.Active = 3
 				job.Status.Conditions = []batchv1.JobCondition{}
 
-				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(ctx, job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if we get condition on work api
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -248,20 +248,20 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 
 			// Set active to 1
 			Eventually(func() error {
-				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(ctx, "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
 				job.Status.Active = 1
 
-				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(ctx, job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if condition is updated on work api
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -279,7 +279,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("should return none for missing wellknown condition", func() {
+		It("should return none for missing wellknown condition", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -300,7 +300,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -310,7 +310,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 
 			// Update Job status on spoke
 			Eventually(func() error {
-				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(ctx, "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -319,13 +319,13 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 				job.Status.Ready = new(int32(1))
 				job.Status.Conditions = []batchv1.JobCondition{}
 
-				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(ctx, job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if we get condition on work api
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -351,9 +351,9 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 			Expect(err).ToNot(HaveOccurred())
 			manifests = append(manifests, util.ToManifest(job2))
 
-			var ctx context.Context
-			ctx, cancel = context.WithCancel(context.Background())
-			go startWorkAgent(ctx, clusterName)
+			var runCtx context.Context
+			runCtx, cancel = context.WithCancel(context.Background())
+			go startWorkAgent(runCtx, clusterName)
 		})
 
 		AfterEach(func() {
@@ -362,7 +362,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 			}
 		})
 
-		It("wildcard option should match all jobs", func() {
+		It("wildcard option should match all jobs", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -383,7 +383,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -396,7 +396,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 			completionTime := metav1.NewTime(now.Add(time.Second))
 			Eventually(func() error {
 				// Set first job as active
-				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(ctx, "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -405,13 +405,13 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 				job.Status.Ready = new(int32(1))
 				job.Status.StartTime = &now
 
-				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(ctx, job, metav1.UpdateOptions{})
 				if err != nil {
 					return err
 				}
 
 				// Set second job as complete
-				job, err = spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job2", metav1.GetOptions{})
+				job, err = spokeKubeClient.BatchV1().Jobs(clusterName).Get(ctx, "job2", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -436,13 +436,13 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 					},
 				}
 
-				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(ctx, job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if we get conditions of jobs on work api
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -472,7 +472,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("matched multi options only the first works ", func() {
+		It("matched multi options only the first works ", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -510,7 +510,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(),
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx,
 				work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
@@ -524,7 +524,7 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 			completionTime := metav1.NewTime(now.Add(time.Second))
 			Eventually(func() error {
 				// Set first job as active
-				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(ctx, "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -533,13 +533,13 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 				job.Status.Ready = new(int32(1))
 				job.Status.StartTime = &now
 
-				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(ctx, job, metav1.UpdateOptions{})
 				if err != nil {
 					return err
 				}
 
 				// Set second job as complete
-				job, err = spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job2", metav1.GetOptions{})
+				job, err = spokeKubeClient.BatchV1().Jobs(clusterName).Get(ctx, "job2", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -564,13 +564,13 @@ var _ = Describe("ManifestWork Condition Rules", func() {
 					},
 				}
 
-				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(ctx, job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if we get conditions of jobs on work api
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

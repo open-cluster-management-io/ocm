@@ -1,7 +1,6 @@
 package token
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"os"
@@ -146,7 +145,7 @@ func TestShouldRefreshToken(t *testing.T) {
 				},
 			}
 
-			shouldRefresh, err := driver.shouldRefreshToken(context.Background(), secret, "")
+			shouldRefresh, err := driver.shouldRefreshToken(t.Context(), secret, "")
 			if err != nil {
 				t.Fatalf("shouldRefreshToken failed: %v", err)
 			}
@@ -208,7 +207,7 @@ func TestShouldRefreshToken_EdgeCases(t *testing.T) {
 				Data: tt.secretData,
 			}
 
-			shouldRefresh, err := driver.shouldRefreshToken(context.Background(), secret, tt.desiredUID)
+			shouldRefresh, err := driver.shouldRefreshToken(t.Context(), secret, tt.desiredUID)
 			if (err != nil) != tt.wantError {
 				t.Errorf("shouldRefreshToken() error = %v, wantError %v", err, tt.wantError)
 				return
@@ -336,7 +335,7 @@ func TestIsHubKubeConfigValid(t *testing.T) {
 				HubKubeconfigDir: hubKubeconfigDir,
 			}
 
-			valid, err := driver.IsHubKubeConfigValid(context.Background(), secretOption)
+			valid, err := driver.IsHubKubeConfigValid(t.Context(), secretOption)
 			if (err != nil) != tt.wantError {
 				t.Errorf("IsHubKubeConfigValid() error = %v, wantError %v", err, tt.wantError)
 				return
@@ -575,7 +574,7 @@ func TestTokenDriver_NilGuards(t *testing.T) {
 				return NewTokenDriverForAddOn("test-addon", "test-cluster", NewTokenOption(), nil, addonClients)
 			},
 			testFunc: func(t *testing.T, driver *TokenDriver) {
-				_, _, err := driver.createToken(context.Background())
+				_, _, err := driver.createToken(t.Context())
 				if err == nil {
 					t.Error("Expected error when tokenControl is nil")
 				}
@@ -705,7 +704,7 @@ func TestTokenDriver_EnsureTokenInfrastructureReady(t *testing.T) {
 			addonClients := newTestAddonClients()
 			driver := NewTokenDriverForAddOn("test-addon", "test-cluster", NewTokenOption(), nil, addonClients)
 
-			uid, ready, err := driver.ensureTokenInfrastructureReady(context.Background(), tt.addon)
+			uid, ready, err := driver.ensureTokenInfrastructureReady(t.Context(), tt.addon)
 
 			if (err != nil) != tt.expectedError {
 				t.Errorf("Expected error=%v, got error=%v", tt.expectedError, err)

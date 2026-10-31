@@ -1,7 +1,6 @@
 package registration_test
 
 import (
-	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -17,7 +16,7 @@ import (
 )
 
 var _ = Describe("ManagedClusterSet", func() {
-	It("should create empty cluster set and keep it synced successfully", func() {
+	It("should create empty cluster set and keep it synced successfully", func(ctx SpecContext) {
 		for i := 0; i < 10; i++ {
 			suffix := rand.String(6)
 			By("Create a ManagedClusterSet")
@@ -28,12 +27,12 @@ var _ = Describe("ManagedClusterSet", func() {
 				},
 			}
 
-			_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+			_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, managedClusterSet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Check if ManagedClusterSet is reconciled")
 			Eventually(func() bool {
-				managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+				managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, managedClusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -67,12 +66,12 @@ var _ = Describe("ManagedClusterSet", func() {
 				},
 			}
 
-			_, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
+			_, err = clusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Check if ManagedClusterSet is reconciled again")
 			Eventually(func() bool {
-				managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+				managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, managedClusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -98,25 +97,25 @@ var _ = Describe("ManagedClusterSet", func() {
 					Name: fmt.Sprintf("cs2-%s", suffix),
 				},
 			}
-			_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+			_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, managedClusterSet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() error {
 				// move the cluster to the new clusterset
-				managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
+				managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Get(ctx, managedCluster.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 				managedCluster.Labels = map[string]string{
 					clusterv1beta2.ClusterSetLabel: managedClusterSet.Name,
 				}
-				_, err := clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
+				_, err := clusterClient.ClusterV1().ManagedClusters().Update(ctx, managedCluster, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// check if the new clusterset synced
 			Eventually(func() bool {
-				managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSet.Name, metav1.GetOptions{})
+				managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, managedClusterSet.Name, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -137,7 +136,7 @@ var _ = Describe("ManagedClusterSet", func() {
 
 			// check if the original clusterset synced
 			Eventually(func() error {
-				managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+				managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, managedClusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -159,7 +158,7 @@ var _ = Describe("ManagedClusterSet", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		}
 	})
-	It("should create legacy cluster set and keep it synced successfully", func() {
+	It("should create legacy cluster set and keep it synced successfully", func(ctx SpecContext) {
 		suffix := rand.String(6)
 		By("Create a ManagedClusterSet")
 		managedClusterSetName := fmt.Sprintf("cs1-%s", suffix)
@@ -174,12 +173,12 @@ var _ = Describe("ManagedClusterSet", func() {
 			},
 		}
 
-		_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+		_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, managedClusterSet, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check if ManagedClusterSet is reconciled")
 		Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -213,12 +212,12 @@ var _ = Describe("ManagedClusterSet", func() {
 			},
 		}
 
-		_, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check if ManagedClusterSet is reconciled again")
 		Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -244,25 +243,25 @@ var _ = Describe("ManagedClusterSet", func() {
 				Name: fmt.Sprintf("cs2-%s", suffix),
 			},
 		}
-		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, managedClusterSet, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() error {
 			// move the cluster to the new clusterset
-			managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
+			managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Get(ctx, managedCluster.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			managedCluster.Labels = map[string]string{
 				clusterv1beta2.ClusterSetLabel: managedClusterSet.Name,
 			}
-			_, err := clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
+			_, err := clusterClient.ClusterV1().ManagedClusters().Update(ctx, managedCluster, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		// check if the new clusterset synced
 		Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSet.Name, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, managedClusterSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -283,7 +282,7 @@ var _ = Describe("ManagedClusterSet", func() {
 
 		// check if the original clusterset synced
 		Eventually(func() error {
-			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -304,7 +303,7 @@ var _ = Describe("ManagedClusterSet", func() {
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
-	It("should create labelSelector cluster set and keep it synced successfully", func() {
+	It("should create labelSelector cluster set and keep it synced successfully", func(ctx SpecContext) {
 		suffix := rand.String(6)
 		By("Create a ManagedClusterSet")
 		managedClusterSetName := fmt.Sprintf("cs1-%s", suffix)
@@ -324,12 +323,12 @@ var _ = Describe("ManagedClusterSet", func() {
 			},
 		}
 
-		_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+		_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, managedClusterSet, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check if ManagedClusterSet is reconciled")
 		Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -363,12 +362,12 @@ var _ = Describe("ManagedClusterSet", func() {
 			},
 		}
 
-		_, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check if ManagedClusterSet is reconciled again")
 		Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -405,25 +404,25 @@ var _ = Describe("ManagedClusterSet", func() {
 			},
 		}
 
-		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), newManagedClusterSet, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, newManagedClusterSet, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() error {
 			// move the cluster to the new clusterset
-			managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
+			managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Get(ctx, managedCluster.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			managedCluster.Labels = map[string]string{
 				"region": "apac",
 			}
-			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
+			_, err = clusterClient.ClusterV1().ManagedClusters().Update(ctx, managedCluster, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		// check if the new clusterset synced
 		Eventually(func() bool {
-			newManagedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), newManagedClusterSet.Name, metav1.GetOptions{})
+			newManagedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, newManagedClusterSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -444,7 +443,7 @@ var _ = Describe("ManagedClusterSet", func() {
 
 		// check if the original clusterset synced
 		Eventually(func() error {
-			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -466,7 +465,7 @@ var _ = Describe("ManagedClusterSet", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 	})
-	It("should create global cluster set and keep it synced successfully", func() {
+	It("should create global cluster set and keep it synced successfully", func(ctx SpecContext) {
 		suffix := rand.String(6)
 		By("Create a ManagedCluster")
 		managedClusterName := fmt.Sprintf("managedcluster-%s", suffix)
@@ -482,7 +481,7 @@ var _ = Describe("ManagedClusterSet", func() {
 			},
 		}
 
-		_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
+		_, err := clusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Create a ManagedClusterSet")
@@ -499,12 +498,12 @@ var _ = Describe("ManagedClusterSet", func() {
 			},
 		}
 
-		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, managedClusterSet, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check if ManagedClusterSet is reconciled")
 		Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}

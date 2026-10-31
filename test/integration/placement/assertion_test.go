@@ -25,25 +25,26 @@ import (
 )
 
 // assert placement
-func assertCreatingPlacement(placement *clusterapiv1beta1.Placement) *clusterapiv1beta1.Placement {
+func assertCreatingPlacement(ctx context.Context, placement *clusterapiv1beta1.Placement) *clusterapiv1beta1.Placement {
 	By("Create placement")
-	newplacement, err := clusterClient.ClusterV1beta1().Placements(placement.Namespace).Create(context.Background(), placement, metav1.CreateOptions{})
+	newplacement, err := clusterClient.ClusterV1beta1().Placements(placement.Namespace).Create(ctx, placement, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	return newplacement
 }
 
-func assertCreatingPlacementWithDecision(placement *clusterapiv1beta1.Placement, numberOfDecisionClusters, numberOfPlacementDecisions int) {
-	newplacement := assertCreatingPlacement(placement)
-	assertPlacementDecisionCreated(newplacement)
-	assertPlacementDecisionNumbers(newplacement.Name, newplacement.Namespace, numberOfDecisionClusters, numberOfPlacementDecisions)
+func assertCreatingPlacementWithDecision(ctx context.Context, placement *clusterapiv1beta1.Placement,
+	numberOfDecisionClusters, numberOfPlacementDecisions int) {
+	newplacement := assertCreatingPlacement(ctx, placement)
+	assertPlacementDecisionCreated(ctx, newplacement)
+	assertPlacementDecisionNumbers(ctx, newplacement.Name, newplacement.Namespace, numberOfDecisionClusters, numberOfPlacementDecisions)
 	if placement.Spec.NumberOfClusters != nil {
-		assertPlacementConditionSatisfied(
+		assertPlacementConditionSatisfied(ctx,
 			newplacement.Name, newplacement.Namespace, numberOfDecisionClusters,
 			numberOfDecisionClusters == int(*placement.Spec.NumberOfClusters))
 	}
 }
 
-func assertPatchingPlacementSpec(newPlacement *clusterapiv1beta1.Placement) {
+func assertPatchingPlacementSpec(ctx context.Context, newPlacement *clusterapiv1beta1.Placement) {
 	By("Patching placement spec")
 	placementPatcher := patcher.NewPatcher[
 		*clusterapiv1beta1.Placement, clusterapiv1beta1.PlacementSpec, clusterapiv1beta1.PlacementStatus](
@@ -51,19 +52,19 @@ func assertPatchingPlacementSpec(newPlacement *clusterapiv1beta1.Placement) {
 
 	Eventually(func() error {
 		oldPlacement, err := clusterClient.ClusterV1beta1().Placements(newPlacement.Namespace).Get(
-			context.Background(), newPlacement.Name, metav1.GetOptions{})
+			ctx, newPlacement.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		_, err = placementPatcher.PatchSpec(context.Background(), newPlacement, newPlacement.Spec, oldPlacement.Spec)
+		_, err = placementPatcher.PatchSpec(ctx, newPlacement, newPlacement.Spec, oldPlacement.Spec)
 		return err
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
-func assertPlacementDeleted(placementName, namespace string) {
+func assertPlacementDeleted(ctx context.Context, placementName, namespace string) {
 	By("Check if placement is gone")
 	Eventually(func() bool {
-		_, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+		_, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(ctx, placementName, metav1.GetOptions{})
 		if err == nil {
 			return false
 		}
@@ -71,10 +72,10 @@ func assertPlacementDeleted(placementName, namespace string) {
 	}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 }
 
-func assertPlacementStatusDecisionGroups(placementName, namespace string, decisionGroupStatus []clusterapiv1beta1.DecisionGroupStatus) {
+func assertPlacementStatusDecisionGroups(ctx context.Context, placementName, namespace string, decisionGroupStatus []clusterapiv1beta1.DecisionGroupStatus) {
 	By("Check the group status of placement")
 	Eventually(func() bool {
-		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(ctx, placementName, metav1.GetOptions{})
 		if err != nil {
 			return false
 		}
@@ -83,10 +84,10 @@ func assertPlacementStatusDecisionGroups(placementName, namespace string, decisi
 	}, eventuallyTimeout*2, eventuallyInterval).Should(BeTrue())
 }
 
-func assertPlacementConditionSatisfied(placementName, namespace string, numOfSelectedClusters int, satisfied bool) {
+func assertPlacementConditionSatisfied(ctx context.Context, placementName, namespace string, numOfSelectedClusters int, satisfied bool) {
 	By("Check the condition PlacementSatisfied of placement")
 	Eventually(func() bool {
-		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(ctx, placementName, metav1.GetOptions{})
 		if err != nil {
 			return false
 		}
@@ -110,10 +111,10 @@ func assertPlacementConditionSatisfied(placementName, namespace string, numOfSel
 	}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 }
 
-func assertPlacementConditionMisconfigured(placementName, namespace string, misConfigured bool) {
+func assertPlacementConditionMisconfigured(ctx context.Context, placementName, namespace string, misConfigured bool) {
 	By("Check the condition PlacementMisconfigured of placement")
 	Eventually(func() bool {
-		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(ctx, placementName, metav1.GetOptions{})
 		if err != nil {
 			return false
 		}
@@ -138,7 +139,7 @@ func assertPlacementConditionMisconfigured(placementName, namespace string, misC
 }
 
 // assert placement decision
-func assertCreatingPlacementDecision(name, namespace string, clusterNames []string) {
+func assertCreatingPlacementDecision(ctx context.Context, name, namespace string, clusterNames []string) {
 	By(fmt.Sprintf("Create placementdecision %s", name))
 	placementDecision := &clusterapiv1beta1.PlacementDecision{
 		ObjectMeta: metav1.ObjectMeta{
@@ -150,7 +151,7 @@ func assertCreatingPlacementDecision(name, namespace string, clusterNames []stri
 		},
 	}
 	placementDecision, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).Create(
-		context.Background(), placementDecision, metav1.CreateOptions{})
+		ctx, placementDecision, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	var clusterDecisions []clusterapiv1beta1.ClusterDecision
 	for _, clusterName := range clusterNames {
@@ -161,14 +162,14 @@ func assertCreatingPlacementDecision(name, namespace string, clusterNames []stri
 
 	placementDecision.Status.Decisions = clusterDecisions
 	_, err = clusterClient.ClusterV1beta1().PlacementDecisions(namespace).UpdateStatus(
-		context.Background(), placementDecision, metav1.UpdateOptions{})
+		ctx, placementDecision, metav1.UpdateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func assertPlacementDecisionCreated(placement *clusterapiv1beta1.Placement) {
+func assertPlacementDecisionCreated(ctx context.Context, placement *clusterapiv1beta1.Placement) {
 	By("Check if placementdecision is created")
 	Eventually(func() bool {
-		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(placement.Namespace).List(context.Background(), metav1.ListOptions{
+		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(placement.Namespace).List(ctx, metav1.ListOptions{
 			LabelSelector: placementLabel + "=" + placement.Name,
 		})
 		if err != nil {
@@ -187,10 +188,10 @@ func assertPlacementDecisionCreated(placement *clusterapiv1beta1.Placement) {
 	}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 }
 
-func assertPlacementDecisionNumbers(placementName, namespace string, desiredNumOfDecisionClusters, desiredNumOfDecisions int) {
+func assertPlacementDecisionNumbers(ctx context.Context, placementName, namespace string, desiredNumOfDecisionClusters, desiredNumOfDecisions int) {
 	By("Check the number of decisions in placementdecisions")
 	Eventually(func() bool {
-		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(ctx, metav1.ListOptions{
 			LabelSelector: placementLabel + "=" + placementName,
 		})
 		if err != nil {
@@ -207,10 +208,10 @@ func assertPlacementDecisionNumbers(placementName, namespace string, desiredNumO
 	}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 }
 
-func assertPlacementDecisionClusterNames(placementName, namespace string, desiredClusters []string) {
+func assertPlacementDecisionClusterNames(ctx context.Context, placementName, namespace string, desiredClusters []string) {
 	By(fmt.Sprintf("Check the cluster names of placementdecisions %s", placementName))
 	Eventually(func() bool {
-		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(ctx, metav1.ListOptions{
 			LabelSelector: placementLabel + "=" + placementName,
 		})
 		if err != nil {
@@ -233,7 +234,7 @@ func assertPlacementDecisionClusterNames(placementName, namespace string, desire
 }
 
 // assert clusterset
-func assertCreatingClusterSet(clusterSetName string, labels ...string) {
+func assertCreatingClusterSet(ctx context.Context, clusterSetName string, labels ...string) {
 	By(fmt.Sprintf("Create clusterset %s", clusterSetName))
 	clusterset := &clusterapiv1beta2.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -256,18 +257,18 @@ func assertCreatingClusterSet(clusterSetName string, labels ...string) {
 		}
 	}
 
-	_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+	_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, clusterset, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func assertBindingClusterSet(clusterSetName, namespace string) {
+func assertBindingClusterSet(ctx context.Context, clusterSetName, namespace string) {
 	By("Create clusterset/clustersetbinding")
 	clusterset := &clusterapiv1beta2.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterSetName,
 		},
 	}
-	_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+	_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, clusterset, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	csb := &clusterapiv1beta2.ManagedClusterSetBinding{
@@ -279,18 +280,18 @@ func assertBindingClusterSet(clusterSetName, namespace string) {
 			ClusterSet: clusterSetName,
 		},
 	}
-	_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+	_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(ctx, csb, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func assertDeletingClusterSet(clusterSetName string) {
+func assertDeletingClusterSet(ctx context.Context, clusterSetName string) {
 	By(fmt.Sprintf("Delete clusterset %s", clusterSetName))
-	err := clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
+	err := clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(ctx, clusterSetName, metav1.DeleteOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	By("Check if clusterset is gone")
 	Eventually(func() bool {
-		_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), clusterSetName, metav1.GetOptions{})
+		_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, clusterSetName, metav1.GetOptions{})
 		if err == nil {
 			return false
 		}
@@ -298,7 +299,7 @@ func assertDeletingClusterSet(clusterSetName string) {
 	}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 }
 
-func assertCreatingClusterSetBinding(clusterSetName, namespace string) {
+func assertCreatingClusterSetBinding(ctx context.Context, clusterSetName, namespace string) {
 	By(fmt.Sprintf("Create clustersetbinding %s", clusterSetName))
 	csb := &clusterapiv1beta2.ManagedClusterSetBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -309,18 +310,18 @@ func assertCreatingClusterSetBinding(clusterSetName, namespace string) {
 			ClusterSet: clusterSetName,
 		},
 	}
-	_, err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+	_, err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(ctx, csb, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func assertDeletingClusterSetBinding(clusterSetName, namespace string) {
+func assertDeletingClusterSetBinding(ctx context.Context, clusterSetName, namespace string) {
 	By(fmt.Sprintf("Delete clustersetbinding %s", clusterSetName))
-	err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
+	err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Delete(ctx, clusterSetName, metav1.DeleteOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	By("Check if clustersetbinding is gone")
 	Eventually(func() bool {
-		_, err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Get(context.Background(), clusterSetName, metav1.GetOptions{})
+		_, err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Get(ctx, clusterSetName, metav1.GetOptions{})
 		if err == nil {
 			return false
 		}
@@ -329,7 +330,7 @@ func assertDeletingClusterSetBinding(clusterSetName, namespace string) {
 }
 
 // assert clusters
-func assertCreatingClusters(clusterSetName string, num int, labels ...string) []string {
+func assertCreatingClusters(ctx context.Context, clusterSetName string, num int, labels ...string) []string {
 	By(fmt.Sprintf("Create %d clusters", num))
 
 	var names []string
@@ -345,14 +346,14 @@ func assertCreatingClusters(clusterSetName string, num int, labels ...string) []
 		for i := 1; i < len(labels); i += 2 {
 			cluster.Labels[labels[i-1]] = labels[i]
 		}
-		cluster, err := clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
+		cluster, err := clusterClient.ClusterV1().ManagedClusters().Create(ctx, cluster, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		cluster.Status.Conditions = []metav1.Condition{}
 		for i := 1; i < len(labels); i += 2 {
 			cluster.Status.ClusterClaims = append(cluster.Status.ClusterClaims, clusterapiv1.ManagedClusterClaim{Name: labels[i-1], Value: labels[i]})
 		}
-		_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.Background(), cluster, metav1.UpdateOptions{})
+		_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		names = append(names, cluster.Name)
@@ -365,24 +366,24 @@ func assertCreatingClusters(clusterSetName string, num int, labels ...string) []
 	return names
 }
 
-func assertCleanupClusters() []string {
+func assertCleanupClusters(ctx context.Context) []string {
 	By("Cleanup all managed clusters")
 	var clusterNames []string
-	clusters, err := clusterClient.ClusterV1().ManagedClusters().List(context.Background(), metav1.ListOptions{})
+	clusters, err := clusterClient.ClusterV1().ManagedClusters().List(ctx, metav1.ListOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	for _, cluster := range clusters.Items {
 		clusterNames = append(clusterNames, cluster.Name)
 	}
 
-	assertDeletingClusters(clusterNames...)
+	assertDeletingClusters(ctx, clusterNames...)
 
 	return clusterNames
 }
 
-func assertPatchingClusterStatusWithResources(managedClusterName string, res []string) {
+func assertPatchingClusterStatusWithResources(ctx context.Context, managedClusterName string, res []string) {
 	By(fmt.Sprintf("Updating ManagedClusters %s cluster resources", managedClusterName))
 
-	oldmc, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedClusterName, metav1.GetOptions{})
+	oldmc, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, managedClusterName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	allocatable := map[clusterapiv1.ResourceName]resource.Quantity{}
@@ -405,17 +406,17 @@ func assertPatchingClusterStatusWithResources(managedClusterName string, res []s
 		*clusterapiv1.ManagedCluster, clusterapiv1.ManagedClusterSpec, clusterapiv1.ManagedClusterStatus](
 		clusterClient.ClusterV1().ManagedClusters())
 
-	_, err = managedClusterPatcher.PatchStatus(context.Background(), newmc, newmc.Status, oldmc.Status)
+	_, err = managedClusterPatcher.PatchStatus(ctx, newmc, newmc.Status, oldmc.Status)
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func assertPatchingClusterSpecWithTaint(managedClusterName string, taint *clusterapiv1.Taint) {
+func assertPatchingClusterSpecWithTaint(ctx context.Context, managedClusterName string, taint *clusterapiv1.Taint) {
 	By(fmt.Sprintf("Updating ManagedClusters %s taint", managedClusterName))
 	if taint == nil {
 		return
 	}
 
-	oldmc, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedClusterName, metav1.GetOptions{})
+	oldmc, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, managedClusterName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	newmc := oldmc.DeepCopy()
@@ -425,19 +426,19 @@ func assertPatchingClusterSpecWithTaint(managedClusterName string, taint *cluste
 		*clusterapiv1.ManagedCluster, clusterapiv1.ManagedClusterSpec, clusterapiv1.ManagedClusterStatus](
 		clusterClient.ClusterV1().ManagedClusters())
 
-	_, err = managedClusterPatcher.PatchSpec(context.Background(), newmc, newmc.Spec, oldmc.Spec)
+	_, err = managedClusterPatcher.PatchSpec(ctx, newmc, newmc.Spec, oldmc.Spec)
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func assertDeletingClusters(clusterNames ...string) {
+func assertDeletingClusters(ctx context.Context, clusterNames ...string) {
 	for _, clusterName := range clusterNames {
 		By(fmt.Sprintf("Delete cluster %s", clusterName))
-		err := clusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
+		err := clusterClient.ClusterV1().ManagedClusters().Delete(ctx, clusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Check if cluster is gone")
 		Eventually(func() bool {
-			_, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), clusterName, metav1.GetOptions{})
+			_, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, clusterName, metav1.GetOptions{})
 			if err == nil {
 				return false
 			}
@@ -446,20 +447,20 @@ func assertDeletingClusters(clusterNames ...string) {
 	}
 }
 
-func assertCreatingAddOnPlacementScores(clusternamespace, crname, scorename string, score int32) {
+func assertCreatingAddOnPlacementScores(ctx context.Context, clusternamespace, crname, scorename string, score int32) {
 	By(fmt.Sprintf("Create namespace %s for addonplacementscores %s", clusternamespace, crname))
-	if _, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), clusternamespace, metav1.GetOptions{}); err != nil {
+	if _, err := kubeClient.CoreV1().Namespaces().Get(ctx, clusternamespace, metav1.GetOptions{}); err != nil {
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusternamespace,
 			},
 		}
-		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	}
 
 	By(fmt.Sprintf("Create addonplacementscores %s in %s", crname, clusternamespace))
-	addOn, err := clusterClient.ClusterV1alpha1().AddOnPlacementScores(clusternamespace).Get(context.Background(), crname, metav1.GetOptions{})
+	addOn, err := clusterClient.ClusterV1alpha1().AddOnPlacementScores(clusternamespace).Get(ctx, crname, metav1.GetOptions{})
 	if err != nil {
 		newAddOn := &clusterapiv1alpha1.AddOnPlacementScore{
 			ObjectMeta: metav1.ObjectMeta{
@@ -467,7 +468,7 @@ func assertCreatingAddOnPlacementScores(clusternamespace, crname, scorename stri
 				Name:      crname,
 			},
 		}
-		addOn, err = clusterClient.ClusterV1alpha1().AddOnPlacementScores(clusternamespace).Create(context.Background(), newAddOn, metav1.CreateOptions{})
+		addOn, err = clusterClient.ClusterV1alpha1().AddOnPlacementScores(clusternamespace).Create(ctx, newAddOn, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	}
 
@@ -482,6 +483,6 @@ func assertCreatingAddOnPlacementScores(clusternamespace, crname, scorename stri
 		ValidUntil: &vu,
 	}
 
-	_, err = clusterClient.ClusterV1alpha1().AddOnPlacementScores(clusternamespace).UpdateStatus(context.Background(), addOn, metav1.UpdateOptions{})
+	_, err = clusterClient.ClusterV1alpha1().AddOnPlacementScores(clusternamespace).UpdateStatus(ctx, addOn, metav1.UpdateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 }

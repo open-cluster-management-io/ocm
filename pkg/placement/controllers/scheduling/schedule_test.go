@@ -1,7 +1,6 @@
 package scheduling
 
 import (
-	"context"
 	"encoding/json"
 	"reflect"
 	"sort"
@@ -564,7 +563,7 @@ func TestSchedule(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			s := NewPluginScheduler(testinghelpers.NewFakePluginHandle(t, clusterClient, c.initObjs...))
 			result, status := s.Schedule(
-				context.TODO(),
+				t.Context(),
 				c.placement,
 				c.clusters,
 			)

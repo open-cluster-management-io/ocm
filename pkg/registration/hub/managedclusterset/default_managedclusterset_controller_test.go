@@ -1,7 +1,6 @@
 package managedclusterset
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -126,7 +125,7 @@ func TestSyncDefaultClusterSet(t *testing.T) {
 				clusterSetLister: informerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName), "")
+			syncErr := ctrl.sync(t.Context(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName), "")
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

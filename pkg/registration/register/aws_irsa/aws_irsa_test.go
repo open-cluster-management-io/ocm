@@ -207,7 +207,7 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 				secretOption.BootStrapKubeConfigFile = path.Join(tempDir, "bootstrap-kubeconfig")
 			}
 
-			valid, err := register.IsHubKubeConfigValidFunc(driver, secretOption)(context.TODO())
+			valid, err := register.IsHubKubeConfigValidFunc(driver, secretOption)(t.Context())
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -250,7 +250,7 @@ func TestAWSIRSADriver_BuildClients_StartsCSRInformer(t *testing.T) {
 	}
 	driver := NewAWSIRSADriver(NewAWSOption(), secretOption).(*AWSIRSADriver)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	if _, err := driver.BuildClients(ctx, secretOption, false); err != nil {

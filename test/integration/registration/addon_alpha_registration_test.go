@@ -35,7 +35,7 @@ var _ = Describe("Addon Alpha Registration", func() {
 	var bootstrapKubeconfig string
 	var expectedProxyURL string
 
-	JustBeforeEach(func() {
+	JustBeforeEach(func(ctx SpecContext) {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
 		hubKubeconfigSecret = fmt.Sprintf("hub-kubeconfig-secret-%s", suffix)
@@ -77,10 +77,10 @@ var _ = Describe("Addon Alpha Registration", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	assertValidClientCertificate := func(secretNamespace, secretName, signerName, expectedProxyURL string) {
+	assertValidClientCertificate := func(ctx context.Context, secretNamespace, secretName, signerName, expectedProxyURL string) {
 		By("Check client certificate in secret")
 		Eventually(func() bool {
-			secret, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+			secret, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -112,11 +112,11 @@ var _ = Describe("Addon Alpha Registration", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	}
 
-	assertClientCertCondition := func(clusterName, addonName string) {
+	assertClientCertCondition := func(ctx context.Context, clusterName, addonName string) {
 		By("Check clientcert addon status condition")
 		Eventually(func() bool {
 			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).
-				Get(context.TODO(), addonName, metav1.GetOptions{})
+				Get(ctx, addonName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -140,10 +140,10 @@ var _ = Describe("Addon Alpha Registration", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	}
 
-	assertAddOnSignerUpdate := func(signerName string) {
+	assertAddOnSignerUpdate := func(ctx context.Context, signerName string) {
 		Eventually(func() error {
 			addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
-				Get(context.TODO(), addOnName, metav1.GetOptions{})
+				Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -154,12 +154,12 @@ var _ = Describe("Addon Alpha Registration", func() {
 				},
 			}
 			_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
-				UpdateStatus(context.TODO(), addOn, metav1.UpdateOptions{})
+				UpdateStatus(ctx, addOn, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 	}
 
-	assertSuccessAddOnEnabling := func() {
+	assertSuccessAddOnEnabling := func(ctx context.Context) {
 		By("Create ManagedClusterAddOn cr with required annotations")
 		// create addon namespace
 		ns := &corev1.Namespace{
@@ -167,7 +167,7 @@ var _ = Describe("Addon Alpha Registration", func() {
 				Name: addOnName,
 			},
 		}
-		_, err = kubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+		_, err = kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		// create addon
@@ -180,39 +180,39 @@ var _ = Describe("Addon Alpha Registration", func() {
 				InstallNamespace: addOnName,
 			},
 		}
-		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
+		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(ctx, addOn, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+		_, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	assertSuccessAddOnBootstrap := func(signerName string) {
-		assertSuccessAddOnEnabling()
-		assertAddOnSignerUpdate(signerName)
+	assertSuccessAddOnBootstrap := func(ctx context.Context, signerName string) {
+		assertSuccessAddOnEnabling(ctx)
+		assertAddOnSignerUpdate(ctx, signerName)
 		assertSuccessCSRApproval()
-		assertValidClientCertificate(addOnName, getAlphaSecretName(addOnName, signerName), signerName, expectedProxyURL)
+		assertValidClientCertificate(ctx, addOnName, getAlphaSecretName(addOnName, signerName), signerName, expectedProxyURL)
 		assertAddonLabel(managedClusterName, addOnName, "unreachable")
-		assertClientCertCondition(managedClusterName, addOnName)
+		assertClientCertCondition(ctx, managedClusterName, addOnName)
 	}
 
-	assertSecretGone := func(secretNamespace, secretName string) {
+	assertSecretGone := func(ctx context.Context, secretNamespace, secretName string) {
 		Eventually(func() bool {
-			_, err = kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+			_, err = kubeClient.CoreV1().Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	}
 
 	assertRegistrationSucceed := func() {
-		It("should register addon successfully", func() {
-			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
+		It("should register addon successfully", func(ctx SpecContext) {
+			assertSuccessClusterBootstrap(ctx, managedClusterName, hubKubeconfigSecret)
 			signerName := certificates.KubeAPIServerClientSignerName
-			assertSuccessAddOnBootstrap(signerName)
+			assertSuccessAddOnBootstrap(ctx, signerName)
 
 			By("Delete the addon and check if secret is gone")
-			err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+			err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(ctx, addOnName, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			assertSecretGone(addOnName, getAlphaSecretName(addOnName, signerName))
+			assertSecretGone(ctx, addOnName, getAlphaSecretName(addOnName, signerName))
 
 			assertHasNoAddonLabel(managedClusterName, addOnName)
 		})
@@ -225,8 +225,8 @@ var _ = Describe("Addon Alpha Registration", func() {
 		})
 		assertRegistrationSucceed()
 
-		It("should register addon successfully even when the install namespace is not available at the beginning", func() {
-			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
+		It("should register addon successfully even when the install namespace is not available at the beginning", func(ctx SpecContext) {
+			assertSuccessClusterBootstrap(ctx, managedClusterName, hubKubeconfigSecret)
 
 			signerName := certificates.KubeAPIServerClientSignerName
 			By("Create ManagedClusterAddOn cr with required annotations")
@@ -241,11 +241,11 @@ var _ = Describe("Addon Alpha Registration", func() {
 					InstallNamespace: addOnName,
 				},
 			}
-			_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
+			_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(ctx, addOn, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() error {
-				created, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				created, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -254,7 +254,7 @@ var _ = Describe("Addon Alpha Registration", func() {
 						SignerName: signerName,
 					},
 				}
-				_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
+				_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(ctx, created, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
@@ -280,32 +280,32 @@ var _ = Describe("Addon Alpha Registration", func() {
 					Name: addOnName,
 				},
 			}
-			_, err = kubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+			_, err = kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			assertValidClientCertificate(addOnName, getAlphaSecretName(addOnName, signerName), signerName, expectedProxyURL)
+			assertValidClientCertificate(ctx, addOnName, getAlphaSecretName(addOnName, signerName), signerName, expectedProxyURL)
 
 			By("Delete the addon and check if secret is gone")
-			err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+			err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(ctx, addOnName, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			assertSecretGone(addOnName, getAlphaSecretName(addOnName, signerName))
+			assertSecretGone(ctx, addOnName, getAlphaSecretName(addOnName, signerName))
 		})
 
-		It("should register addon with custom signer successfully", func() {
-			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
+		It("should register addon with custom signer successfully", func(ctx SpecContext) {
+			assertSuccessClusterBootstrap(ctx, managedClusterName, hubKubeconfigSecret)
 			signerName := "example.com/signer1"
-			assertSuccessAddOnBootstrap(signerName)
+			assertSuccessAddOnBootstrap(ctx, signerName)
 		})
 
-		It("should addon registration config updated successfully", func() {
-			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
+		It("should addon registration config updated successfully", func(ctx SpecContext) {
+			assertSuccessClusterBootstrap(ctx, managedClusterName, hubKubeconfigSecret)
 			signerName := certificates.KubeAPIServerClientSignerName
-			assertSuccessAddOnBootstrap(signerName)
+			assertSuccessAddOnBootstrap(ctx, signerName)
 
 			// update registration config and change the signer
 			newSignerName := "example.com/signer1"
 			Eventually(func() error {
-				addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -314,27 +314,27 @@ var _ = Describe("Addon Alpha Registration", func() {
 						SignerName: newSignerName,
 					},
 				}
-				_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), addOn, metav1.UpdateOptions{})
+				_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(ctx, addOn, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
-			assertSecretGone(addOnName, getAlphaSecretName(addOnName, signerName))
+			assertSecretGone(ctx, addOnName, getAlphaSecretName(addOnName, signerName))
 
 			assertSuccessCSRApproval()
-			assertValidClientCertificate(addOnName, getAlphaSecretName(addOnName, newSignerName), newSignerName, expectedProxyURL)
+			assertValidClientCertificate(ctx, addOnName, getAlphaSecretName(addOnName, newSignerName), newSignerName, expectedProxyURL)
 		})
 
-		It("should rotate addon client cert successfully", func() {
-			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
+		It("should rotate addon client cert successfully", func(ctx SpecContext) {
+			assertSuccessClusterBootstrap(ctx, managedClusterName, hubKubeconfigSecret)
 			signerName := certificates.KubeAPIServerClientSignerName
-			assertSuccessAddOnBootstrap(signerName)
+			assertSuccessAddOnBootstrap(ctx, signerName)
 
 			secretName := getAlphaSecretName(addOnName, signerName)
-			secret, err := kubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
+			secret, err := kubeClient.CoreV1().Secrets(addOnName).Get(ctx, secretName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			By("Wait for cert rotation")
 			assertSuccessCSRApproval()
 			Eventually(func() bool {
-				newSecret, err := kubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
+				newSecret, err := kubeClient.CoreV1().Secrets(addOnName).Get(ctx, secretName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -343,16 +343,16 @@ var _ = Describe("Addon Alpha Registration", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 
-		It("should stop addon client cert update if too frequent", func() {
-			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
+		It("should stop addon client cert update if too frequent", func(ctx SpecContext) {
+			assertSuccessClusterBootstrap(ctx, managedClusterName, hubKubeconfigSecret)
 			signerName := certificates.KubeAPIServerClientSignerName
-			assertSuccessAddOnBootstrap(signerName)
+			assertSuccessAddOnBootstrap(ctx, signerName)
 
 			// update subject for 15 times
 			for i := 1; i <= 15; i++ {
 				currentIndex := i
 				Eventually(func() error {
-					addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+					addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
@@ -368,7 +368,7 @@ var _ = Describe("Addon Alpha Registration", func() {
 							},
 						},
 					}
-					_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), addOn, metav1.UpdateOptions{})
+					_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(ctx, addOn, metav1.UpdateOptions{})
 					return err
 				}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 				// sleep 1 second to ensure controller issue a new csr.
@@ -376,14 +376,14 @@ var _ = Describe("Addon Alpha Registration", func() {
 			}
 
 			By("CSR should not exceed 10")
-			csrs, err := kubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{
+			csrs, err := kubeClient.CertificatesV1().CertificateSigningRequests().List(ctx, metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s,%s=%s", clusterv1.ClusterNameLabelKey, managedClusterName, addonv1alpha1.AddonLabelKey, addOnName),
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(csrs.Items)).To(BeNumerically("<=", 10))
 
 			Eventually(func() error {
-				addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

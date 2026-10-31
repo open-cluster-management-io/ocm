@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -25,7 +24,7 @@ var _ = Describe("ManagedNamespace", func() {
 		var expectedNamespaces []string
 		var originalManagedNamespaces []clusterv1.ManagedNamespaceConfig
 
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			suffix := rand.String(6)
 			expectedNamespaces = []string{
 				fmt.Sprintf("test-ns-1-%s", suffix),
@@ -35,7 +34,7 @@ var _ = Describe("ManagedNamespace", func() {
 			// Update the existing universal cluster set with managed namespaces
 			Eventually(func() error {
 				clusterSet, err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Get(
-					context.TODO(), universalClusterSetName, metav1.GetOptions{})
+					ctx, universalClusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -50,16 +49,16 @@ var _ = Describe("ManagedNamespace", func() {
 				}
 
 				_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Update(
-					context.TODO(), clusterSet, metav1.UpdateOptions{})
+					ctx, clusterSet, metav1.UpdateOptions{})
 				return err
 			}, 30*time.Second, 2*time.Second).Should(Succeed())
 		})
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			// Restore original managed namespaces in the universal cluster set
 			Eventually(func() error {
 				clusterSet, err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Get(
-					context.TODO(), universalClusterSetName, metav1.GetOptions{})
+					ctx, universalClusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -68,25 +67,25 @@ var _ = Describe("ManagedNamespace", func() {
 				clusterSet.Spec.ManagedNamespaces = originalManagedNamespaces
 
 				_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Update(
-					context.TODO(), clusterSet, metav1.UpdateOptions{})
+					ctx, clusterSet, metav1.UpdateOptions{})
 				return err
 			}, 30*time.Second, 2*time.Second).Should(Succeed())
 
 			// Clean up any test namespaces that might have been created on the spoke cluster
 			for _, nsName := range expectedNamespaces {
 				err := spoke.KubeClient.CoreV1().Namespaces().Delete(
-					context.TODO(), nsName, metav1.DeleteOptions{})
+					ctx, nsName, metav1.DeleteOptions{})
 				if err != nil && !errors.IsNotFound(err) {
 					GinkgoLogr.Error(err, "failed to delete test namespace", "namespace", nsName)
 				}
 			}
 		})
 
-		It("should update ManagedCluster status with managed namespaces from ManagedClusterSet", func() {
+		It("should update ManagedCluster status with managed namespaces from ManagedClusterSet", func(ctx SpecContext) {
 			By("Waiting for the hub-side managed namespace controller to update the ManagedCluster status")
 			Eventually(func() bool {
 				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
-					context.TODO(), universalClusterName, metav1.GetOptions{})
+					ctx, universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -116,7 +115,7 @@ var _ = Describe("ManagedNamespace", func() {
 				"ManagedCluster status should be updated with managed namespaces")
 		})
 
-		It("should create managed namespaces on spoke cluster with correct labels", func() {
+		It("should create managed namespaces on spoke cluster with correct labels", func(ctx SpecContext) {
 			// Get expected hub cluster set label
 			expectedLabel := managedcluster.GetHubClusterSetLabel(hubHash)
 
@@ -124,7 +123,7 @@ var _ = Describe("ManagedNamespace", func() {
 			Eventually(func() bool {
 				// List all namespaces with the expected label set to "true"
 				namespaceList, err := spoke.KubeClient.CoreV1().Namespaces().List(
-					context.TODO(), metav1.ListOptions{
+					ctx, metav1.ListOptions{
 						LabelSelector: fmt.Sprintf("%s=true", expectedLabel),
 					})
 				if err != nil {
@@ -143,11 +142,11 @@ var _ = Describe("ManagedNamespace", func() {
 				"All expected namespaces should be created with correct hub-specific label")
 		})
 
-		It("should update managed namespace conditions when namespace creation succeeds", func() {
+		It("should update managed namespace conditions when namespace creation succeeds", func(ctx SpecContext) {
 			By("Waiting for successful namespace creation conditions")
 			Eventually(func() bool {
 				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
-					context.TODO(), universalClusterName, metav1.GetOptions{})
+					ctx, universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -168,7 +167,7 @@ var _ = Describe("ManagedNamespace", func() {
 				"All managed namespaces should have successful conditions")
 		})
 
-		It("should cleanup previously managed namespaces when removed from cluster set", func() {
+		It("should cleanup previously managed namespaces when removed from cluster set", func(ctx SpecContext) {
 			// Get expected hub cluster set label
 			expectedLabel := managedcluster.GetHubClusterSetLabel(hubHash)
 
@@ -177,7 +176,7 @@ var _ = Describe("ManagedNamespace", func() {
 				nsName := expectedNS
 				Eventually(func() error {
 					_, err := spoke.KubeClient.CoreV1().Namespaces().Get(
-						context.TODO(), nsName, metav1.GetOptions{})
+						ctx, nsName, metav1.GetOptions{})
 					return err
 				}, 120*time.Second, 3*time.Second).Should(Succeed())
 			}
@@ -186,7 +185,7 @@ var _ = Describe("ManagedNamespace", func() {
 			// Update the cluster set to remove the first namespace
 			Eventually(func() error {
 				clusterSet, err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Get(
-					context.TODO(), universalClusterSetName, metav1.GetOptions{})
+					ctx, universalClusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -197,7 +196,7 @@ var _ = Describe("ManagedNamespace", func() {
 				}
 
 				_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Update(
-					context.TODO(), clusterSet, metav1.UpdateOptions{})
+					ctx, clusterSet, metav1.UpdateOptions{})
 				return err
 			}, 30*time.Second, 2*time.Second).Should(Succeed())
 
@@ -205,7 +204,7 @@ var _ = Describe("ManagedNamespace", func() {
 			removedNS := expectedNamespaces[0]
 			Eventually(func() bool {
 				ns, err := spoke.KubeClient.CoreV1().Namespaces().Get(
-					context.TODO(), removedNS, metav1.GetOptions{})
+					ctx, removedNS, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -223,7 +222,7 @@ var _ = Describe("ManagedNamespace", func() {
 			remainingNS := expectedNamespaces[1]
 			Consistently(func() bool {
 				ns, err := spoke.KubeClient.CoreV1().Namespaces().Get(
-					context.TODO(), remainingNS, metav1.GetOptions{})
+					ctx, remainingNS, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -244,7 +243,7 @@ var _ = Describe("ManagedNamespace", func() {
 		var namespace1, namespace2 string
 		var originalUniversalManagedNamespaces []clusterv1.ManagedNamespaceConfig
 
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			suffix := rand.String(6)
 			additionalClusterSetName = fmt.Sprintf("test-clusterset-%s", suffix)
 			namespace1 = fmt.Sprintf("test-ns-1-%s", suffix)
@@ -253,7 +252,7 @@ var _ = Describe("ManagedNamespace", func() {
 			// Store original managed namespaces from universal cluster set
 			Eventually(func() error {
 				clusterSet, err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Get(
-					context.TODO(), universalClusterSetName, metav1.GetOptions{})
+					ctx, universalClusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -264,7 +263,7 @@ var _ = Describe("ManagedNamespace", func() {
 			// Add managed namespace to universal cluster set
 			Eventually(func() error {
 				clusterSet, err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Get(
-					context.TODO(), universalClusterSetName, metav1.GetOptions{})
+					ctx, universalClusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -272,7 +271,7 @@ var _ = Describe("ManagedNamespace", func() {
 				clusterSet.Spec.ManagedNamespaces = append(originalUniversalManagedNamespaces, clusterv1.ManagedNamespaceConfig{Name: namespace1})
 
 				_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Update(
-					context.TODO(), clusterSet, metav1.UpdateOptions{})
+					ctx, clusterSet, metav1.UpdateOptions{})
 				return err
 			}, 30*time.Second, 2*time.Second).Should(Succeed())
 
@@ -297,15 +296,15 @@ var _ = Describe("ManagedNamespace", func() {
 			}
 
 			_, err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(
-				context.TODO(), additionalClusterSet, metav1.CreateOptions{})
+				ctx, additionalClusterSet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			// Restore original managed namespaces in the universal cluster set
 			Eventually(func() error {
 				clusterSet, err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Get(
-					context.TODO(), universalClusterSetName, metav1.GetOptions{})
+					ctx, universalClusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -313,29 +312,29 @@ var _ = Describe("ManagedNamespace", func() {
 				clusterSet.Spec.ManagedNamespaces = originalUniversalManagedNamespaces
 
 				_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Update(
-					context.TODO(), clusterSet, metav1.UpdateOptions{})
+					ctx, clusterSet, metav1.UpdateOptions{})
 				return err
 			}, 30*time.Second, 2*time.Second).Should(Succeed())
 
 			// Clean up additional cluster set
 			err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Delete(
-				context.TODO(), additionalClusterSetName, metav1.DeleteOptions{})
+				ctx, additionalClusterSetName, metav1.DeleteOptions{})
 			if !errors.IsNotFound(err) {
 				Expect(err).ToNot(HaveOccurred())
 			}
 
 			// Clean up test namespaces
 			Expect(spoke.KubeClient.CoreV1().Namespaces().Delete(
-				context.TODO(), namespace1, metav1.DeleteOptions{})).ToNot(HaveOccurred())
+				ctx, namespace1, metav1.DeleteOptions{})).ToNot(HaveOccurred())
 			Expect(spoke.KubeClient.CoreV1().Namespaces().Delete(
-				context.TODO(), namespace2, metav1.DeleteOptions{})).ToNot(HaveOccurred())
+				ctx, namespace2, metav1.DeleteOptions{})).ToNot(HaveOccurred())
 		})
 
-		It("should manage namespaces from multiple cluster sets", func() {
+		It("should manage namespaces from multiple cluster sets", func(ctx SpecContext) {
 			By("Waiting for ManagedCluster status to include namespaces from both cluster sets")
 			Eventually(func() bool {
 				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
-					context.TODO(), universalClusterName, metav1.GetOptions{})
+					ctx, universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -360,7 +359,7 @@ var _ = Describe("ManagedNamespace", func() {
 				expectedNamespaces := []string{namespace1, namespace2}
 				for _, nsName := range expectedNamespaces {
 					_, err := spoke.KubeClient.CoreV1().Namespaces().Get(
-						context.TODO(), nsName, metav1.GetOptions{})
+						ctx, nsName, metav1.GetOptions{})
 					if err != nil {
 						return false
 					}

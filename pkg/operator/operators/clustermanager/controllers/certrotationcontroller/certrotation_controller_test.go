@@ -1,7 +1,6 @@
 package certrotationcontroller
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -76,7 +75,7 @@ func TestCertRotation(t *testing.T) {
 				if err != nil {
 					t.Fatalf("expected no error, but get %q", err)
 				}
-				secretList, err := kubeClient.CoreV1().Secrets("").List(context.Background(), metav1.ListOptions{})
+				secretList, err := kubeClient.CoreV1().Secrets("").List(t.Context(), metav1.ListOptions{})
 				if err != nil {
 					t.Fatalf("expected no error when list secret:%s", err)
 				}
@@ -95,7 +94,7 @@ func TestCertRotation(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected an error")
 				}
-				secretList, err := kubeClient.CoreV1().Secrets("").List(context.Background(), metav1.ListOptions{})
+				secretList, err := kubeClient.CoreV1().Secrets("").List(t.Context(), metav1.ListOptions{})
 				if err != nil {
 					t.Fatalf("expected no error when list secret:%s", err)
 				}
@@ -199,7 +198,7 @@ func TestCertRotation(t *testing.T) {
 
 			controller := NewCertRotationController(kubeClient, secretInformers, configmapInformer, operatorInformers.Operator().V1().ClusterManagers())
 
-			err := controller.Sync(context.TODO(), syncContext, c.queueKey)
+			err := controller.Sync(t.Context(), syncContext, c.queueKey)
 			c.validate(t, kubeClient, err)
 		})
 	}
@@ -240,7 +239,7 @@ func TestCertRotationGRPCAuth(t *testing.T) {
 			},
 			validate: func(t *testing.T, kubeClient kubernetes.Interface, controller *certRotationController) {
 				// Check that GRPC server secret was created after update
-				secret, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), helpers.GRPCServerSecret, metav1.GetOptions{})
+				secret, err := kubeClient.CoreV1().Secrets(namespace).Get(t.Context(), helpers.GRPCServerSecret, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("expected grpc server secret to be created after update, but got error: %v", err)
 				}
@@ -288,7 +287,7 @@ func TestCertRotationGRPCAuth(t *testing.T) {
 			},
 			validate: func(t *testing.T, kubeClient kubernetes.Interface, controller *certRotationController) {
 				// Check that GRPC server secret was deleted after update
-				_, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), helpers.GRPCServerSecret, metav1.GetOptions{})
+				_, err := kubeClient.CoreV1().Secrets(namespace).Get(t.Context(), helpers.GRPCServerSecret, metav1.GetOptions{})
 				if !errors.IsNotFound(err) {
 					t.Fatalf("expected GRPC server secret to be deleted after update, but got error: %v", err)
 				}
@@ -346,7 +345,7 @@ func TestCertRotationGRPCAuth(t *testing.T) {
 			}
 
 			// First sync with initial configuration
-			if err := controller.sync(context.TODO(), syncContext, testClusterManagerNameDefault); err != nil {
+			if err := controller.sync(t.Context(), syncContext, testClusterManagerNameDefault); err != nil {
 				t.Fatal(err)
 			}
 
@@ -354,7 +353,7 @@ func TestCertRotationGRPCAuth(t *testing.T) {
 			if err := clusterManagerStore.Update(c.updatedClusterManager); err != nil {
 				t.Fatal(err)
 			}
-			if err := controller.sync(context.TODO(), syncContext, testClusterManagerNameDefault); err != nil {
+			if err := controller.sync(t.Context(), syncContext, testClusterManagerNameDefault); err != nil {
 				t.Fatal(err)
 			}
 
@@ -702,7 +701,7 @@ func TestCertRotationGRPCServerHostNames(t *testing.T) {
 			}
 
 			// Sync the controller
-			err := controller.sync(context.TODO(), syncContext, testClusterManagerNameDefault)
+			err := controller.sync(t.Context(), syncContext, testClusterManagerNameDefault)
 
 			// Check if we expect an error
 			if c.expectedErrorSubstr != "" {
@@ -756,7 +755,7 @@ func TestCertRotationPlacementDebug(t *testing.T) {
 				},
 			},
 			validate: func(t *testing.T, kubeClient kubernetes.Interface, controller *certRotationController) {
-				secret, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), helpers.PlacementDebugServingCertSecret, metav1.GetOptions{})
+				secret, err := kubeClient.CoreV1().Secrets(namespace).Get(t.Context(), helpers.PlacementDebugServingCertSecret, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("expected placement debug serving cert secret to be created after update, but got error: %v", err)
 				}
@@ -804,7 +803,7 @@ func TestCertRotationPlacementDebug(t *testing.T) {
 				},
 			},
 			validate: func(t *testing.T, kubeClient kubernetes.Interface, controller *certRotationController) {
-				_, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), helpers.PlacementDebugServingCertSecret, metav1.GetOptions{})
+				_, err := kubeClient.CoreV1().Secrets(namespace).Get(t.Context(), helpers.PlacementDebugServingCertSecret, metav1.GetOptions{})
 				if !errors.IsNotFound(err) {
 					t.Fatalf("expected placement debug serving cert secret to be deleted after update, but got error: %v", err)
 				}
@@ -859,14 +858,14 @@ func TestCertRotationPlacementDebug(t *testing.T) {
 				clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
 			}
 
-			if err := controller.sync(context.TODO(), syncContext, testClusterManagerNameDefault); err != nil {
+			if err := controller.sync(t.Context(), syncContext, testClusterManagerNameDefault); err != nil {
 				t.Fatal(err)
 			}
 
 			if err := clusterManagerStore.Update(c.updatedClusterManager); err != nil {
 				t.Fatal(err)
 			}
-			if err := controller.sync(context.TODO(), syncContext, testClusterManagerNameDefault); err != nil {
+			if err := controller.sync(t.Context(), syncContext, testClusterManagerNameDefault); err != nil {
 				t.Fatal(err)
 			}
 
@@ -876,13 +875,13 @@ func TestCertRotationPlacementDebug(t *testing.T) {
 }
 
 func assertResourcesExistAndValid(t *testing.T, kubeClient kubernetes.Interface, namespace string) {
-	configmap, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), "ca-bundle-configmap", metav1.GetOptions{})
+	configmap, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(t.Context(), "ca-bundle-configmap", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	for _, name := range secretNames {
-		secret, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		secret, err := kubeClient.CoreV1().Secrets(namespace).Get(t.Context(), name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			t.Fatalf("secret not found: %v", name)
 		}
@@ -938,13 +937,13 @@ func assertResourcesExistAndValid(t *testing.T, kubeClient kubernetes.Interface,
 }
 
 func assertResourcesNotExist(t *testing.T, kubeClient kubernetes.Interface, namespace string) {
-	_, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), "ca-bundle-configmap", metav1.GetOptions{})
+	_, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(t.Context(), "ca-bundle-configmap", metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
 		t.Fatalf("expect configmap not found, but get err: %v", err)
 	}
 
 	for _, name := range secretNames {
-		_, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		_, err := kubeClient.CoreV1().Secrets(namespace).Get(t.Context(), name, metav1.GetOptions{})
 		if !errors.IsNotFound(err) {
 			t.Fatalf("expect secret not found, but get err: %v", err)
 		}

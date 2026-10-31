@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -37,26 +36,26 @@ var _ = Describe("ManifestWork admission webhook", Label("validating-webhook", "
 	})
 
 	Context("Creating a manifestwork", func() {
-		It("Should respond bad request when creating a manifestwork with no manifests", func() {
+		It("Should respond bad request when creating a manifestwork with no manifests", func(ctx SpecContext) {
 			work := newManifestWork(universalClusterName, workName)
-			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsBadRequest(err)).Should(BeTrue())
 		})
 
-		It("Should respond bad request when creating a manifest with no name", func() {
+		It("Should respond bad request when creating a manifest with no name", func(ctx SpecContext) {
 			work := newManifestWork(universalClusterName, workName, []runtime.Object{util.NewConfigmap("default", "", nil, nil)}...)
-			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsBadRequest(err)).Should(BeTrue())
 		})
 
-		It("Should respond bad request when creating a manifestwork with duplicate manifests", func() {
+		It("Should respond bad request when creating a manifestwork with duplicate manifests", func(ctx SpecContext) {
 			work := newManifestWork(universalClusterName, workName, []runtime.Object{
 				util.NewConfigmap("default", "cm1", nil, nil),
 				util.NewConfigmap("default", "cm1", nil, nil), // duplicate
 			}...)
-			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsBadRequest(err)).Should(BeTrue())
 		})
@@ -65,7 +64,7 @@ var _ = Describe("ManifestWork admission webhook", Label("validating-webhook", "
 			var hubUser string
 			var roleName string
 
-			BeforeEach(func() {
+			BeforeEach(func(ctx SpecContext) {
 				hubUser = fmt.Sprintf("sa-%s", nameSuffix)
 				roleName = fmt.Sprintf("role-%s", nameSuffix)
 
@@ -75,7 +74,7 @@ var _ = Describe("ManifestWork admission webhook", Label("validating-webhook", "
 
 				// create a temporary role
 				_, err := hub.KubeClient.RbacV1().Roles(universalClusterName).Create(
-					context.TODO(), &rbacv1.Role{
+					ctx, &rbacv1.Role{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: universalClusterName,
 							Name:      roleName,
@@ -92,7 +91,7 @@ var _ = Describe("ManifestWork admission webhook", Label("validating-webhook", "
 
 				// create a temporary rolebinding
 				_, err = hub.KubeClient.RbacV1().RoleBindings(universalClusterName).Create(
-					context.TODO(), &rbacv1.RoleBinding{
+					ctx, &rbacv1.RoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: universalClusterName,
 							Name:      roleName,
@@ -113,21 +112,21 @@ var _ = Describe("ManifestWork admission webhook", Label("validating-webhook", "
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			AfterEach(func() {
+			AfterEach(func(ctx SpecContext) {
 				// delete the temporary role
-				err := hub.KubeClient.RbacV1().Roles(universalClusterName).Delete(context.TODO(), roleName, metav1.DeleteOptions{})
+				err := hub.KubeClient.RbacV1().Roles(universalClusterName).Delete(ctx, roleName, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
 					Expect(err).ToNot(HaveOccurred())
 				}
 
 				// delete the temporary rolebinding
-				err = hub.KubeClient.RbacV1().RoleBindings(universalClusterName).Delete(context.TODO(), roleName, metav1.DeleteOptions{})
+				err = hub.KubeClient.RbacV1().RoleBindings(universalClusterName).Delete(ctx, roleName, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
 					Expect(err).ToNot(HaveOccurred())
 				}
 			})
 
-			It("Should respond bad request when no permission for nil executor", func() {
+			It("Should respond bad request when no permission for nil executor", func(ctx SpecContext) {
 				work := newManifestWork(universalClusterName, workName, []runtime.Object{util.NewConfigmap("default", "cm1", nil, nil)}...)
 
 				// impersonate as a hub user without execute-as permission
@@ -138,7 +137,7 @@ var _ = Describe("ManifestWork admission webhook", Label("validating-webhook", "
 				impersonatedHubWorkClient, err := workclientset.NewForConfig(&impersonatedConfig)
 				Expect(err).ToNot(HaveOccurred())
 				_, err = impersonatedHubWorkClient.WorkV1().ManifestWorks(universalClusterName).Create(
-					context.Background(), work, metav1.CreateOptions{})
+					ctx, work, metav1.CreateOptions{})
 				Expect(err).To(HaveOccurred())
 				if !errors.IsBadRequest(err) {
 					// not bad request, assert true=false to show the error message
@@ -151,21 +150,21 @@ var _ = Describe("ManifestWork admission webhook", Label("validating-webhook", "
 	Context("Updating a manifestwork", func() {
 		var err error
 
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			work := newManifestWork(universalClusterName, workName, []runtime.Object{util.NewConfigmap("default", "cm1", nil, nil)}...)
-			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Should respond bad request when a manifestwork with invalid manifests", func() {
+		It("Should respond bad request when a manifestwork with invalid manifests", func(ctx SpecContext) {
 			manifest := workapiv1.Manifest{}
 			manifest.Object = util.NewConfigmap("default", "", nil, nil)
 			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
 				work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, manifest)
-				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(ctx, work, metav1.UpdateOptions{})
 				return err
 			})
 
@@ -173,7 +172,7 @@ var _ = Describe("ManifestWork admission webhook", Label("validating-webhook", "
 			Expect(errors.IsBadRequest(err)).Should(BeTrue())
 		})
 
-		It("Should respond bad request when the size of manifests is more than the limit", func() {
+		It("Should respond bad request when the size of manifests is more than the limit", func(ctx SpecContext) {
 			manifests := []workapiv1.Manifest{
 				{
 					RawExtension: runtime.RawExtension{
@@ -203,11 +202,11 @@ var _ = Describe("ManifestWork admission webhook", Label("validating-webhook", "
 			}
 
 			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
 				work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, manifests...)
-				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(ctx, work, metav1.UpdateOptions{})
 				return err
 			})
 

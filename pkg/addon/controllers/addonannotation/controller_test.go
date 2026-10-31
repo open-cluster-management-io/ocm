@@ -1,7 +1,6 @@
 package addonannotation
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -530,7 +529,7 @@ func TestSync(t *testing.T) {
 			}
 
 			syncContext := testingcommon.NewFakeSyncContext(t, c.syncKey)
-			err := controller.sync(context.TODO(), syncContext, c.syncKey)
+			err := controller.sync(t.Context(), syncContext, c.syncKey)
 			if err != nil && !c.expectErr {
 				t.Errorf("expected no error when sync: %v", err)
 			}

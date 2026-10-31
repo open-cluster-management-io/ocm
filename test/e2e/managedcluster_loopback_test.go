@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -26,7 +25,7 @@ import (
 var _ = Describe("Loopback registration [development]", func() {
 	var clusterId string
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		// create ClusterClaim cr
 		clusterId = rand.String(12)
 		claim := &clusterv1alpha1.ClusterClaim{
@@ -39,9 +38,9 @@ var _ = Describe("Loopback registration [development]", func() {
 		}
 		// create the claim
 		Eventually(func() error {
-			existing, err := hub.ClusterClient.ClusterV1alpha1().ClusterClaims().Get(context.TODO(), claim.Name, metav1.GetOptions{})
+			existing, err := hub.ClusterClient.ClusterV1alpha1().ClusterClaims().Get(ctx, claim.Name, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
-				_, err = hub.ClusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), claim, metav1.CreateOptions{})
+				_, err = hub.ClusterClient.ClusterV1alpha1().ClusterClaims().Create(ctx, claim, metav1.CreateOptions{})
 				return err
 			}
 			if err != nil {
@@ -49,14 +48,14 @@ var _ = Describe("Loopback registration [development]", func() {
 			}
 			if existing.Spec.Value != clusterId {
 				existing.Spec.Value = clusterId
-				_, err = hub.ClusterClient.ClusterV1alpha1().ClusterClaims().Update(context.TODO(), existing, metav1.UpdateOptions{})
+				_, err = hub.ClusterClient.ClusterV1alpha1().ClusterClaims().Update(ctx, existing, metav1.UpdateOptions{})
 				return err
 			}
 			return nil
 		}).Should(Succeed())
 	})
 
-	It("Should register the hub as a managed cluster", func() {
+	It("Should register the hub as a managed cluster", func(ctx SpecContext) {
 		var (
 			err    error
 			suffix = rand.String(6)
@@ -71,14 +70,14 @@ var _ = Describe("Loopback registration [development]", func() {
 		By(fmt.Sprintf("Waiting for ManagedCluster %q to exist", universalClusterName))
 		Eventually(func() error {
 			var err error
-			managedCluster, err = managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+			managedCluster, err = managedClusters.Get(ctx, universalClusterName, metav1.GetOptions{})
 			return err
 		}).Should(Succeed())
 
 		By("Waiting for ManagedCluster to have HubAccepted=true")
 		Eventually(func() error {
 			var err error
-			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+			managedCluster, err := managedClusters.Get(ctx, universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -93,7 +92,7 @@ var _ = Describe("Loopback registration [development]", func() {
 		By("Waiting for ManagedCluster to join the hub cluser")
 		Eventually(func() error {
 			var err error
-			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+			managedCluster, err := managedClusters.Get(ctx, universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -106,7 +105,7 @@ var _ = Describe("Loopback registration [development]", func() {
 
 		By("Waiting for ManagedCluster available")
 		Eventually(func() error {
-			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+			managedCluster, err := managedClusters.Get(ctx, universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -121,7 +120,7 @@ var _ = Describe("Loopback registration [development]", func() {
 		By(fmt.Sprintf("Make sure ManagedCluster lease %q exists", leaseName))
 		var lastRenewTime *metav1.MicroTime
 		Eventually(func() error {
-			lease, err := hub.KubeClient.CoordinationV1().Leases(universalClusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
+			lease, err := hub.KubeClient.CoordinationV1().Leases(universalClusterName).Get(ctx, leaseName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -134,7 +133,7 @@ var _ = Describe("Loopback registration [development]", func() {
 
 		By(fmt.Sprintf("Make sure ManagedCluster lease %q is updated", leaseName))
 		Eventually(func() error {
-			lease, err := hub.KubeClient.CoordinationV1().Leases(universalClusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
+			lease, err := hub.KubeClient.CoordinationV1().Leases(universalClusterName).Get(ctx, leaseName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -152,7 +151,7 @@ var _ = Describe("Loopback registration [development]", func() {
 
 		By(fmt.Sprintf("Make sure ManagedCluster lease %q is updated again", leaseName))
 		Eventually(func() error {
-			lease, err := hub.KubeClient.CoordinationV1().Leases(universalClusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
+			lease, err := hub.KubeClient.CoordinationV1().Leases(universalClusterName).Get(ctx, leaseName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -167,7 +166,7 @@ var _ = Describe("Loopback registration [development]", func() {
 
 		By("Make sure ManagedCluster is still available")
 		Eventually(func() error {
-			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+			managedCluster, err := managedClusters.Get(ctx, universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -181,7 +180,7 @@ var _ = Describe("Loopback registration [development]", func() {
 		// make sure the cpu and memory are still in the status, for compatibility
 		By("Make sure cpu and memory exist in status")
 		Eventually(func() error {
-			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+			managedCluster, err := managedClusters.Get(ctx, universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -207,7 +206,7 @@ var _ = Describe("Loopback registration [development]", func() {
 
 		By("Make sure ClusterClaims are synced")
 		Eventually(func() error {
-			mc, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+			mc, err := managedClusters.Get(ctx, universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -232,7 +231,7 @@ var _ = Describe("Loopback registration [development]", func() {
 				Name: addOnName,
 			},
 		}
-		_, err = spoke.KubeClient.CoreV1().Namespaces().Create(context.TODO(), addOnNs, metav1.CreateOptions{})
+		_, err = spoke.KubeClient.CoreV1().Namespaces().Create(ctx, addOnNs, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		// create an addon
@@ -243,11 +242,11 @@ var _ = Describe("Loopback registration [development]", func() {
 			},
 			Spec: addonv1alpha1.ManagedClusterAddOnSpec{},
 		}
-		_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
+		_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Create(ctx, addOn, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() error {
-			created, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			created, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -259,7 +258,7 @@ var _ = Describe("Loopback registration [development]", func() {
 				},
 				Namespace: addOnName,
 			}
-			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).UpdateStatus(ctx, created, metav1.UpdateOptions{})
 			return err
 		}).Should(Succeed())
 
@@ -271,7 +270,7 @@ var _ = Describe("Loopback registration [development]", func() {
 		By(fmt.Sprintf("Waiting for the CSR for addOn %q to exist", addOnName))
 		Eventually(func() error {
 			var err error
-			csrs, err = csrClient.List(context.TODO(), metav1.ListOptions{
+			csrs, err = csrClient.List(ctx, metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s,open-cluster-management.io/addon-name=%s", universalClusterName, addOnName),
 			})
 			if err != nil {
@@ -291,7 +290,7 @@ var _ = Describe("Loopback registration [development]", func() {
 			csr := &csrs.Items[i]
 
 			Eventually(func() error {
-				csr, err = csrClient.Get(context.TODO(), csr.Name, metav1.GetOptions{})
+				csr, err = csrClient.Get(ctx, csr.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -306,7 +305,7 @@ var _ = Describe("Loopback registration [development]", func() {
 					Reason:  "Approved by E2E",
 					Message: "Approved as part of Loopback e2e",
 				})
-				_, err := csrClient.UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
+				_, err := csrClient.UpdateApproval(ctx, csr.Name, csr, metav1.UpdateOptions{})
 				return err
 			}).Should(Succeed())
 		}
@@ -314,7 +313,7 @@ var _ = Describe("Loopback registration [development]", func() {
 		By("Check addon client certificate in secret")
 		secretName := fmt.Sprintf("%s-hub-kubeconfig", addOnName)
 		Eventually(func() error {
-			secret, err := spoke.KubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
+			secret, err := spoke.KubeClient.CoreV1().Secrets(addOnName).Get(ctx, secretName, metav1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("waiting for secret %s/%s: %v", addOnName, secretName, err)
 			}
@@ -332,7 +331,7 @@ var _ = Describe("Loopback registration [development]", func() {
 
 		By("Check addon status")
 		Eventually(func() error {
-			found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.TODO(), addOn.Name, metav1.GetOptions{})
+			found, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(ctx, addOn.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -345,16 +344,16 @@ var _ = Describe("Loopback registration [development]", func() {
 		}).Should(Succeed())
 
 		By("Delete the addon and check if secret is gone")
-		err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+		err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(ctx, addOnName, metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() bool {
-			_, err = spoke.KubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
+			_, err = spoke.KubeClient.CoreV1().Secrets(addOnName).Get(ctx, secretName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}).Should(BeTrue())
 
 		By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
-		err = spoke.KubeClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+		err = spoke.KubeClient.CoreV1().Namespaces().Delete(ctx, addOnName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 })

@@ -68,11 +68,11 @@ var _ = AfterSuite(func() {
 
 var _ = Describe("start hub manager", func() {
 	It("start hub manager", func() {
-		ctx, stopHub := context.WithCancel(context.Background())
+		runCtx, stopHub := context.WithCancel(context.Background())
 
 		// start hub controller
 		go func() {
-			err := RunManager(ctx, &controllercmd.ControllerContext{
+			err := RunManager(runCtx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
 			})

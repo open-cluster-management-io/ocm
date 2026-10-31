@@ -27,7 +27,7 @@ var _ = Describe("Addon Lease Resync", func() {
 	var err error
 	var cancel context.CancelFunc
 
-	assertAddOn := func() {
+	assertAddOn := func(ctx context.Context) {
 		By(fmt.Sprintf("Create addon %q on managed cluster namespace %q", addOnName, managedClusterName))
 		// create addon on managed cluster namespace
 		addOn := &addonv1beta1.ManagedClusterAddOn{
@@ -37,16 +37,16 @@ var _ = Describe("Addon Lease Resync", func() {
 			},
 			Spec: addonv1beta1.ManagedClusterAddOnSpec{},
 		}
-		_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
+		_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(ctx, addOn, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() error {
-			addOn, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			addOn, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			addOn.Status.Namespace = addOnName
-			_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), addOn, metav1.UpdateOptions{})
+			_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).UpdateStatus(ctx, addOn, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
@@ -58,7 +58,7 @@ var _ = Describe("Addon Lease Resync", func() {
 				Name: addOnName,
 			},
 		}
-		_, err = kubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+		_, err = kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		// create addon lease on addon namespace
@@ -71,11 +71,11 @@ var _ = Describe("Addon Lease Resync", func() {
 				RenewTime: &metav1.MicroTime{Time: time.Now()},
 			},
 		}
-		_, err = kubeClient.CoordinationV1().Leases(addOnName).Create(context.TODO(), addOnLease, metav1.CreateOptions{})
+		_, err = kubeClient.CoordinationV1().Leases(addOnName).Create(ctx, addOnLease, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
 		hubKubeconfigSecret = fmt.Sprintf("hub-kubeconfig-secret-%s", suffix)
@@ -100,16 +100,16 @@ var _ = Describe("Addon Lease Resync", func() {
 		cancel()
 	})
 
-	It("should update addon status to unavailable after addon lease controller resync", func() {
-		assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
-		assertAddOn()
+	It("should update addon status to unavailable after addon lease controller resync", func(ctx SpecContext) {
+		assertSuccessClusterBootstrap(ctx, managedClusterName, hubKubeconfigSecret)
+		assertAddOn(ctx)
 
 		// The addon lease is created once and is not renewed by any agent in this test.
 		// With AddOnLeaseControllerLeaseDurationSeconds=1 the lease goes stale after a
 		// ~5s grace period, so the "available" window is too short to observe reliably
 		// on a slow machine. Keep the lease fresh until we have confirmed "available",
 		// then stop renewing to exercise the transition to "unavailable".
-		renewCtx, stopRenew := context.WithCancel(context.TODO())
+		renewCtx, stopRenew := context.WithCancel(context.Background())
 		defer stopRenew()
 		go func() {
 			ticker := time.NewTicker(time.Second)
@@ -130,7 +130,7 @@ var _ = Describe("Addon Lease Resync", func() {
 		}()
 
 		Eventually(func() error {
-			addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -148,7 +148,7 @@ var _ = Describe("Addon Lease Resync", func() {
 
 		// do not update addon lease, wait resync once, the addon status should be unavailable
 		Eventually(func() error {
-			addOn, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			addOn, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}

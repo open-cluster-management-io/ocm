@@ -33,14 +33,14 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 
 	var err error
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		workName = fmt.Sprintf("status-feedback-work-%s", rand.String(5))
 		clusterName = rand.String(5)
 
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
 		}
-		_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err = spokeKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// reset manifests
@@ -52,8 +52,8 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	AfterEach(func() {
-		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err := spokeKubeClient.CoreV1().Namespaces().Delete(ctx, clusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -63,9 +63,9 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			Expect(err).ToNot(HaveOccurred())
 			manifests = append(manifests, util.ToManifest(u))
 
-			var ctx context.Context
-			ctx, cancel = context.WithCancel(context.Background())
-			go startWorkAgent(ctx, clusterName)
+			var runCtx context.Context
+			runCtx, cancel = context.WithCancel(context.Background())
+			go startWorkAgent(runCtx, clusterName)
 		})
 
 		AfterEach(func() {
@@ -74,7 +74,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			}
 		})
 
-		It("should return well known statuses", func() {
+		It("should return well known statuses", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -91,7 +91,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -101,7 +101,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 
 			// Update Deployment status on spoke
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -110,13 +110,13 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				deploy.Status.Replicas = 3
 				deploy.Status.ReadyReplicas = 2
 
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(ctx, deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if we get status of deployment on work api
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -163,7 +163,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 
 			// Update replica of deployment
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -172,13 +172,13 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				deploy.Status.Replicas = 3
 				deploy.Status.ReadyReplicas = 3
 
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(ctx, deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if the status of deployment is synced on work api
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -224,7 +224,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("should return statuses by JSONPaths", func() {
+		It("should return statuses by JSONPaths", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -251,7 +251,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -260,7 +260,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -272,13 +272,13 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 					},
 				}
 
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(ctx, deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if we get status of deployment on work api
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -310,7 +310,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("should return none for resources with no wellknown status", func() {
+		It("should return none for resources with no wellknown status", func(ctx SpecContext) {
 			sa, _ := util.NewServiceAccount(clusterName, "sa")
 			work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, util.ToManifest(sa))
 
@@ -343,7 +343,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -353,7 +353,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 
 			// Update Deployment status on spoke
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -362,13 +362,13 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				deploy.Status.Replicas = 3
 				deploy.Status.ReadyReplicas = 2
 
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(ctx, deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if we get status of deployment on work api
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -420,7 +420,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("Should return raw json string if the result is a structure", func() {
+		It("Should return raw json string if the result is a structure", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -443,7 +443,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -464,9 +464,9 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			DeferCleanup(func() {
 				_ = features.SpokeMutableFeatureGate.Set(fmt.Sprintf("%s=false", ocmfeature.RawFeedbackJsonString))
 			})
-			var ctx context.Context
-			ctx, cancel = context.WithCancel(context.Background())
-			go startWorkAgent(ctx, clusterName)
+			var runCtx context.Context
+			runCtx, cancel = context.WithCancel(context.Background())
+			go startWorkAgent(runCtx, clusterName)
 		})
 
 		AfterEach(func() {
@@ -475,7 +475,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			}
 		})
 
-		It("Should return raw json string if the result is a structure", func() {
+		It("Should return raw json string if the result is a structure", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -498,7 +498,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -507,7 +507,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -519,13 +519,13 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 					},
 				}
 
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(ctx, deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if we get status of deployment on work api
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -567,9 +567,9 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			Expect(err).ToNot(HaveOccurred())
 			manifests = append(manifests, util.ToManifest(u))
 
-			var ctx context.Context
-			ctx, cancel = context.WithCancel(context.Background())
-			go startWorkAgent(ctx, clusterName)
+			var runCtx context.Context
+			runCtx, cancel = context.WithCancel(context.Background())
+			go startWorkAgent(runCtx, clusterName)
 		})
 
 		AfterEach(func() {
@@ -578,7 +578,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			}
 		})
 
-		It("should return well known statuses", func() {
+		It("should return well known statuses", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -596,7 +596,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			}
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).
-				Create(context.Background(), work, metav1.CreateOptions{})
+				Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient,
@@ -609,7 +609,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			// Update DaemonSet status on spoke
 			Eventually(func() error {
 				ds, err := spokeKubeClient.AppsV1().DaemonSets(clusterName).
-					Get(context.Background(), "ds1", metav1.GetOptions{})
+					Get(ctx, "ds1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -619,14 +619,14 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				ds.Status.NumberReady = 2
 
 				_, err = spokeKubeClient.AppsV1().DaemonSets(clusterName).
-					UpdateStatus(context.Background(), ds, metav1.UpdateOptions{})
+					UpdateStatus(ctx, ds, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if we get status of daemonset on work api
 			Eventually(func() error {
 				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).
-					Get(context.Background(), work.Name, metav1.GetOptions{})
+					Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -676,7 +676,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			// Update replica of deployment
 			Eventually(func() error {
 				ds, err := spokeKubeClient.AppsV1().DaemonSets(clusterName).
-					Get(context.Background(), "ds1", metav1.GetOptions{})
+					Get(ctx, "ds1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -686,14 +686,14 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				ds.Status.NumberReady = 3
 
 				_, err = spokeKubeClient.AppsV1().DaemonSets(clusterName).
-					UpdateStatus(context.Background(), ds, metav1.UpdateOptions{})
+					UpdateStatus(ctx, ds, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if the status of the daemonset is synced on work api
 			Eventually(func() error {
 				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).
-					Get(context.Background(), work.Name, metav1.GetOptions{})
+					Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -753,9 +753,9 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 
 			err = features.SpokeMutableFeatureGate.Set(fmt.Sprintf("%s=true", ocmfeature.RawFeedbackJsonString))
 			Expect(err).NotTo(HaveOccurred())
-			var ctx context.Context
-			ctx, cancel = context.WithCancel(context.Background())
-			go startWorkAgent(ctx, clusterName)
+			var runCtx context.Context
+			runCtx, cancel = context.WithCancel(context.Background())
+			go startWorkAgent(runCtx, clusterName)
 		})
 
 		AfterEach(func() {
@@ -764,7 +764,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			}
 		})
 
-		It("wildcard option should match all deployments", func() {
+		It("wildcard option should match all deployments", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -787,7 +787,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -797,7 +797,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 
 			// Update Deployment status on spoke
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -806,12 +806,12 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				deploy.Status.Replicas = 3
 				deploy.Status.ReadyReplicas = 3
 
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(ctx, deploy, metav1.UpdateOptions{})
 				if err != nil {
 					return err
 				}
 
-				deploy, err = spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy2", metav1.GetOptions{})
+				deploy, err = spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy2", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -820,13 +820,13 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				deploy.Status.Replicas = 4
 				deploy.Status.ReadyReplicas = 4
 
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(ctx, deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if we get status of deployment on work api
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -877,7 +877,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 
 		})
 
-		It("matched multi options only the first works ", func() {
+		It("matched multi options only the first works ", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -920,7 +920,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(),
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx,
 				work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
@@ -932,7 +932,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			// Update Deployment status on spoke
 			Eventually(func() error {
 				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).
-					Get(context.Background(), "deploy1", metav1.GetOptions{})
+					Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -945,13 +945,13 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				}
 
 				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).
-					UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+					UpdateStatus(ctx, deploy, metav1.UpdateOptions{})
 				if err != nil {
 					return err
 				}
 
 				deploy, err = spokeKubeClient.AppsV1().Deployments(clusterName).
-					Get(context.Background(), "deploy2", metav1.GetOptions{})
+					Get(ctx, "deploy2", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -961,14 +961,14 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				deploy.Status.ReadyReplicas = 4
 
 				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).
-					UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+					UpdateStatus(ctx, deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Check if we get status of deployment on work api
 			Eventually(func() error {
 				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).
-					Get(context.Background(), work.Name, metav1.GetOptions{})
+					Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1027,8 +1027,8 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			Expect(err).ToNot(HaveOccurred())
 			manifests = append(manifests, util.ToManifest(u))
 
-			var ctx context.Context
-			ctx, cancel = context.WithCancel(context.Background())
+			var runCtx context.Context
+			runCtx, cancel = context.WithCancel(context.Background())
 			// increase normal sync interval so we can validate watch based status feedback
 			syncIntervalOptionDecorator := func(
 				opt *spoke.WorkloadAgentOptions,
@@ -1036,7 +1036,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				opt.StatusSyncInterval = 30 * time.Second
 				return opt, commonOpt
 			}
-			go startWorkAgent(ctx, clusterName, syncIntervalOptionDecorator)
+			go startWorkAgent(runCtx, clusterName, syncIntervalOptionDecorator)
 		})
 
 		AfterEach(func() {
@@ -1045,7 +1045,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			}
 		})
 
-		It("should register informer and watch resource status changes", func() {
+		It("should register informer and watch resource status changes", func(ctx SpecContext) {
 			// Create ManifestWork with watch-based feedback
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
@@ -1074,7 +1074,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for work to be applied
@@ -1088,7 +1088,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			// Update Deployment status on spoke
 			Eventually(func() error {
 				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).
-					Get(context.Background(), "deploy-watch", metav1.GetOptions{})
+					Get(ctx, "deploy-watch", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1097,14 +1097,14 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				deploy.Status.ReadyReplicas = 3
 				deploy.Status.AvailableReplicas = 3
 				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).
-					UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+					UpdateStatus(ctx, deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// Verify feedback values are updated via watch
 			Eventually(func() error {
 				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).
-					Get(context.Background(), work.Name, metav1.GetOptions{})
+					Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1131,7 +1131,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("should watch cluster-scope resources like namespaces", func() {
+		It("should watch cluster-scope resources like namespaces", func(ctx SpecContext) {
 			// Create a namespace manifest
 			testNsName := fmt.Sprintf("test-ns-%s", rand.String(5))
 			namespaceManifest := util.ToManifest(&corev1.Namespace{
@@ -1176,7 +1176,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Wait for work to be applied
@@ -1190,7 +1190,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			// Update namespace status - Kubernetes sets phase to Active automatically,
 			// but we'll verify it's being watched
 			Eventually(func() error {
-				ns, err := spokeKubeClient.CoreV1().Namespaces().Get(context.Background(), testNsName, metav1.GetOptions{})
+				ns, err := spokeKubeClient.CoreV1().Namespaces().Get(ctx, testNsName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1199,7 +1199,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 				// We just need to ensure it has a phase set
 				if ns.Status.Phase == "" {
 					ns.Status.Phase = corev1.NamespaceActive
-					_, err = spokeKubeClient.CoreV1().Namespaces().UpdateStatus(context.Background(), ns, metav1.UpdateOptions{})
+					_, err = spokeKubeClient.CoreV1().Namespaces().UpdateStatus(ctx, ns, metav1.UpdateOptions{})
 					return err
 				}
 				return nil
@@ -1208,7 +1208,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 			// Verify feedback values are updated via watch
 			Eventually(func() error {
 				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).
-					Get(context.Background(), work.Name, metav1.GetOptions{})
+					Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

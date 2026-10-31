@@ -1,7 +1,6 @@
 package registration
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -116,7 +115,7 @@ func TestDumpSecret(t *testing.T) {
 			}
 
 			err = DumpSecret(
-				context.TODO(), kubeClient.CoreV1(), testNamespace, testSecretName, hubKubeconfigDir)
+				t.Context(), kubeClient.CoreV1(), testNamespace, testSecretName, hubKubeconfigDir)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}

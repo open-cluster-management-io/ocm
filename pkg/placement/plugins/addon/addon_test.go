@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -95,7 +94,7 @@ func TestScoreClusterWithAddOn(t *testing.T) {
 				scoreName:       "score1",
 			}
 
-			scoreResult, status := addon.Score(context.TODO(), c.placement, c.clusters)
+			scoreResult, status := addon.Score(t.Context(), c.placement, c.clusters)
 			scores := scoreResult.Scores
 			err := status.AsError()
 			if err != nil && err.Error() != c.expectedErr.Error() {

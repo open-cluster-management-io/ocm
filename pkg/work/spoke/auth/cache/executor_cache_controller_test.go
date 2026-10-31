@@ -175,7 +175,7 @@ func TestCacheController(t *testing.T) {
 		},
 	)
 
-	ctx := context.TODO()
+	ctx := t.Context()
 
 	work, _ := spoketesting.NewManifestWork(0,
 		testingcommon.NewUnstructured("v1", "Secret", allowNS, "test"),
@@ -218,7 +218,7 @@ func TestCacheController(t *testing.T) {
 		t.Errorf("Exepected no error, but got %v", err)
 	}
 
-	err = checkSARCount(kubeClient, baseline+1*sarChecksPerSync)
+	err = checkSARCount(t.Context(), kubeClient, baseline+1*sarChecksPerSync)
 	if err != nil {
 		t.Error(err)
 	}
@@ -228,7 +228,7 @@ func TestCacheController(t *testing.T) {
 		t.Errorf("Exepected no error, but got %v", err)
 	}
 
-	err = checkSARCount(kubeClient, baseline+2*sarChecksPerSync)
+	err = checkSARCount(t.Context(), kubeClient, baseline+2*sarChecksPerSync)
 	if err != nil {
 		t.Error(err)
 	}
@@ -238,7 +238,7 @@ func TestCacheController(t *testing.T) {
 		t.Errorf("Exepected no error, but got %v", err)
 	}
 
-	err = checkSARCount(kubeClient, baseline+3*sarChecksPerSync)
+	err = checkSARCount(t.Context(), kubeClient, baseline+3*sarChecksPerSync)
 	if err != nil {
 		t.Error(err)
 	}
@@ -248,7 +248,7 @@ func TestCacheController(t *testing.T) {
 		t.Errorf("Exepected no error, but got %v", err)
 	}
 
-	err = checkSARCount(kubeClient, baseline+4*sarChecksPerSync)
+	err = checkSARCount(t.Context(), kubeClient, baseline+4*sarChecksPerSync)
 	if err != nil {
 		t.Error(err)
 	}
@@ -275,7 +275,7 @@ func waitForInitialSync(t *testing.T, kubeClient *fakekube.Clientset, mapper *sa
 	t.Helper()
 
 	var count, lastCount, settledPolls int
-	err := wait.PollUntilContextTimeout(context.TODO(), pollInterval, pollTimeout, true,
+	err := wait.PollUntilContextTimeout(t.Context(), pollInterval, pollTimeout, true,
 		func(context.Context) (bool, error) {
 			count = countSARRequests(kubeClient.Actions())
 			if count > 0 && count == lastCount && mapper.count() == expectedBindings {
@@ -300,9 +300,9 @@ func waitForInitialSync(t *testing.T, kubeClient *fakekube.Clientset, mapper *sa
 	return count
 }
 
-func checkSARCount(kubeClient *fakekube.Clientset, expected int) error {
+func checkSARCount(ctx context.Context, kubeClient *fakekube.Clientset, expected int) error {
 	var actual int
-	err := wait.PollUntilContextTimeout(context.TODO(), pollInterval, pollTimeout, true,
+	err := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true,
 		func(context.Context) (bool, error) {
 			actual = countSARRequests(kubeClient.Actions())
 			if actual > expected {
@@ -402,7 +402,7 @@ func TestCacheControllerClusterRoleWithRoleBindingOnly(t *testing.T) {
 		},
 	)
 
-	ctx := context.TODO()
+	ctx := t.Context()
 
 	work, _ := spoketesting.NewManifestWork(0,
 		testingcommon.NewUnstructured("v1", "Secret", allowNS, "test"),
@@ -439,7 +439,7 @@ func TestCacheControllerClusterRoleWithRoleBindingOnly(t *testing.T) {
 		t.Errorf("Expected no error, but got %v", err)
 	}
 
-	err = checkSARCount(kubeClient, baseline+sarChecksPerSync)
+	err = checkSARCount(t.Context(), kubeClient, baseline+sarChecksPerSync)
 	if err != nil {
 		t.Errorf("ClusterRole deletion did not trigger cache refresh through RoleBinding path: %v", err)
 	}

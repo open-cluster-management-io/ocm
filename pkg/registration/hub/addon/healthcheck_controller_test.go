@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -105,7 +104,7 @@ func TestSync(t *testing.T) {
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 			}
 
-			syncErr := ctrl.sync(context.TODO(),
+			syncErr := ctrl.sync(t.Context(),
 				testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName),
 				testinghelpers.TestManagedClusterName)
 			if syncErr != nil {

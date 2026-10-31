@@ -1,7 +1,6 @@
 package clusterrole
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -120,7 +119,7 @@ func TestSyncManagedClusterClusterRole(t *testing.T) {
 				labels:        c.labels,
 			}
 
-			syncErr := ctrl.sync(context.TODO(),
+			syncErr := ctrl.sync(t.Context(),
 				testingcommon.NewFakeSyncContext(t, "testmangedclsuterclusterrole"),
 				"testmangedclsuterclusterrole")
 			if syncErr != nil {

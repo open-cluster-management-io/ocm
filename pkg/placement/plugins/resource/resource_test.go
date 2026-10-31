@@ -1,7 +1,6 @@
 package resource
 
 import (
-	"context"
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -129,7 +128,7 @@ func TestScoreClusterWithResource(t *testing.T) {
 				algorithm: c.algorithm,
 			}
 
-			scoreResult, status := resource.Score(context.TODO(), c.placement, c.clusters)
+			scoreResult, status := resource.Score(t.Context(), c.placement, c.clusters)
 			scores := scoreResult.Scores
 			err := status.AsError()
 

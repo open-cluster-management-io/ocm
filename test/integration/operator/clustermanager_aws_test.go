@@ -19,14 +19,14 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 	var tags = "product:v1:tenant:app-name=My-App,product:v1:tenant:created-by=Team-1"
 
 	BeforeEach(func() {
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
-		go startHubOperator(ctx, operatorapiv1.InstallModeDefault)
+		var runCtx context.Context
+		runCtx, cancel = context.WithCancel(context.Background())
+		go startHubOperator(runCtx, operatorapiv1.InstallModeDefault)
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx SpecContext) {
 		// delete deployment for clustermanager here so tests are not impacted with each other
-		err := kubeClient.AppsV1().Deployments(hubNamespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+		err := kubeClient.AppsV1().Deployments(hubNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		if cancel != nil {
 			cancel()
@@ -34,9 +34,9 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 	})
 
 	Context("Deploy hub with aws auth", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			Eventually(func() error {
-				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(),
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(ctx,
 					clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -58,14 +58,14 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 						},
 					},
 				}
-				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(ctx,
 					clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			Eventually(func() error {
-				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(),
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(ctx,
 					clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -81,15 +81,15 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 						FeatureGates: featureGates,
 					}
 				}
-				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(ctx,
 					clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
-		It("should have IAM role annotation when initialized with awsirsa", func() {
+		It("should have IAM role annotation when initialized with awsirsa", func(ctx SpecContext) {
 			Eventually(func() bool {
 				registrationControllerSA, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(
-					context.Background(), hubRegistrationSA, metav1.GetOptions{})
+					ctx, hubRegistrationSA, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -98,11 +98,11 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 				return annotation == "arn:aws:iam::123456789012:role/hub-cluster_managed-cluster-identity-creator"
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
-		It("registration-controller should have command line option hub cluster arn when initialized with awsirsa", func() {
+		It("registration-controller should have command line option hub cluster arn when initialized with awsirsa", func(ctx SpecContext) {
 			Eventually(func() bool {
 
 				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
-					Get(context.Background(), fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
+					Get(ctx, fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -111,11 +111,11 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 				return present && strings.Split(hubClusterArnArg, "=")[1] == hubClusterArn
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
-		It("registration-controller should have command line option aws-resource-tags when initialized with awsirsa", func() {
+		It("registration-controller should have command line option aws-resource-tags when initialized with awsirsa", func(ctx SpecContext) {
 			Eventually(func() bool {
 
 				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
-					Get(context.Background(), fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
+					Get(ctx, fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -125,10 +125,10 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 				return present && strings.SplitN(tagsArg, "=", 2)[1] == tags
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
-		It("should have auto approved arn patterns separated by comma with awsirsa", func() {
+		It("should have auto approved arn patterns separated by comma with awsirsa", func(ctx SpecContext) {
 			Eventually(func() bool {
 				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
-					Get(context.Background(), fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
+					Get(ctx, fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -141,9 +141,9 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 	})
 
 	Context("Deploy hub with aws auth with no tags", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			Eventually(func() error {
-				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(),
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(ctx,
 					clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -160,14 +160,14 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 						},
 					},
 				}
-				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(ctx,
 					clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			Eventually(func() error {
-				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(),
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(ctx,
 					clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -183,16 +183,16 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 						FeatureGates: featureGates,
 					}
 				}
-				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(ctx,
 					clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
-		It("registration-controller should not have command line option aws-resource-tags when not initialized with awsirsa", func() {
+		It("registration-controller should not have command line option aws-resource-tags when not initialized with awsirsa", func(ctx SpecContext) {
 			Eventually(func() bool {
 
 				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
-					Get(context.Background(), fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
+					Get(ctx, fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
 				if err != nil {
 					return false
 				}

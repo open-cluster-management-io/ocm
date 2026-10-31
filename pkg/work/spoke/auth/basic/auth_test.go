@@ -1,7 +1,6 @@
 package basic
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -106,7 +105,7 @@ func TestValidate(t *testing.T) {
 	validator := NewSARValidator(nil, kubeClient)
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			err := validator.Validate(context.TODO(), test.executor, gvr, test.namespace, test.name, true, nil)
+			err := validator.Validate(t.Context(), test.executor, gvr, test.namespace, test.name, true, nil)
 			if test.expect == nil {
 				if err != nil {
 					t.Errorf("expect nil but got %s", err)
@@ -199,7 +198,7 @@ func TestValidateEscalation(t *testing.T) {
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			err := validator.Validate(context.TODO(), test.executor, gvr, test.namespace, test.name, true, test.obj)
+			err := validator.Validate(t.Context(), test.executor, gvr, test.namespace, test.name, true, test.obj)
 			if test.expect == nil {
 				if err != nil {
 					t.Errorf("expect nil but got %s", err)

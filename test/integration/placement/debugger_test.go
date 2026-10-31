@@ -29,7 +29,7 @@ var _ = Describe("DebugService", func() {
 	var clusterSet1Name string
 	var suffix string
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		suffix = rand.String(5)
 		namespace = fmt.Sprintf("ns-%s", suffix)
 		placementName = fmt.Sprintf("placement-%s", suffix)
@@ -41,15 +41,15 @@ var _ = Describe("DebugService", func() {
 				Name: namespace,
 			},
 		}
-		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	AfterEach(func() {
-		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err := kubeClient.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		assertCleanupClusters()
+		assertCleanupClusters(ctx)
 	})
 
 	Context("Debug Endpoint Permission Check with Real RBAC", func() {
@@ -63,24 +63,24 @@ var _ = Describe("DebugService", func() {
 			roleBindingName = fmt.Sprintf("test-rb-%s", suffix)
 		})
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			By("Cleanup RBAC resources")
-			_ = kubeClient.CoreV1().ServiceAccounts(namespace).Delete(context.Background(), serviceAccountName, metav1.DeleteOptions{})
-			_ = kubeClient.RbacV1().Roles(namespace).Delete(context.Background(), roleName, metav1.DeleteOptions{})
-			_ = kubeClient.RbacV1().RoleBindings(namespace).Delete(context.Background(), roleBindingName, metav1.DeleteOptions{})
-			_ = clusterClient.ClusterV1beta1().Placements(namespace).Delete(context.Background(), placementName, metav1.DeleteOptions{})
+			_ = kubeClient.CoreV1().ServiceAccounts(namespace).Delete(ctx, serviceAccountName, metav1.DeleteOptions{})
+			_ = kubeClient.RbacV1().Roles(namespace).Delete(ctx, roleName, metav1.DeleteOptions{})
+			_ = kubeClient.RbacV1().RoleBindings(namespace).Delete(ctx, roleBindingName, metav1.DeleteOptions{})
+			_ = clusterClient.ClusterV1beta1().Placements(namespace).Delete(ctx, placementName, metav1.DeleteOptions{})
 		})
 
-		It("Should allow request with valid ServiceAccount token and proper RBAC", func() {
+		It("Should allow request with valid ServiceAccount token and proper RBAC", func(ctx SpecContext) {
 			// Create ClusterSet, binding and clusters
-			assertBindingClusterSet(clusterSet1Name, namespace)
-			assertCreatingClusters(clusterSet1Name, 2)
+			assertBindingClusterSet(ctx, clusterSet1Name, namespace)
+			assertCreatingClusters(ctx, clusterSet1Name, 2)
 
 			// Create placement
 			placement := testinghelpers.NewPlacement(namespace, placementName).
 				WithClusterSets(clusterSet1Name).
 				Build()
-			assertCreatingPlacement(placement)
+			assertCreatingPlacement(ctx, placement)
 
 			// Create ServiceAccount
 			sa := &corev1.ServiceAccount{
@@ -89,7 +89,7 @@ var _ = Describe("DebugService", func() {
 					Namespace: namespace,
 				},
 			}
-			_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(context.Background(), sa, metav1.CreateOptions{})
+			_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(ctx, sa, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create Role with permission to get placements (GET debug endpoint checks get verb)
@@ -106,7 +106,7 @@ var _ = Describe("DebugService", func() {
 					},
 				},
 			}
-			_, err = kubeClient.RbacV1().Roles(namespace).Create(context.Background(), role, metav1.CreateOptions{})
+			_, err = kubeClient.RbacV1().Roles(namespace).Create(ctx, role, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create RoleBinding
@@ -128,19 +128,19 @@ var _ = Describe("DebugService", func() {
 					Name:     roleName,
 				},
 			}
-			_, err = kubeClient.RbacV1().RoleBindings(namespace).Create(context.Background(), roleBinding, metav1.CreateOptions{})
+			_, err = kubeClient.RbacV1().RoleBindings(namespace).Create(ctx, roleBinding, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create debugger using helper function
-			ctx, stopFunc := context.WithCancel(context.Background())
+			runCtx, stopFunc := context.WithCancel(context.Background())
 			defer stopFunc()
 
-			debug, clusterInformers, err := controllers.NewDebuggerWithInformers(ctx, restConfig)
+			debug, clusterInformers, err := controllers.NewDebuggerWithInformers(runCtx, restConfig)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Start informers and wait for cache sync
-			clusterInformers.Start(ctx.Done())
-			Expect(cache.WaitForCacheSync(ctx.Done(),
+			clusterInformers.Start(runCtx.Done())
+			Expect(cache.WaitForCacheSync(runCtx.Done(),
 				clusterInformers.Cluster().V1beta1().Placements().Informer().HasSynced,
 				clusterInformers.Cluster().V1beta1().PlacementDecisions().Informer().HasSynced,
 				clusterInformers.Cluster().V1().ManagedClusters().Informer().HasSynced,
@@ -186,16 +186,16 @@ var _ = Describe("DebugService", func() {
 			Expect(result.Placement).ToNot(BeNil())
 		})
 
-		It("Should reject request when ServiceAccount lacks RBAC permission", func() {
+		It("Should reject request when ServiceAccount lacks RBAC permission", func(ctx SpecContext) {
 			// Create ClusterSet, binding and clusters
-			assertBindingClusterSet(clusterSet1Name, namespace)
-			assertCreatingClusters(clusterSet1Name, 2)
+			assertBindingClusterSet(ctx, clusterSet1Name, namespace)
+			assertCreatingClusters(ctx, clusterSet1Name, 2)
 
 			// Create placement
 			placement := testinghelpers.NewPlacement(namespace, placementName).
 				WithClusterSets(clusterSet1Name).
 				Build()
-			assertCreatingPlacement(placement)
+			assertCreatingPlacement(ctx, placement)
 
 			// Create ServiceAccount WITHOUT any RBAC permissions
 			sa := &corev1.ServiceAccount{
@@ -204,19 +204,19 @@ var _ = Describe("DebugService", func() {
 					Namespace: namespace,
 				},
 			}
-			_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(context.Background(), sa, metav1.CreateOptions{})
+			_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(ctx, sa, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create debugger using helper function
-			ctx, stopFunc := context.WithCancel(context.Background())
+			runCtx, stopFunc := context.WithCancel(context.Background())
 			defer stopFunc()
 
-			debug, clusterInformers, err := controllers.NewDebuggerWithInformers(ctx, restConfig)
+			debug, clusterInformers, err := controllers.NewDebuggerWithInformers(runCtx, restConfig)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Start informers and wait for cache sync
-			clusterInformers.Start(ctx.Done())
-			Expect(cache.WaitForCacheSync(ctx.Done(),
+			clusterInformers.Start(runCtx.Done())
+			Expect(cache.WaitForCacheSync(runCtx.Done(),
 				clusterInformers.Cluster().V1beta1().Placements().Informer().HasSynced,
 				clusterInformers.Cluster().V1beta1().PlacementDecisions().Informer().HasSynced,
 				clusterInformers.Cluster().V1().ManagedClusters().Informer().HasSynced,
@@ -263,10 +263,10 @@ var _ = Describe("DebugService", func() {
 			Expect(result.Error).To(ContainSubstring("does not have permission to get placements"))
 		})
 
-		It("Should accept POST request with placement JSON and valid token", func() {
+		It("Should accept POST request with placement JSON and valid token", func(ctx SpecContext) {
 			// Create ClusterSet, binding and clusters (no placement in cluster)
-			assertBindingClusterSet(clusterSet1Name, namespace)
-			assertCreatingClusters(clusterSet1Name, 3)
+			assertBindingClusterSet(ctx, clusterSet1Name, namespace)
+			assertCreatingClusters(ctx, clusterSet1Name, 3)
 
 			// Create ServiceAccount
 			sa := &corev1.ServiceAccount{
@@ -275,7 +275,7 @@ var _ = Describe("DebugService", func() {
 					Namespace: namespace,
 				},
 			}
-			_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(context.Background(), sa, metav1.CreateOptions{})
+			_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(ctx, sa, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create Role with permission to create placements
@@ -292,7 +292,7 @@ var _ = Describe("DebugService", func() {
 					},
 				},
 			}
-			_, err = kubeClient.RbacV1().Roles(namespace).Create(context.Background(), role, metav1.CreateOptions{})
+			_, err = kubeClient.RbacV1().Roles(namespace).Create(ctx, role, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create RoleBinding
@@ -314,19 +314,19 @@ var _ = Describe("DebugService", func() {
 					Name:     roleName,
 				},
 			}
-			_, err = kubeClient.RbacV1().RoleBindings(namespace).Create(context.Background(), roleBinding, metav1.CreateOptions{})
+			_, err = kubeClient.RbacV1().RoleBindings(namespace).Create(ctx, roleBinding, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create debugger using helper function
-			ctx, stopFunc := context.WithCancel(context.Background())
+			runCtx, stopFunc := context.WithCancel(context.Background())
 			defer stopFunc()
 
-			debug, clusterInformers, err := controllers.NewDebuggerWithInformers(ctx, restConfig)
+			debug, clusterInformers, err := controllers.NewDebuggerWithInformers(runCtx, restConfig)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Start informers and wait for cache sync
-			clusterInformers.Start(ctx.Done())
-			Expect(cache.WaitForCacheSync(ctx.Done(),
+			clusterInformers.Start(runCtx.Done())
+			Expect(cache.WaitForCacheSync(runCtx.Done(),
 				clusterInformers.Cluster().V1beta1().Placements().Informer().HasSynced,
 				clusterInformers.Cluster().V1beta1().PlacementDecisions().Informer().HasSynced,
 				clusterInformers.Cluster().V1().ManagedClusters().Informer().HasSynced,

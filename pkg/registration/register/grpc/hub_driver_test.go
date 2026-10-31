@@ -1,7 +1,6 @@
 package grpc
 
 import (
-	"context"
 	"crypto/x509/pkix"
 	"net"
 	"testing"
@@ -146,7 +145,7 @@ func TestSignCSR(t *testing.T) {
 				duration:   1 * time.Hour,
 			}
 
-			if err := ctrl.sync(context.Background(), testingcommon.NewFakeSyncContext(t, "test_csr"), "test_csr"); err != nil {
+			if err := ctrl.sync(t.Context(), testingcommon.NewFakeSyncContext(t, "test_csr"), "test_csr"); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 

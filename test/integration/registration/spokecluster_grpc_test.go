@@ -116,20 +116,20 @@ var _ = Describe("Registration using GRPC", Ordered, Label("grpc-test"), func() 
 		}()
 	})
 
-	AfterAll(func() {
+	AfterAll(func(ctx SpecContext) {
 		stopGRPCServer()
 		// restart hub with default option
-		startHub(hubOption)
+		startHub(ctx, hubOption)
 	})
 
 	Context("ManagedCluster registration", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			postfix = rand.String(5)
 			hubOptionWithGRPC = hub.NewHubManagerOptions()
 			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{operatorv1.CSRAuthType, operatorv1.GRPCAuthType}
 			hubOptionWithGRPC.GRPCCAFile = gRPCServerOptions.ClientCAFile
 			hubOptionWithGRPC.GRPCCAKeyFile = gRPCCAKeyFile
-			startHub(hubOptionWithGRPC)
+			startHub(ctx, hubOptionWithGRPC)
 
 			grpcManagedClusterName = fmt.Sprintf("%s-managedcluster-grpc-%s", grpcTest, postfix)
 			kubeManagedClusterName = fmt.Sprintf("%s-managedcluster-kube-%s", grpcTest, postfix)
@@ -217,14 +217,14 @@ var _ = Describe("Registration using GRPC", Ordered, Label("grpc-test"), func() 
 	})
 
 	Context("Certificate rotation", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			postfix = rand.String(5)
 			hubOptionWithGRPC = hub.NewHubManagerOptions()
 			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{operatorv1.GRPCAuthType}
 			hubOptionWithGRPC.GRPCCAFile = gRPCServerOptions.ClientCAFile
 			hubOptionWithGRPC.GRPCCAKeyFile = gRPCCAKeyFile
 			hubOptionWithGRPC.GRPCSigningDuration = 5 * time.Second
-			startHub(hubOptionWithGRPC)
+			startHub(ctx, hubOptionWithGRPC)
 
 			grpcManagedClusterName = fmt.Sprintf("%s-cert-rotation-%s", grpcTest, postfix)
 
@@ -294,14 +294,14 @@ var _ = Describe("Registration using GRPC", Ordered, Label("grpc-test"), func() 
 	})
 
 	Context("Auto approval", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			postfix = rand.String(5)
 			hubOptionWithGRPC = hub.NewHubManagerOptions()
 			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{operatorv1.GRPCAuthType}
 			hubOptionWithGRPC.GRPCCAFile = gRPCServerOptions.ClientCAFile
 			hubOptionWithGRPC.GRPCCAKeyFile = gRPCCAKeyFile
 			hubOptionWithGRPC.AutoApprovedGRPCUsers = []string{"test-client"}
-			startHub(hubOptionWithGRPC)
+			startHub(ctx, hubOptionWithGRPC)
 
 			grpcManagedClusterName = fmt.Sprintf("%s-auto-approval-%s", grpcTest, postfix)
 

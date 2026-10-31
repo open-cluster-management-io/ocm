@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"context"
 	"testing"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -218,7 +217,7 @@ func TestValidateCreate(t *testing.T) {
 				},
 			}
 
-			ctx := admission.NewContextWithRequest(context.Background(), req)
+			ctx := admission.NewContextWithRequest(t.Context(), req)
 
 			_, err := w.ValidateCreate(ctx, c.cluster)
 			if err != nil && !c.expectedError {
@@ -581,7 +580,7 @@ func TestValidateUpdate(t *testing.T) {
 				},
 			}
 
-			ctx := admission.NewContextWithRequest(context.Background(), req)
+			ctx := admission.NewContextWithRequest(t.Context(), req)
 
 			_, err := w.ValidateUpdate(ctx, c.oldCluster, c.cluster)
 			if err != nil && !c.expectedError {

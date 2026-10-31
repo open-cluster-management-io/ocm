@@ -135,11 +135,11 @@ func TestValidate(t *testing.T) {
 		},
 	)
 
-	ctx := context.TODO()
+	ctx := t.Context()
 	cacheValidator := newExecutorCacheValidator(ctx, clusterName, kubeClient)
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			err := cacheValidator.Validate(context.TODO(), test.executor, gvr, test.namespace, test.name, true, nil)
+			err := cacheValidator.Validate(t.Context(), test.executor, gvr, test.namespace, test.name, true, nil)
 			if test.expect == nil {
 				if err != nil {
 					t.Errorf("expect nil but got %s", err)
@@ -207,7 +207,7 @@ func TestCacheWorks(t *testing.T) {
 		},
 	)
 
-	ctx := context.TODO()
+	ctx := t.Context()
 
 	work, _ := spoketesting.NewManifestWork(0,
 		testingcommon.NewUnstructured("v1", "Secret", allowNS, "test"),
@@ -220,7 +220,7 @@ func TestCacheWorks(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			// call validate 10 times
 			for i := 0; i < 10; i++ {
-				err := cacheValidator.Validate(context.TODO(), test.executor, gvr, test.namespace, test.name, true, nil)
+				err := cacheValidator.Validate(t.Context(), test.executor, gvr, test.namespace, test.name, true, nil)
 				if test.expect == nil {
 					if err != nil {
 						t.Errorf("expect nil but got %s", err)

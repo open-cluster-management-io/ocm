@@ -77,7 +77,7 @@ var _ = AfterSuite(func() {
 
 var _ = Describe("start work agent", func() {
 	It("start work agent", func() {
-		ctx, stopAgent := context.WithCancel(context.Background())
+		runCtx, stopAgent := context.WithCancel(context.Background())
 		commonOpts := commonoptions.NewAgentOptions()
 		commonOpts.SpokeClusterName = "cluster1"
 		opts := NewWorkloadAgentOptions()
@@ -86,7 +86,7 @@ var _ = Describe("start work agent", func() {
 
 		// start hub controller
 		go func() {
-			err := agentConfig.RunWorkloadAgent(ctx, &controllercmd.ControllerContext{
+			err := agentConfig.RunWorkloadAgent(runCtx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("work-agent"),
 			})

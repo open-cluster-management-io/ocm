@@ -87,7 +87,7 @@ func TestGRPCStartFuncBridgesTLSFlags(t *testing.T) {
 	grpcServerOpts := grpcopts.NewGRPCServerOptions()
 	startFunc := grpcStartFunc(opts, grpcServerOpts)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 	defer cancel()
 
 	// Run will fail (no real kube context), but the TLS fields should be bridged first.

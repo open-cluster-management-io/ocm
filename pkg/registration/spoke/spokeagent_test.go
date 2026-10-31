@@ -234,7 +234,7 @@ func TestGetSpokeClusterCABundle(t *testing.T) {
 				restConig.CAData = nil
 				restConig.CAFile = path.Join(tempDir, c.caFile)
 			}
-			_, cancel := context.WithCancel(context.TODO())
+			_, cancel := context.WithCancel(t.Context())
 			cfg := NewSpokeAgentConfig(commonoptions.NewAgentOptions(), c.options, cancel)
 			caData, err := cfg.getSpokeClusterCABundle(restConig)
 			testingcommon.AssertError(t, err, c.expectedErr)
@@ -301,7 +301,7 @@ var _ = Describe("start agent", func() {
 		_ = features.SpokeMutableFeatureGate.SetFromMap(map[string]bool{
 			string(ocmfeature.MultipleHubs): false,
 		})
-		ctx, stopAgent := context.WithCancel(context.Background())
+		runCtx, stopAgent := context.WithCancel(context.Background())
 		agentOptions := NewSpokeAgentOptions()
 		commonOptions := commonoptions.NewAgentOptions()
 		commonOptions.AgentID = "test"
@@ -310,7 +310,7 @@ var _ = Describe("start agent", func() {
 
 		agentConfig := NewSpokeAgentConfig(commonOptions, agentOptions, stopAgent)
 		go func() {
-			err := agentConfig.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
+			err := agentConfig.RunSpokeAgent(runCtx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("agent"),
 			})

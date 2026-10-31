@@ -30,8 +30,8 @@ var _ = Describe("Klusterlet Hosted mode", func() {
 	var workDeploymentName string
 	var workSAName string
 
-	BeforeEach(func() {
-		var ctx context.Context
+	BeforeEach(func(ctx SpecContext) {
+		var runCtx context.Context
 		klusterlet = &operatorapiv1.Klusterlet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("klusterlet-%s", rand.String(6)),
@@ -65,7 +65,7 @@ var _ = Describe("Klusterlet Hosted mode", func() {
 				Name: agentNamespace,
 			},
 		}
-		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// Create the external managed kubeconfig secret
@@ -78,15 +78,15 @@ var _ = Describe("Klusterlet Hosted mode", func() {
 				"kubeconfig": util.NewKubeConfig(hostedRestConfig),
 			},
 		}
-		_, err = kubeClient.CoreV1().Secrets(agentNamespace).Create(context.Background(), managedKubeconfigSecret, metav1.CreateOptions{})
+		_, err = kubeClient.CoreV1().Secrets(agentNamespace).Create(ctx, managedKubeconfigSecret, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		ctx, cancel = context.WithCancel(context.Background())
-		go startKlusterletOperator(ctx)
+		runCtx, cancel = context.WithCancel(context.Background())
+		go startKlusterletOperator(runCtx)
 	})
 
-	AfterEach(func() {
-		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), agentNamespace, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err := kubeClient.CoreV1().Namespaces().Delete(ctx, agentNamespace, metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		if cancel != nil {
@@ -107,17 +107,17 @@ var _ = Describe("Klusterlet Hosted mode", func() {
 
 		})
 
-		AfterEach(func() {
-			Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
+		AfterEach(func(ctx SpecContext) {
+			Expect(operatorClient.OperatorV1().Klusterlets().Delete(ctx, klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
 		})
 
-		It("should have expected resource created successfully", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("should have expected resource created successfully", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Check if relatedResources are correct
 			Eventually(func() error {
-				actual, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				actual, err := operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -133,14 +133,14 @@ var _ = Describe("Klusterlet Hosted mode", func() {
 			// Check CRDs
 			Eventually(func() bool {
 				if _, err := hostedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
-					context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+					ctx, "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
 				if _, err := hostedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
-					context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+					ctx, "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -149,25 +149,25 @@ var _ = Describe("Klusterlet Hosted mode", func() {
 			// Check clusterrole/clusterrolebinding
 			Eventually(func() bool {
 				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(
-					context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
+					ctx, registrationManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(ctx, workManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(ctx, registrationManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(ctx, workManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -175,38 +175,38 @@ var _ = Describe("Klusterlet Hosted mode", func() {
 
 			// Check role/rolebinding
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().Roles(agentNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().Roles(agentNamespace).Get(ctx, registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().Roles(agentNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().Roles(agentNamespace).Get(ctx, workManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().RoleBindings(agentNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().RoleBindings(agentNamespace).Get(ctx, registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().RoleBindings(agentNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().RoleBindings(agentNamespace).Get(ctx, workManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			// Check extension apiserver rolebinding
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(ctx, registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(ctx, workManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -214,25 +214,25 @@ var _ = Describe("Klusterlet Hosted mode", func() {
 
 			// Check service account
 			Eventually(func() bool {
-				if _, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(context.Background(), registrationSAName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(ctx, registrationSAName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(context.Background(), workSAName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(ctx, workSAName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), registrationSAName, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(ctx, registrationSAName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), workSAName, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(ctx, workSAName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -240,13 +240,13 @@ var _ = Describe("Klusterlet Hosted mode", func() {
 
 			// Check deployment
 			Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(ctx, registrationDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -254,7 +254,7 @@ var _ = Describe("Klusterlet Hosted mode", func() {
 
 			// Check addon namespace
 			Eventually(func() bool {
-				if _, err := hostedKubeClient.CoreV1().Namespaces().Get(context.Background(), helpers.DefaultAddonNamespace, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().Namespaces().Get(ctx, helpers.DefaultAddonNamespace, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -263,19 +263,19 @@ var _ = Describe("Klusterlet Hosted mode", func() {
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Applied", "KlusterletApplied", metav1.ConditionTrue)
 		})
 
-		It("should render self-report flags and RBAC when reportHostingCluster is enabled (KEP-188)", func() {
+		It("should render self-report flags and RBAC when reportHostingCluster is enabled (KEP-188)", func(ctx SpecContext) {
 			// Unique namespace: the shared default may still be terminating from the prior spec.
 			klusterlet.Spec.Namespace = fmt.Sprintf("open-cluster-management-%s", klusterlet.Name)
 			klusterlet.Spec.DeployOption.ReportHostingCluster = operatorapiv1.ReportHostingClusterModeEnable
 			klusterlet.Spec.DeployOption.Hosted = &operatorapiv1.KlusterletHostedConfiguration{
 				ManagementClusterName: "management-cluster-x",
 			}
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() []string {
 				deployment, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(
-					context.Background(), registrationDeploymentName, metav1.GetOptions{})
+					ctx, registrationDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return nil
 				}
@@ -285,7 +285,7 @@ var _ = Describe("Klusterlet Hosted mode", func() {
 
 			Eventually(func() error {
 				role, err := hostedKubeClient.RbacV1().ClusterRoles().Get(
-					context.Background(), registrationManagedRoleName, metav1.GetOptions{})
+					ctx, registrationManagedRoleName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

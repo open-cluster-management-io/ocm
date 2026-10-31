@@ -92,7 +92,7 @@ func TestComplete(t *testing.T) {
 			options.HubKubeconfigDir = dir
 
 			err = registration.DumpSecret(
-				context.TODO(), kubeClient.CoreV1(), componentNamespace, "hub-kubeconfig-secret",
+				t.Context(), kubeClient.CoreV1(), componentNamespace, "hub-kubeconfig-secret",
 				options.HubKubeconfigDir)
 			if err != nil {
 				t.Error(err)
@@ -430,7 +430,7 @@ func TestApplyTLSFromConfigMap(t *testing.T) {
 			var configFile string
 			cmd.Flags().StringVar(&configFile, "config", "", "")
 
-			err := applyTLSFromConfigMap(context.Background(), kubeClient, "test-ns", cmd)
+			err := applyTLSFromConfigMap(t.Context(), kubeClient, "test-ns", cmd)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

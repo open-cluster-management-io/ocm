@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"context"
 	"testing"
 
 	"github.com/google/cel-go/cel"
@@ -74,7 +73,7 @@ func TestEvaluateSingleExpression(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			prg := mustCompileCel(t, env, tt.expression)
-			result, remaining := EvaluateSingleExpression(context.Background(), prg, tt.budget, tt.expression, tt.input)
+			result, remaining := EvaluateSingleExpression(t.Context(), prg, tt.budget, tt.expression, tt.input)
 
 			if tt.wantResult && result == nil {
 				t.Fatalf("expected a non-nil result, got nil")
@@ -96,7 +95,7 @@ func TestCostCalculation(t *testing.T) {
 	env := newTestCelEnv(t)
 	prg := mustCompileCel(t, env, "x == 10")
 
-	_, details, err := prg.ContextEval(context.Background(), map[string]any{"x": int64(10)})
+	_, details, err := prg.ContextEval(t.Context(), map[string]any{"x": int64(10)})
 	if err != nil {
 		t.Fatalf("failed to evaluate program: %v", err)
 	}
@@ -135,7 +134,7 @@ func TestCostCalculation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ok, cost := CostCalculation(context.Background(), tt.details, tt.budget, "x == 10")
+			ok, cost := CostCalculation(t.Context(), tt.details, tt.budget, "x == 10")
 			if ok != tt.wantOK {
 				t.Fatalf("expected ok=%v, got %v", tt.wantOK, ok)
 			}

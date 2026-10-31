@@ -164,37 +164,37 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 		var ns1 string
 		var ns2 string
 
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			ns1 = fmt.Sprintf("ns1-%s", nameSuffix)
 			ns2 = fmt.Sprintf("ns2-%s", nameSuffix)
 
 			// create ns2
 			ns := &corev1.Namespace{}
 			ns.Name = ns2
-			_, err = spoke.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+			_, err = spoke.KubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 		})
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			// remove finalizer from cm3 if necessary
-			cm3, err := spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
+			cm3, err := spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(ctx, "cm3", metav1.GetOptions{})
 			if err == nil {
 				cm3.Finalizers = nil
-				err = spoke.KubeClient.CoreV1().ConfigMaps(ns2).Delete(context.Background(), "cm3", metav1.DeleteOptions{})
+				err = spoke.KubeClient.CoreV1().ConfigMaps(ns2).Delete(ctx, "cm3", metav1.DeleteOptions{})
 			}
 			if err != nil {
 				Expect(errors.IsNotFound(err)).To(BeTrue())
 			}
 
 			// delete ns2
-			err = spoke.KubeClient.CoreV1().Namespaces().Delete(context.Background(), ns2, metav1.DeleteOptions{})
+			err = spoke.KubeClient.CoreV1().Namespaces().Delete(ctx, ns2, metav1.DeleteOptions{})
 			if err != nil {
 				Expect(errors.IsNotFound(err)).To(BeTrue())
 			}
 		})
 
-		It("Should create, update and delete manifestwork successfully", func() {
+		It("Should create, update and delete manifestwork successfully", func(ctx SpecContext) {
 			By("create manifestwork")
 
 			cmFinalizers := []string{"cluster.open-cluster-management.io/testing"}
@@ -205,27 +205,27 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 				util.NewConfigmap(ns2, "cm3", nil, cmFinalizers),
 			}
 			work := newManifestWork(universalClusterName, workName, objects...)
-			work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// check if resources are applied for manifests
 			Eventually(func() error {
-				_, err := spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm1", metav1.GetOptions{})
+				_, err := spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(ctx, "cm1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				_, err = spoke.KubeClient.CoreV1().Namespaces().Get(context.Background(), ns1, metav1.GetOptions{})
+				_, err = spoke.KubeClient.CoreV1().Namespaces().Get(ctx, ns1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm2", metav1.GetOptions{})
+				_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(ctx, "cm2", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
+				_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(ctx, "cm3", metav1.GetOptions{})
 				return err
 			}).ShouldNot(HaveOccurred())
 
@@ -234,13 +234,13 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 				// check manifest status conditions
 				expectedManifestStatuses := []metav1.ConditionStatus{
 					metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
-				return assertManifestWorkAppliedSuccessfully(universalClusterName, workName, expectedManifestStatuses)
+				return assertManifestWorkAppliedSuccessfully(ctx, universalClusterName, workName, expectedManifestStatuses)
 			}).ShouldNot(HaveOccurred())
 
 			// get the corresponding AppliedManifestWork
 			var appliedManifestWork *workapiv1.AppliedManifestWork
 			Eventually(func() error {
-				appliedManifestWorkList, err := spoke.WorkClient.WorkV1().AppliedManifestWorks().List(context.Background(), metav1.ListOptions{})
+				appliedManifestWorkList, err := spoke.WorkClient.WorkV1().AppliedManifestWorks().List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return err
 				}
@@ -285,20 +285,20 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 			}
 			newWork := newManifestWork(universalClusterName, workName, newObjects...)
 			Eventually(func() error {
-				work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
 				work.Spec.Workload.Manifests = newWork.Spec.Workload.Manifests
-				work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+				work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(ctx, work, metav1.UpdateOptions{})
 				return err
 			}).Should(Succeed())
 
 			// check if cm1 is removed from applied resources list in status
 			Eventually(func() error {
 				appliedManifestWork, err = spoke.WorkClient.WorkV1().AppliedManifestWorks().Get(
-					context.Background(), appliedManifestWork.Name, metav1.GetOptions{})
+					ctx, appliedManifestWork.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -312,16 +312,16 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 				// check manifest status conditions
 				expectedManifestStatuses := []metav1.ConditionStatus{
 					metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
-				return assertManifestWorkAppliedSuccessfully(universalClusterName, workName, expectedManifestStatuses)
+				return assertManifestWorkAppliedSuccessfully(ctx, universalClusterName, workName, expectedManifestStatuses)
 			}).ShouldNot(HaveOccurred())
 
 			// check if cm1 is deleted
-			_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm1", metav1.GetOptions{})
+			_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(ctx, "cm1", metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 
 			// check if cm3 is updated
 			Eventually(func() error {
-				cm, err := spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
+				cm, err := spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(ctx, "cm3", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -334,41 +334,41 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 			}).ShouldNot(HaveOccurred())
 
 			By("delete manifestwork")
-			err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Delete(context.Background(), workName, metav1.DeleteOptions{})
+			err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Delete(ctx, workName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// remove finalizer from cm3 in 2 seconds
 			timer := time.NewTimer(2 * time.Second)
 			go func() {
 				<-timer.C
-				cm, err := spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
+				cm, err := spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(ctx, "cm3", metav1.GetOptions{})
 				if err == nil {
 					cm.Finalizers = nil
-					_, _ = spoke.KubeClient.CoreV1().ConfigMaps(ns2).Update(context.Background(), cm, metav1.UpdateOptions{})
+					_, _ = spoke.KubeClient.CoreV1().ConfigMaps(ns2).Update(ctx, cm, metav1.UpdateOptions{})
 				}
 			}()
 
 			// wait for deletion of manifest work
 			Eventually(func() bool {
-				_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
 			}).Should(BeTrue())
 
 			// Once manifest work is deleted, its corresponding appliedManifestWorks should be deleted as well
-			_, err = spoke.WorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWork.Name, metav1.GetOptions{})
+			_, err = spoke.WorkClient.WorkV1().AppliedManifestWorks().Get(ctx, appliedManifestWork.Name, metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 
 			// Once manifest work is deleted, all applied resources should have already been deleted too
-			_, err = spoke.KubeClient.CoreV1().Namespaces().Get(context.Background(), ns1, metav1.GetOptions{})
+			_, err = spoke.KubeClient.CoreV1().Namespaces().Get(ctx, ns1, metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 
-			_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm2", metav1.GetOptions{})
+			_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(ctx, "cm2", metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 
-			_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
+			_, err = spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(ctx, "cm3", metav1.GetOptions{})
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 
-			err = spoke.KubeClient.CoreV1().Namespaces().Delete(context.Background(), ns2, metav1.DeleteOptions{})
+			err = spoke.KubeClient.CoreV1().Namespaces().Delete(ctx, ns2, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -380,18 +380,18 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 			jobName = fmt.Sprintf("job1-%s", nameSuffix)
 		})
 
-		It("Should create, delete job in manifestwork successfully", func() {
+		It("Should create, delete job in manifestwork successfully", func(ctx SpecContext) {
 			By("create manifestwork")
 			objects := []runtime.Object{
 				newJob(jobName),
 			}
 			work := newManifestWork(universalClusterName, workName, objects...)
-			work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// check status conditions in manifestwork status
 			Eventually(func() error {
-				work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -408,7 +408,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 
 			// Ensure pod is created
 			Eventually(func() error {
-				pods, err := spoke.KubeClient.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{})
+				pods, err := spoke.KubeClient.CoreV1().Pods("default").List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return err
 				}
@@ -421,12 +421,12 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 			}).ShouldNot(HaveOccurred())
 
 			By("delete manifestwork")
-			err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Delete(context.Background(), workName, metav1.DeleteOptions{})
+			err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Delete(ctx, workName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// pods should be all cleaned.
 			Eventually(func() error {
-				pods, err := spoke.KubeClient.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{})
+				pods, err := spoke.KubeClient.CoreV1().Pods("default").List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return err
 				}
@@ -443,25 +443,25 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 	Context("With CRD/CR", func() {
 		var crNamespace string
 
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			crNamespace = fmt.Sprintf("ns3-%s", nameSuffix)
 
 			// create namespace for cr
 			ns := &corev1.Namespace{}
 			ns.Name = crNamespace
-			_, err = spoke.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+			_, err = spoke.KubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			// delete namespace for cr
-			err = spoke.KubeClient.CoreV1().Namespaces().Delete(context.Background(), crNamespace, metav1.DeleteOptions{})
+			err = spoke.KubeClient.CoreV1().Namespaces().Delete(ctx, crNamespace, metav1.DeleteOptions{})
 			if err != nil {
 				Expect(errors.IsNotFound(err)).To(BeTrue())
 			}
 		})
 
-		It("should create crd/cr with aggregated cluster role successfully", func() {
+		It("should create crd/cr with aggregated cluster role successfully", func(ctx SpecContext) {
 			crd, err := newCrd(guestBookCRDJson)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -473,14 +473,14 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 
 			objects := []runtime.Object{crd, clusterRole, cr}
 			work := newManifestWork(universalClusterName, workName, objects...)
-			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// check status conditions in manifestwork status
 			Eventually(func() error {
 				expectedManifestStatuses := []metav1.ConditionStatus{
 					metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
-				return assertManifestWorkAppliedSuccessfully(universalClusterName, workName, expectedManifestStatuses)
+				return assertManifestWorkAppliedSuccessfully(ctx, universalClusterName, workName, expectedManifestStatuses)
 			}).ShouldNot(HaveOccurred())
 
 			// Upgrade crd/cr and check if cr resource is recreated.
@@ -489,7 +489,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 				Resource: "guestbooks",
 				Version:  "v1",
 				Group:    "my.domain",
-			}).Namespace(crNamespace).Get(context.Background(), "cr1", metav1.GetOptions{})
+			}).Namespace(crNamespace).Get(ctx, "cr1", metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			currentUID := guestbook.GetUID()
 
@@ -500,10 +500,10 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 			work = newManifestWork(universalClusterName, workName, objects...)
 
 			// Update work
-			existingWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+			existingWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			work.ResourceVersion = existingWork.ResourceVersion
-			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(ctx, work, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// check if v2 cr is applied
@@ -512,7 +512,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 					Resource: "guestbooks",
 					Version:  "v2",
 					Group:    "my.domain",
-				}).Namespace(crNamespace).Get(context.Background(), "cr1", metav1.GetOptions{})
+				}).Namespace(crNamespace).Get(ctx, "cr1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -530,7 +530,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 	})
 
 	Context("ManifestWork status feedback", func() {
-		It("should return wellkown status of deployment", func() {
+		It("should return wellkown status of deployment", func(ctx SpecContext) {
 			deployment := newDeployment("busybox")
 			objects := []runtime.Object{deployment}
 			work := newManifestWork(universalClusterName, workName, objects...)
@@ -558,12 +558,12 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 					},
 				},
 			}
-			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Check deployment status
 			Eventually(func() error {
-				work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -618,9 +618,8 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 
 	Context("Multiple owner references deletion", func() {
 		var nsName, cmName string
-		ctx := context.Background()
 
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			nsName = fmt.Sprintf("ns1-%s", rand.String(5))
 			cmName = "cm1"
 			ns := &corev1.Namespace{}
@@ -633,17 +632,17 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 			}
 			work := newManifestWork(universalClusterName, workName, objects...)
 			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			err := spoke.KubeClient.CoreV1().Namespaces().Delete(ctx, nsName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 		})
 
-		It("Should keep the resource when there are other appliedManifestWork owners", func() {
+		It("Should keep the resource when there are other appliedManifestWork owners", func(ctx SpecContext) {
 			work2Name := fmt.Sprintf("w2-%s", nameSuffix)
 			objects := []runtime.Object{
 				util.NewConfigmap(nsName, cmName, nil, nil),
@@ -663,7 +662,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 
 					// check manifest status conditions
 					expectedManifestStatuses := []metav1.ConditionStatus{metav1.ConditionTrue}
-					return assertManifestWorkAppliedSuccessfully(universalClusterName, work.Name, expectedManifestStatuses)
+					return assertManifestWorkAppliedSuccessfully(ctx, universalClusterName, work.Name, expectedManifestStatuses)
 				}).ShouldNot(HaveOccurred())
 			}
 
@@ -710,11 +709,11 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 
-		It("Should delete the resource even if there are other non-appliedManifestWork owners", func() {
+		It("Should delete the resource even if there are other non-appliedManifestWork owners", func(ctx SpecContext) {
 			// check status conditions in manifestwork status
 			Eventually(func() error { // check manifest status conditions
 				expectedManifestStatuses := []metav1.ConditionStatus{metav1.ConditionTrue}
-				return assertManifestWorkAppliedSuccessfully(universalClusterName, workName, expectedManifestStatuses)
+				return assertManifestWorkAppliedSuccessfully(ctx, universalClusterName, workName, expectedManifestStatuses)
 			}).ShouldNot(HaveOccurred())
 
 			By("check if resources are applied for manifests")
@@ -768,7 +767,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 	})
 
 	Context("CleanUpCompletedManifestWork feature", func() {
-		It("Should cleanup manifestwork with TTL after job completion", func() {
+		It("Should cleanup manifestwork with TTL after job completion", func(ctx SpecContext) {
 			By("Create manifestwork with job that sleeps 5 seconds")
 			jobName := fmt.Sprintf("sleep-job-%s", nameSuffix)
 			sleepJob := newSleepJob(jobName, 10)
@@ -806,12 +805,12 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 				},
 			}
 
-			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Wait for job to be applied and running")
 			Eventually(func() error {
-				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -826,7 +825,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 
 			// Verify job pod was created
 			Eventually(func() error {
-				pods, err := spoke.KubeClient.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{
+				pods, err := spoke.KubeClient.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("job=%s", jobName),
 				})
 				if err != nil {
@@ -840,7 +839,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 
 			By("Wait for job to complete and manifestwork to be marked complete")
 			Eventually(func() error {
-				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -852,7 +851,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 
 			By("Wait for manifestwork to be deleted after TTL")
 			Eventually(func() error {
-				currentWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				currentWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
 					return nil
 				}
@@ -864,14 +863,14 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 
 			By("Verify job resources are cleaned up")
 			Eventually(func() bool {
-				_, err := spoke.KubeClient.BatchV1().Jobs("default").Get(context.Background(), jobName, metav1.GetOptions{})
+				_, err := spoke.KubeClient.BatchV1().Jobs("default").Get(ctx, jobName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
 			}).Should(BeTrue())
 		})
 	})
 
 	Context("ManifestWork server side apply", func() {
-		It("should ignore fields with certain field", func() {
+		It("should ignore fields with certain field", func(ctx SpecContext) {
 			deployment := newDeployment("busybox-ssa")
 			deployment.Spec.Replicas = new(int32(2))
 			objects := []runtime.Object{deployment}
@@ -897,12 +896,12 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 					},
 				},
 			}
-			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Check deployment status
 			Eventually(func() error {
-				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(context.Background(), deployment.Name, metav1.GetOptions{})
+				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(ctx, deployment.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -917,7 +916,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 
 			By("update replicas in the manifestwork")
 			Eventually(func() error {
-				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -925,13 +924,13 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 				objects := []runtime.Object{deployment}
 				newWork := newManifestWork(universalClusterName, workName, objects...)
 				actualWork.Spec.Workload = newWork.Spec.Workload
-				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), actualWork, metav1.UpdateOptions{})
+				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(ctx, actualWork, metav1.UpdateOptions{})
 				return err
 			}).ShouldNot(HaveOccurred())
 
 			// Check deployment status
 			Eventually(func() error {
-				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(context.Background(), deployment.Name, metav1.GetOptions{})
+				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(ctx, deployment.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -944,7 +943,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 			By("update deployment with new replicas")
 			specConfig := applyappsv1.DeploymentSpec().WithReplicas(5)
 			applyConfig := applyappsv1.Deployment(deployment.Name, deployment.Namespace).WithSpec(specConfig)
-			_, err = spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Apply(context.Background(), applyConfig, metav1.ApplyOptions{
+			_, err = spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Apply(ctx, applyConfig, metav1.ApplyOptions{
 				FieldManager: "another-actor",
 				Force:        true,
 			})
@@ -952,7 +951,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 
 			By("update work with new replicas and type to onSpokePresent")
 			Eventually(func() error {
-				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -961,13 +960,13 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 				newWork := newManifestWork(universalClusterName, workName, objects...)
 				actualWork.Spec.Workload = newWork.Spec.Workload
 				actualWork.Spec.ManifestConfigs[0].UpdateStrategy.ServerSideApply.IgnoreFields[0].Condition = workapiv1.IgnoreFieldsConditionOnSpokePresent
-				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), actualWork, metav1.UpdateOptions{})
+				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(ctx, actualWork, metav1.UpdateOptions{})
 				return err
 			}).ShouldNot(HaveOccurred())
 
 			// wait until the work has been applied
 			Eventually(func() error {
-				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx, workName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -983,7 +982,7 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 
 			// Check deployment status, it should not be changed
 			Eventually(func() error {
-				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(context.Background(), deployment.Name, metav1.GetOptions{})
+				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(ctx, deployment.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -994,13 +993,13 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 			}).ShouldNot(HaveOccurred())
 
 			err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Delete(
-				context.Background(), work.Name, metav1.DeleteOptions{})
+				ctx, work.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Check deployment is removed
 			Eventually(func() error {
 				_, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(
-					context.Background(), deployment.Name, metav1.GetOptions{})
+					ctx, deployment.Name, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
 					return nil
 				}
@@ -1013,10 +1012,10 @@ var _ = Describe("Work agent", Label("work-agent", "sanity-check"), func() {
 	})
 })
 
-func assertManifestWorkAppliedSuccessfully(workNamespace, workName string,
+func assertManifestWorkAppliedSuccessfully(ctx context.Context, workNamespace, workName string,
 	expectedManifestStatuses []metav1.ConditionStatus) error {
 	work, err := hub.WorkClient.WorkV1().ManifestWorks(workNamespace).Get(
-		context.Background(), workName, metav1.GetOptions{})
+		ctx, workName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

@@ -56,7 +56,7 @@ var _ = AfterSuite(func() {
 
 var _ = Describe("start cluster manager", func() {
 	It("start hub manager", func() {
-		ctx, stopHub := context.WithCancel(context.Background())
+		runCtx, stopHub := context.WithCancel(context.Background())
 		var wg sync.WaitGroup
 		wg.Add(1)
 
@@ -65,7 +65,7 @@ var _ = Describe("start cluster manager", func() {
 			defer GinkgoRecover()
 			defer wg.Done()
 			o := &Options{ImagePullSecretName: "my-registry-secret"}
-			err := o.RunClusterManagerOperator(ctx, &controllercmd.ControllerContext{
+			err := o.RunClusterManagerOperator(runCtx, &controllercmd.ControllerContext{
 				KubeConfig:        cfg,
 				EventRecorder:     util.NewIntegrationTestEventRecorder("integration"),
 				OperatorNamespace: metav1.NamespaceDefault,
