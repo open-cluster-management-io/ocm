@@ -1,0 +1,42 @@
+# East-west gateway Service for one cluster, used with the istio-mesh addon
+# (addon-contrib/istio-mesh-addon). istiod finds the gateway of a network by the
+# topology.istio.io/network label on this Service, so the label must hold the real
+# network name. An AddOnTemplate cannot template metadata.labels, so apply this per
+# cluster with ${CLUSTER_NAME} filled in:
+#   CLUSTER_NAME=<cluster> envsubst '${CLUSTER_NAME}' < eastwest-gateway-service.yaml | kubectl apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: istio-eastwestgateway
+    install.operator.istio.io/owning-resource: unknown
+    istio: eastwestgateway
+    istio.io/rev: default
+    operator.istio.io/component: IngressGateways
+    release: istio
+    topology.istio.io/network: network-${CLUSTER_NAME}
+  name: istio-eastwestgateway
+  namespace: istio-system
+spec:
+  ports:
+  - name: status-port
+    port: 15021
+    protocol: TCP
+    targetPort: 15021
+  - name: tls
+    port: 15443
+    protocol: TCP
+    targetPort: 15443
+  - name: tls-istiod
+    port: 15012
+    protocol: TCP
+    targetPort: 15012
+  - name: tls-webhook
+    port: 15017
+    protocol: TCP
+    targetPort: 15017
+  selector:
+    app: istio-eastwestgateway
+    istio: eastwestgateway
+    topology.istio.io/network: network-${CLUSTER_NAME}
+  type: LoadBalancer
