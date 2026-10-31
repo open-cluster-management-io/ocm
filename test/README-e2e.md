@@ -119,6 +119,7 @@ IMAGE_TAG=e2e make run-e2e
 | `IMAGE_TAG` | Tag for built images | `latest` |
 | `SKIP_IMAGE_BUILD` | Set to `true` to skip building and loading images | `false` |
 | `SKIP_E2E_BUILD` | Set to `true` to run an existing `./e2e.test` instead of compiling it | `false` |
+| `E2E_DIAGNOSTICS_DIR` | When set, a failed spec saves agent logs and cluster state to this directory before cleanup | Not set (off) |
 | `CONTAINER_CLI` | Override auto-detection (`docker` or `podman`) | Auto-detected |
 | `BUILD_PLATFORM` | Override platform (e.g., `linux/arm64`) | Auto-detected from kind |
 | `KLUSTERLET_DEPLOY_MODE` | Deployment mode | `Default` |
