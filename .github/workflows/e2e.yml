@@ -144,3 +144,20 @@ jobs:
         run: make test-e2e SKIP_IMAGE_BUILD=true SKIP_E2E_BUILD=true ${{ matrix.make_vars }}
         env:
           KUBECONFIG: /home/runner/.kube/config
+      # These jobs fail intermittently, and without the component logs there is
+      # nothing to diagnose a failure from after the runner is gone.
+      - name: Collect logs
+        if: ${{ failure() }}
+        run: bash .github/scripts/collect-e2e-logs.sh
+        env:
+          KUBECONFIG: /home/runner/.kube/config
+          OUTPUT_DIR: e2e-logs
+      - name: Upload logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-logs-${{ matrix.name }}
+          path: e2e-logs
+          retention-days: 7
+          if-no-files-found: warn
+          overwrite: true
