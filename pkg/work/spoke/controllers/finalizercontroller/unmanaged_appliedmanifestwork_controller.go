@@ -174,7 +174,7 @@ func (m *unmanagedAppliedWorkController) evictAppliedManifestWork(ctx context.Co
 		}
 		// Mass simultaneous stamps usually mean the local ManifestWork store is empty/partial
 		// (cloudevents replay), not that the hub deleted most of the estate (#1786).
-		m.warnIfMassEviction(ctx, controllerContext)
+		m.warnIfMassEviction(ctx, controllerContext, appliedManifestWork.Name)
 		return nil
 	}
 
@@ -201,12 +201,14 @@ func (m *unmanagedAppliedWorkController) evictAppliedManifestWork(ctx context.Co
 // ManifestWork informer can report HasSynced before resync replay fills the local store, so
 // NotFound-based eviction can stamp many works at once; a true "store reconciled" signal must
 // come from sdk-go (#1786).
-func (m *unmanagedAppliedWorkController) warnIfMassEviction(ctx context.Context, controllerContext factory.SyncContext) {
+func (m *unmanagedAppliedWorkController) warnIfMassEviction(ctx context.Context, controllerContext factory.SyncContext, justStampedName string) {
 	stamped, total := countAgentEvictionStamps(m.appliedManifestWorkLister, m.agentID)
-	// The lister may not yet reflect the EvictionStartTime we just patched on the current object.
-	stamped++
-	if total < stamped {
-		total = stamped
+	// Include the object we just stamped only if the lister has not already reflected the patch.
+	if aw, err := m.appliedManifestWorkLister.Get(justStampedName); err != nil || aw.Status.EvictionStartTime == nil {
+		stamped++
+		if total < stamped {
+			total = stamped
+		}
 	}
 	if !shouldWarnMassEviction(stamped, total) {
 		return
