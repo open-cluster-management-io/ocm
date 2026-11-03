@@ -42,6 +42,7 @@ type testResult struct {
 	filterResults     []scheduling.FilterResult
 	prioritizeResults []scheduling.PrioritizerResult
 	prioritizerScore  scheduling.PrioritizerScore
+	decisions         []*clusterapiv1.ManagedCluster
 }
 
 func (r *testResult) FilterResults() []scheduling.FilterResult {
@@ -57,7 +58,7 @@ func (r *testResult) PrioritizerScores() scheduling.PrioritizerScore {
 }
 
 func (r *testResult) Decisions() []*clusterapiv1.ManagedCluster {
-	return []*clusterapiv1.ManagedCluster{}
+	return r.decisions
 }
 
 func (r *testResult) NumOfUnscheduled() int {
@@ -1004,5 +1005,91 @@ func TestDebuggerPermissionCheck(t *testing.T) {
 				t.Errorf("Expected no error but got: %s", result.Error)
 			}
 		})
+	}
+}
+
+func TestDebuggerOmitsClusterDetailsWithoutListPermission(t *testing.T) {
+	placementNamespace := "test-ns"
+	placementName := "test-placement"
+
+	initObjs := []runtime.Object{
+		testinghelpers.NewManagedCluster("cluster1").WithLabel("clusterset", "test-set").Build(),
+		testinghelpers.NewManagedCluster("cluster2").WithLabel("clusterset", "test-set").Build(),
+		testinghelpers.NewClusterSet("test-set").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{
+			SelectorType: clusterapiv1beta2.LabelSelector,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"clusterset": "test-set"},
+			},
+		}).Build(),
+		testinghelpers.NewClusterSetBinding(placementNamespace, "test-set"),
+		testinghelpers.NewPlacement(placementNamespace, placementName).WithClusterSets("test-set").Build(),
+	}
+
+	clusterClient := clusterfake.NewSimpleClientset(initObjs...)
+	clusterInformerFactory := testinghelpers.NewClusterInformerFactory(clusterClient, initObjs...)
+	kubeClient := kubefake.NewClientset()
+
+	kubeClient.PrependReactor("create", "subjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		sar := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SubjectAccessReview)
+		attrs := sar.Spec.ResourceAttributes
+		if attrs != nil && attrs.Resource == "managedclusters" {
+			sar.Status.Allowed = false
+			sar.Status.Reason = "forbidden"
+		} else {
+			sar.Status.Allowed = true
+		}
+		return true, sar, nil
+	})
+
+	selected := []*clusterapiv1.ManagedCluster{
+		testinghelpers.NewManagedCluster("cluster2").Build(),
+	}
+	s := &testScheduler{result: &testResult{
+		filterResults:     []scheduling.FilterResult{{Name: "filter1", FilteredClusters: []string{"cluster1"}}},
+		prioritizeResults: []scheduling.PrioritizerResult{{Name: "prio", Scores: map[string]int64{"cluster1": 0, "cluster2": 100}}},
+		prioritizerScore:  scheduling.PrioritizerScore{"cluster1": 0, "cluster2": 100},
+		decisions:         selected,
+	}}
+	debugger := NewDebugger(
+		s,
+		kubeClient,
+		clusterInformerFactory.Cluster().V1beta1().Placements(),
+		clusterInformerFactory.Cluster().V1().ManagedClusters(),
+		clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets(),
+		clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
+	)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userInfo := &user.DefaultInfo{Name: "limited-user", Groups: []string{"system:authenticated"}}
+		debugger.Handler(w, r.WithContext(request.WithUser(r.Context(), userInfo)))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s%s%s/%s", server.URL, DebugPath, placementNamespace, placementName), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	var result DebugResult
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status %d, body %+v", res.StatusCode, result)
+	}
+	if len(result.FilterResults) != 0 || len(result.PrioritizeResults) != 0 || len(result.AggregatedScores) != 0 {
+		t.Fatalf("expected filter/score fields omitted, got %+v", result)
+	}
+	if !reflect.DeepEqual(result.SelectedClusters, []string{"cluster2"}) {
+		t.Fatalf("selectedClusters = %v, want [cluster2]", result.SelectedClusters)
+	}
+	if result.Note == "" {
+		t.Fatal("expected a permission note")
 	}
 }
