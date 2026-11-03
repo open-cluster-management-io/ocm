@@ -12,6 +12,17 @@ metadata:
     {{ end }}
 spec:
   replicas: {{ .Replica }}
+  {{- if .AgentBind.HostNetwork }}
+  strategy:
+    rollingUpdate:
+      {{- if lt .Replica 4 }}
+      maxUnavailable: 1
+      {{- else }}
+      maxUnavailable: 25%
+      {{- end }}
+      maxSurge: 0
+    type: RollingUpdate
+  {{- end }}
   selector:
     matchLabels:
       app: klusterlet-agent
@@ -166,6 +177,9 @@ spec:
           {{if .TLSCipherSuites}}
           - "--tls-cipher-suites={{ .TLSCipherSuites }}"
           {{end}}
+          {{if ne .AgentBind.HealthProbePort 8443}}
+          - "--health-port={{ .AgentBind.HealthProbePort }}"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:
@@ -210,14 +224,14 @@ spec:
           httpGet:
             path: /healthz
             scheme: HTTPS
-            port: 8443
+            port: {{ .AgentBind.HealthProbePort }}
           initialDelaySeconds: 2
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /healthz
             scheme: HTTPS
-            port: 8443
+            port: {{ .AgentBind.HealthProbePort }}
           initialDelaySeconds: 2
         {{- if or (eq .ResourceRequirementResourceType "Default") (eq .ResourceRequirementResourceType "") }}
         resources:
@@ -245,6 +259,10 @@ spec:
           - mountPath: /awscli
             name: awscli
       {{end}}
+      {{- if .AgentBind.HostNetwork }}
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
+      {{- end }}
       {{- if .PriorityClassName }}
       priorityClassName: "{{ .PriorityClassName }}"
       {{- end }}
