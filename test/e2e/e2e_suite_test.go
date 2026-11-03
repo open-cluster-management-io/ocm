@@ -224,7 +224,29 @@ var _ = BeforeSuite(func() {
 	}).Should(Succeed())
 })
 
+// specFailed records whether any spec failed, so AfterSuite can leave the
+// cluster alone when one did.
+var specFailed bool
+
+var _ = ReportAfterEach(func(report SpecReport) {
+	if report.Failed() {
+		specFailed = true
+	}
+})
+
 var _ = AfterSuite(func() {
+	// Cleanup deletes the ManagedCluster and the Klusterlet, which tears down
+	// the agent namespace and its pods. After a failure that state is the only
+	// evidence of what went wrong, and CI collects it once the suite exits, so
+	// leave the cluster as the failing spec left it.
+	//
+	// CI gives every job a fresh kind cluster, so nothing leaks between runs.
+	// Locally this deliberately leaves resources behind after a failed run.
+	if specFailed {
+		By("skip cleaning klusterlet resources: a spec failed, leaving the cluster for diagnostics")
+		return
+	}
+
 	By(fmt.Sprintf("clean klusterlet %v resources after the test case", universalKlusterletName))
 	framework.CleanKlusterletRelatedResources(hub, spoke, universalKlusterletName, universalClusterName)
 })

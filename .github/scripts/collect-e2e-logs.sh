@@ -84,10 +84,22 @@ for ns in ${namespaces}; do
   )
 
   for pod in ${pods}; do
-    run "logs/${ns}/${pod}.log" logs -n "${ns}" "${pod}" --all-containers --tail=-1
-    # A restarted pod is itself a likely cause, so keep the previous container's
-    # log. Absent a restart this just records "not found", which is harmless.
-    run "logs/${ns}/${pod}-previous.log" logs -n "${ns}" "${pod}" --all-containers --tail=-1 --previous
+    # One call per container rather than --all-containers: a container whose log
+    # is unavailable would cut the whole pod's output short. That is routine
+    # with --previous, where usually only one container has restarted.
+    containers=$(
+      kube get pod "${pod}" -n "${ns}" -o jsonpath='{range .spec.initContainers[*]}{.name}{"\n"}{end}{range .spec.containers[*]}{.name}{"\n"}{end}' \
+        2>/dev/null || true
+    )
+
+    for container in ${containers}; do
+      run "logs/${ns}/${pod}/${container}.log" \
+        logs -n "${ns}" "${pod}" -c "${container}" --tail=-1
+      # A restarted pod is itself a likely cause, so keep the previous
+      # container's log. Absent a restart this just records "not found".
+      run "logs/${ns}/${pod}/${container}-previous.log" \
+        logs -n "${ns}" "${pod}" -c "${container}" --tail=-1 --previous
+    done
   done
 done
 
