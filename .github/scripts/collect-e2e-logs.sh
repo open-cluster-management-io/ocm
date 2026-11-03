@@ -16,6 +16,16 @@ KUBECTL="${KUBECTL:-kubectl}"
 # minutes, and collecting diagnostics must not be what times the job out.
 REQUEST_TIMEOUT="${REQUEST_TIMEOUT:-30s}"
 CALL_TIMEOUT="${CALL_TIMEOUT:-60s}"
+# Cap the whole run as well as each call. The per-call limit alone does not
+# bound the total, and the job still has to upload the artifact afterwards.
+TOTAL_BUDGET_SECONDS="${TOTAL_BUDGET_SECONDS:-480}"
+
+deadline=$(($(date +%s) + TOTAL_BUDGET_SECONDS))
+
+# budget_left reports whether there is still time to make another call.
+budget_left() {
+  [ "$(date +%s)" -lt "${deadline}" ]
+}
 
 mkdir -p "${OUTPUT_DIR}"
 
@@ -41,7 +51,30 @@ run() {
   local file="${OUTPUT_DIR}/$1"
   shift
   mkdir -p "$(dirname "${file}")"
+  if ! budget_left; then
+    echo "skipped: collection budget of ${TOTAL_BUDGET_SECONDS}s exhausted" >"${file}"
+    return
+  fi
   kube "$@" >"${file}" 2>&1
+}
+
+# discover <error-file> <kubectl args...> prints the command's stdout. On
+# failure it records why in <error-file>, including the exit status, since a
+# call killed by `timeout` can fail without writing anything to stderr.
+discover() {
+  local errfile="${OUTPUT_DIR}/$1"
+  shift
+  mkdir -p "$(dirname "${errfile}")"
+
+  local out status
+  out=$(kube "$@" 2>"${errfile}")
+  status=$?
+  if [ "${status}" -ne 0 ]; then
+    echo "command failed with exit status ${status}: kubectl $*" >>"${errfile}"
+    return 1
+  fi
+
+  printf '%s\n' "${out}"
 }
 
 echo "Collecting e2e diagnostics into ${OUTPUT_DIR}"
@@ -72,7 +105,8 @@ done
 # the agent namespace is the klusterlet's own name (e2e-universal-klusterlet),
 # not an open-cluster-management-* one, so match those too.
 namespaces=$(
-  kube get namespaces -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null |
+  discover "namespace-discovery-error.txt" get namespaces \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' |
     grep -E '^(open-cluster-management|e2e-|klusterlet)' || true
 )
 
@@ -81,9 +115,11 @@ for ns in ${namespaces}; do
   mkdir -p "${OUTPUT_DIR}/logs/${ns}"
 
   # Discovery errors go into the artifact too: an empty logs/ directory with no
-  # explanation is the thing this script exists to avoid.
-  if ! pods=$(kube get pods -n "${ns}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>"${OUTPUT_DIR}/logs/${ns}/.pod-discovery-error"); then
-    echo "failed to list pods in ${ns}, see .pod-discovery-error"
+  # explanation is the thing this script exists to avoid. These names are not
+  # dotfiles on purpose, since upload-artifact drops hidden files by default.
+  if ! pods=$(discover "logs/${ns}/pod-discovery-error.txt" get pods -n "${ns}" \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); then
+    echo "failed to list pods in ${ns}, see logs/${ns}/pod-discovery-error.txt"
     pods=""
   fi
 
@@ -91,9 +127,10 @@ for ns in ${namespaces}; do
     # One call per container rather than --all-containers: a container whose log
     # is unavailable would cut the whole pod's output short. That is routine
     # with --previous, where usually only one container has restarted.
-    if ! containers=$(kube get pod "${pod}" -n "${ns}" -o jsonpath='{range .spec.initContainers[*]}{.name}{"\n"}{end}{range .spec.containers[*]}{.name}{"\n"}{end}' \
-      2>"${OUTPUT_DIR}/logs/${ns}/${pod}.container-discovery-error"); then
-      echo "failed to list containers of ${ns}/${pod}, see ${pod}.container-discovery-error"
+    if ! containers=$(discover "logs/${ns}/${pod}-container-discovery-error.txt" \
+      get pod "${pod}" -n "${ns}" \
+      -o jsonpath='{range .spec.initContainers[*]}{.name}{"\n"}{end}{range .spec.containers[*]}{.name}{"\n"}{end}'); then
+      echo "failed to list containers of ${ns}/${pod}, see logs/${ns}/${pod}-container-discovery-error.txt"
       containers=""
     fi
 
@@ -109,9 +146,14 @@ for ns in ${namespaces}; do
 done
 
 # Discovery succeeded wherever the error file stayed empty; drop those so only
-# real errors show up in the artifact.
-find "${OUTPUT_DIR}" -type f -name "*discovery-error" -empty -delete
+# real errors show up in the artifact. A failure always writes the exit status,
+# so an empty file here really does mean success.
+find "${OUTPUT_DIR}" -type f -name "*discovery-error.txt" -empty -delete
 find "${OUTPUT_DIR}" -type d -empty -delete
+
+if ! budget_left; then
+  echo "WARNING: the ${TOTAL_BUDGET_SECONDS}s collection budget ran out; some files say so instead of holding output"
+fi
 
 echo "Collected:"
 find "${OUTPUT_DIR}" -type f | sort
