@@ -1467,6 +1467,141 @@ func TestRenderingResourceRequirements(t *testing.T) {
 	}
 }
 
+func TestRenderingAgentBindConfiguration(t *testing.T) {
+	const (
+		agentFile        = "klusterlet/management/klusterlet-agent-deployment.yaml"
+		registrationFile = "klusterlet/management/klusterlet-registration-deployment.yaml"
+		workFile         = "klusterlet/management/klusterlet-work-deployment.yaml"
+	)
+	defaultBind := agentBindConfig{HealthProbePort: defaultAgentHealthProbePort}
+	sharedBind := agentBindConfig{HealthProbePort: 9443, HostNetwork: true}
+	allFiles := func(bind agentBindConfig) map[string]agentBindConfig {
+		return map[string]agentBindConfig{agentFile: bind, registrationFile: bind, workFile: bind}
+	}
+
+	tests := []struct {
+		name        string
+		agentConfig *operatorapiv1.AgentConfiguration
+		// want is the expected bind configuration of each rendered deployment.
+		want map[string]agentBindConfig
+	}{
+		{
+			name: "agentConfiguration not set",
+			want: allFiles(defaultBind),
+		},
+		{
+			name:        "bindConfiguration not set",
+			agentConfig: &operatorapiv1.AgentConfiguration{},
+			want:        allFiles(defaultBind),
+		},
+		{
+			name: "health probe port not defaulted",
+			agentConfig: &operatorapiv1.AgentConfiguration{
+				BindConfiguration: &operatorapiv1.AgentBindConfiguration{},
+			},
+			want: allFiles(defaultBind),
+		},
+		{
+			name: "shared bind configuration applies to all agents",
+			agentConfig: &operatorapiv1.AgentConfiguration{
+				BindConfiguration: &operatorapiv1.AgentBindConfiguration{
+					HealthProbePort: 9443,
+					MetricsPort:     9090,
+					HostNetwork:     true,
+				},
+			},
+			want: allFiles(sharedBind),
+		},
+		{
+			name: "per-agent bind configuration overrides the shared one",
+			agentConfig: &operatorapiv1.AgentConfiguration{
+				BindConfiguration: &operatorapiv1.AgentBindConfiguration{HealthProbePort: 9443, HostNetwork: true},
+				WorkAgentConfiguration: &operatorapiv1.AgentComponentConfiguration{
+					BindConfiguration: &operatorapiv1.AgentBindConfiguration{HealthProbePort: 9444, HostNetwork: true},
+				},
+			},
+			want: map[string]agentBindConfig{
+				agentFile:        sharedBind,
+				registrationFile: sharedBind,
+				workFile:         {HealthProbePort: 9444, HostNetwork: true},
+			},
+		},
+		{
+			name: "per-agent bind configuration without a shared one",
+			agentConfig: &operatorapiv1.AgentConfiguration{
+				RegistrationAgentConfiguration: &operatorapiv1.AgentComponentConfiguration{
+					BindConfiguration: &operatorapiv1.AgentBindConfiguration{HealthProbePort: 9445, HostNetwork: true},
+				},
+				// An agent configuration without a bind configuration falls back to the shared one.
+				WorkAgentConfiguration: &operatorapiv1.AgentComponentConfiguration{},
+			},
+			want: map[string]agentBindConfig{
+				agentFile:        defaultBind,
+				registrationFile: {HealthProbePort: 9445, HostNetwork: true},
+				workFile:         defaultBind,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+			klusterlet.Spec.AgentConfiguration = tt.agentConfig
+			config := newFakeKlusterletConfigWithResourceRequirement(t, nil)
+			config.populateAgentBindConfiguration(klusterlet)
+
+			for _, file := range getManifestFiles() {
+				want, ok := tt.want[file]
+				if !ok {
+					t.Fatalf("no expected bind configuration for %s", file)
+				}
+				manifest, err := manifests.KlusterletManifestFiles.ReadFile(file)
+				if err != nil {
+					t.Fatalf("Failed to read file %s", file)
+				}
+				objData := assets.MustCreateAssetFromTemplate(file, manifest, config).Data
+				deploy := &appsv1.Deployment{}
+				if err = yaml.Unmarshal(objData, deploy); err != nil {
+					t.Fatalf("Failed to unmarshal deployment %s: %v", file, err)
+				}
+
+				container := deploy.Spec.Template.Spec.Containers[0]
+				for probeName, probe := range map[string]*corev1.Probe{
+					"liveness": container.LivenessProbe, "readiness": container.ReadinessProbe} {
+					if got := probe.HTTPGet.Port.IntVal; got != want.HealthProbePort {
+						t.Errorf("%s: expected %s probe port %d, got %d", file, probeName, want.HealthProbePort, got)
+					}
+				}
+				// The flag is only passed when the port differs from library-go's default.
+				wantArg := fmt.Sprintf("--health-port=%d", want.HealthProbePort)
+				hasArg := slices.Contains(container.Args, wantArg)
+				if wantFlag := want.HealthProbePort != defaultAgentHealthProbePort; hasArg != wantFlag {
+					t.Errorf("%s: expected arg %q present=%v, args: %v", file, wantArg, wantFlag, container.Args)
+				}
+
+				podSpec := deploy.Spec.Template.Spec
+				if podSpec.HostNetwork != want.HostNetwork {
+					t.Errorf("%s: expected hostNetwork %v, got %v", file, want.HostNetwork, podSpec.HostNetwork)
+				}
+				if !want.HostNetwork {
+					if podSpec.DNSPolicy != "" || deploy.Spec.Strategy.RollingUpdate != nil {
+						t.Errorf("%s: expected no dnsPolicy or strategy without host network", file)
+					}
+					continue
+				}
+				if podSpec.DNSPolicy != corev1.DNSClusterFirstWithHostNet {
+					t.Errorf("%s: expected dnsPolicy %s, got %s", file, corev1.DNSClusterFirstWithHostNet, podSpec.DNSPolicy)
+				}
+				// maxSurge 0 so a new pod never waits for a host port still held by the old one.
+				rollingUpdate := deploy.Spec.Strategy.RollingUpdate
+				if rollingUpdate == nil || rollingUpdate.MaxSurge.IntValue() != 0 || rollingUpdate.MaxUnavailable.IntValue() != 1 {
+					t.Errorf("%s: expected rollingUpdate maxSurge 0 and maxUnavailable 1, got %+v", file, rollingUpdate)
+				}
+			}
+		})
+	}
+}
+
 func TestClusterClaimConfigInSingletonMode(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	claimConfig := &operatorapiv1.ClusterClaimConfiguration{
@@ -1661,6 +1796,7 @@ func newFakeKlusterletConfigWithResourceRequirement(t *testing.T, r *operatorapi
 		ResourceRequirementResourceType:             operatorapiv1.ResourceQosClassResourceRequirement,
 		ResourceRequirements:                        requirements,
 	}
+	config.populateAgentBindConfiguration(klusterlet)
 	return config
 }
 

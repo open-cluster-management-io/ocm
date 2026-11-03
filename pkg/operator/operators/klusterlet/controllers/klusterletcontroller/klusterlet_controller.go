@@ -45,6 +45,9 @@ const (
 	klusterletFinalizer                   = "operator.open-cluster-management.io/klusterlet-cleanup"
 	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 	klusterletNamespaceLabelKey           = "operator.open-cluster-management.io/klusterlet"
+
+	// defaultAgentHealthProbePort matches library-go's default serving port for the agents.
+	defaultAgentHealthProbePort = int32(8443)
 )
 
 // buildClusterAnnotationsString renders the ClusterAnnotations map into the
@@ -258,6 +261,57 @@ type klusterletConfig struct {
 	NetworkPoliciesEnabled bool
 	TLSMinVersion          string
 	TLSCipherSuites        string
+
+	// AgentBind is the server binding of the singleton klusterlet-agent.
+	AgentBind agentBindConfig
+	// RegistrationBind and WorkBind are the server bindings of the registration and work agents
+	// in Default mode.
+	RegistrationBind agentBindConfig
+	WorkBind         agentBindConfig
+}
+
+// agentBindConfig is the server binding of one agent deployment.
+type agentBindConfig struct {
+	// HealthProbePort is the port the agent serves /healthz (and /metrics) on.
+	HealthProbePort int32
+	// HostNetwork runs the agent pod in host networking mode.
+	HostNetwork bool
+}
+
+// newAgentBindConfig converts an API bind configuration, falling back to base when it is nil.
+// MetricsPort is not used: the agents serve /metrics from the same library-go server as
+// /healthz, so they have no separate metrics listener to bind.
+func newAgentBindConfig(bind *operatorapiv1.AgentBindConfiguration, base agentBindConfig) agentBindConfig {
+	if bind == nil {
+		return base
+	}
+	config := agentBindConfig{HealthProbePort: defaultAgentHealthProbePort, HostNetwork: bind.HostNetwork}
+	// The CRD defaults and validates the port; 0 only reaches here if defaulting was skipped.
+	if bind.HealthProbePort > 0 {
+		config.HealthProbePort = bind.HealthProbePort
+	}
+	return config
+}
+
+// populateAgentBindConfiguration resolves the bind configuration of each agent deployment.
+// bindConfiguration applies to the singleton klusterlet-agent. In Default mode the registration
+// and work agents are separate pods, so each can override it; otherwise they share it.
+func (config *klusterletConfig) populateAgentBindConfiguration(klusterlet *operatorapiv1.Klusterlet) {
+	agentConfig := klusterlet.Spec.AgentConfiguration
+	if agentConfig == nil {
+		agentConfig = &operatorapiv1.AgentConfiguration{}
+	}
+
+	config.AgentBind = newAgentBindConfig(agentConfig.BindConfiguration,
+		agentBindConfig{HealthProbePort: defaultAgentHealthProbePort})
+	config.RegistrationBind = config.AgentBind
+	config.WorkBind = config.AgentBind
+	if agentConfig.RegistrationAgentConfiguration != nil {
+		config.RegistrationBind = newAgentBindConfig(agentConfig.RegistrationAgentConfiguration.BindConfiguration, config.AgentBind)
+	}
+	if agentConfig.WorkAgentConfiguration != nil {
+		config.WorkBind = newAgentBindConfig(agentConfig.WorkAgentConfiguration.BindConfiguration, config.AgentBind)
+	}
 }
 
 // If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.
@@ -334,6 +388,8 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		ResourceRequirements:            resourceRequirements,
 		DisableAddonNamespace:           n.disableAddonNamespace,
 	}
+
+	config.populateAgentBindConfiguration(klusterlet)
 
 	if klusterlet.Spec.DeployOption.ReportHostingCluster == operatorapiv1.ReportHostingClusterModeEnable {
 		config.ReportHostingCluster = true
