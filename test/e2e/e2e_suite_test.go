@@ -222,11 +222,19 @@ var _ = BeforeSuite(func() {
 		_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), umc, metav1.UpdateOptions{})
 		return err
 	}).Should(Succeed())
+
+	setupComplete = true
 })
 
 // specFailed records whether any spec failed, so AfterSuite can leave the
 // cluster alone when one did.
 var specFailed bool
+
+// setupComplete is set at the end of BeforeSuite. When BeforeSuite fails no
+// spec runs, so ReportAfterEach never fires and specFailed stays false, but
+// Ginkgo still runs AfterSuite — cleanup would then delete the evidence of the
+// setup failure.
+var setupComplete bool
 
 var _ = ReportAfterEach(func(report SpecReport) {
 	if report.Failed() {
@@ -242,6 +250,10 @@ var _ = AfterSuite(func() {
 	//
 	// CI gives every job a fresh kind cluster, so nothing leaks between runs.
 	// Locally this deliberately leaves resources behind after a failed run.
+	if !setupComplete {
+		By("skip cleaning klusterlet resources: suite setup did not complete, leaving the cluster for diagnostics")
+		return
+	}
 	if specFailed {
 		By("skip cleaning klusterlet resources: a spec failed, leaving the cluster for diagnostics")
 		return

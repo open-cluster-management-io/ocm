@@ -78,19 +78,24 @@ namespaces=$(
 
 for ns in ${namespaces}; do
   run "describe/${ns}-pods.txt" describe pods -n "${ns}"
+  mkdir -p "${OUTPUT_DIR}/logs/${ns}"
 
-  pods=$(
-    kube get pods -n "${ns}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true
-  )
+  # Discovery errors go into the artifact too: an empty logs/ directory with no
+  # explanation is the thing this script exists to avoid.
+  if ! pods=$(kube get pods -n "${ns}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>"${OUTPUT_DIR}/logs/${ns}/.pod-discovery-error"); then
+    echo "failed to list pods in ${ns}, see .pod-discovery-error"
+    pods=""
+  fi
 
   for pod in ${pods}; do
     # One call per container rather than --all-containers: a container whose log
     # is unavailable would cut the whole pod's output short. That is routine
     # with --previous, where usually only one container has restarted.
-    containers=$(
-      kube get pod "${pod}" -n "${ns}" -o jsonpath='{range .spec.initContainers[*]}{.name}{"\n"}{end}{range .spec.containers[*]}{.name}{"\n"}{end}' \
-        2>/dev/null || true
-    )
+    if ! containers=$(kube get pod "${pod}" -n "${ns}" -o jsonpath='{range .spec.initContainers[*]}{.name}{"\n"}{end}{range .spec.containers[*]}{.name}{"\n"}{end}' \
+      2>"${OUTPUT_DIR}/logs/${ns}/${pod}.container-discovery-error"); then
+      echo "failed to list containers of ${ns}/${pod}, see ${pod}.container-discovery-error"
+      containers=""
+    fi
 
     for container in ${containers}; do
       run "logs/${ns}/${pod}/${container}.log" \
@@ -102,6 +107,11 @@ for ns in ${namespaces}; do
     done
   done
 done
+
+# Discovery succeeded wherever the error file stayed empty; drop those so only
+# real errors show up in the artifact.
+find "${OUTPUT_DIR}" -type f -name "*discovery-error" -empty -delete
+find "${OUTPUT_DIR}" -type d -empty -delete
 
 echo "Collected:"
 find "${OUTPUT_DIR}" -type f | sort
