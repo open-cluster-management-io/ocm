@@ -235,7 +235,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		JustAfterEach(func() {
+		AfterEach(func() {
 			// delete namespace
 			err := hub.KubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
