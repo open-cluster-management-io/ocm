@@ -27,6 +27,15 @@ budget_left() {
   [ "$(date +%s)" -lt "${deadline}" ]
 }
 
+# seconds_left reports the budget remaining, never below zero.
+seconds_left() {
+  local remaining=$((deadline - $(date +%s)))
+  if [ "${remaining}" -lt 0 ]; then
+    remaining=0
+  fi
+  echo "${remaining}"
+}
+
 mkdir -p "${OUTPUT_DIR}"
 
 # --request-timeout bounds a single request but not kubectl's retry backoff on
@@ -34,9 +43,21 @@ mkdir -p "${OUTPUT_DIR}"
 # present on the GitHub runners; fall back to running unwrapped without it.
 # stdin is closed on every call: without credentials kubectl prompts for a
 # username and would otherwise block forever waiting on it.
+#
+# Each call is capped at the shorter of CALL_TIMEOUT and the budget remaining,
+# so no single call can run past the overall deadline.
 if command -v timeout >/dev/null 2>&1; then
   kube() {
-    timeout --kill-after=5s "${CALL_TIMEOUT}" \
+    local limit="${CALL_TIMEOUT%s}" remaining
+    remaining=$(seconds_left)
+    if [ "${remaining}" -lt "${limit}" ]; then
+      limit="${remaining}"
+    fi
+    if [ "${limit}" -lt 1 ]; then
+      return 124
+    fi
+
+    timeout --kill-after=5s "${limit}s" \
       "${KUBECTL}" --request-timeout="${REQUEST_TIMEOUT}" "$@" </dev/null
   }
 else
@@ -66,14 +87,29 @@ discover() {
   shift
   mkdir -p "$(dirname "${errfile}")"
 
-  local out status
-  out=$(kube "$@" 2>"${errfile}")
-  status=$?
-  if [ "${status}" -ne 0 ]; then
-    echo "command failed with exit status ${status}: kubectl $*" >>"${errfile}"
+  if ! budget_left; then
+    echo "skipped: collection budget of ${TOTAL_BUDGET_SECONDS}s exhausted" >"${errfile}"
     return 1
   fi
 
+  # Keep stderr aside and only publish it if the command actually failed:
+  # kubectl writes harmless warnings there on success, and a file named
+  # ...-discovery-error.txt holding one would be misleading.
+  local out status stderr_file
+  stderr_file=$(mktemp)
+  out=$(kube "$@" 2>"${stderr_file}")
+  status=$?
+
+  if [ "${status}" -ne 0 ]; then
+    {
+      cat "${stderr_file}"
+      echo "command failed with exit status ${status}: kubectl $*"
+    } >"${errfile}"
+    rm -f "${stderr_file}"
+    return 1
+  fi
+
+  rm -f "${stderr_file}"
   printf '%s\n' "${out}"
 }
 
