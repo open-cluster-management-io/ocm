@@ -419,7 +419,7 @@ type Toleration struct {
 	// +optional
 	Effect v1.TaintEffect `json:"effect,omitempty"`
 	// TolerationSeconds represents the period of time the toleration (which must be of effect
-	// NoSelect/PreferNoSelect, otherwise this field is ignored) tolerates the taint.
+	// NoSelect/NoSelectIfNew, otherwise this field is ignored) tolerates the taint.
 	// The default value is nil, which indicates it tolerates the taint forever.
 	// The start time of counting the TolerationSeconds should be the TimeAdded in Taint, not the cluster
 	// scheduled time or TolerationSeconds added time.

@@ -49,8 +49,10 @@ spec:
                   such as the bind ports of their health probe and metrics endpoints.
                 properties:
                   bindConfiguration:
-                    description: BindConfiguration represents the server bind configuration
-                      of the klusterlet agents.
+                    description: |-
+                      BindConfiguration represents the server bind configuration of the klusterlet agents.
+                      It applies to the klusterlet-agent in Singleton mode. In Default mode, it applies to
+                      the registration and work agents that do not set their own bindConfiguration.
                     properties:
                       healthProbePort:
                         default: 8443
@@ -73,6 +75,76 @@ spec:
                         format: int32
                         maximum: 65535
                         type: integer
+                    type: object
+                  registrationAgentConfiguration:
+                    description: |-
+                      RegistrationAgentConfiguration represents the configuration of the registration agent
+                      in Default mode. It is ignored in Singleton mode.
+                    properties:
+                      bindConfiguration:
+                        description: |-
+                          BindConfiguration represents the server bind configuration of the agent.
+                          In Default mode the registration and work agents run as separate pods. When both
+                          use hostNetwork and can be scheduled on the same node, set a different
+                          healthProbePort for each of them.
+                        properties:
+                          healthProbePort:
+                            default: 8443
+                            description: |-
+                              HealthProbePort represents the bind port of the agents' health check endpoint. The default value is 8443.
+                              Agents run as non-root, so privileged ports below 1024 are not allowed.
+                            format: int32
+                            maximum: 65535
+                            minimum: 1024
+                            type: integer
+                          hostNetwork:
+                            description: HostNetwork enables running the agent pods
+                              in host networking mode.
+                            type: boolean
+                          metricsPort:
+                            default: 8080
+                            description: |-
+                              MetricsPort represents the bind port of the agents' metrics endpoint. The default value is 8080.
+                              Metrics may be disabled by setting a value less than or equal to 0.
+                            format: int32
+                            maximum: 65535
+                            type: integer
+                        type: object
+                    type: object
+                  workAgentConfiguration:
+                    description: |-
+                      WorkAgentConfiguration represents the configuration of the work agent in Default mode.
+                      It is ignored in Singleton mode.
+                    properties:
+                      bindConfiguration:
+                        description: |-
+                          BindConfiguration represents the server bind configuration of the agent.
+                          In Default mode the registration and work agents run as separate pods. When both
+                          use hostNetwork and can be scheduled on the same node, set a different
+                          healthProbePort for each of them.
+                        properties:
+                          healthProbePort:
+                            default: 8443
+                            description: |-
+                              HealthProbePort represents the bind port of the agents' health check endpoint. The default value is 8443.
+                              Agents run as non-root, so privileged ports below 1024 are not allowed.
+                            format: int32
+                            maximum: 65535
+                            minimum: 1024
+                            type: integer
+                          hostNetwork:
+                            description: HostNetwork enables running the agent pods
+                              in host networking mode.
+                            type: boolean
+                          metricsPort:
+                            default: 8080
+                            description: |-
+                              MetricsPort represents the bind port of the agents' metrics endpoint. The default value is 8080.
+                              Metrics may be disabled by setting a value less than or equal to 0.
+                            format: int32
+                            maximum: 65535
+                            type: integer
+                        type: object
                     type: object
                 type: object
               clusterName:
