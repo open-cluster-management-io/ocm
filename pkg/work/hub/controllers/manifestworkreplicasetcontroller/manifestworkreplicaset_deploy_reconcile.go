@@ -3,14 +3,18 @@ package manifestworkreplicasetcontroller
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	worklisterv1 "open-cluster-management.io/api/client/work/listers/work/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
@@ -23,6 +27,7 @@ import (
 
 // deployReconciler is to manage ManifestWork based on the placement.
 type deployReconciler struct {
+	workClient          workclientset.Interface
 	workApplier         *workapplier.WorkApplier
 	manifestWorkLister  worklisterv1.ManifestWorkLister
 	placeDecisionLister clusterlister.PlacementDecisionLister
@@ -44,18 +49,29 @@ func (d *deployReconciler) reconcile(
 	}
 
 	// Get all ManifestWorks belonging to this ManifestWorkReplicaSet
-	allManifestWorks, _, err := getManifestWorkInReplicaSet(mwrSet, d.manifestWorkLister)
+	allManifestWorks, works, err := getManifestWorkInReplicaSet(mwrSet, d.manifestWorkLister)
 	if err != nil {
 		return mwrSet, reconcileContinue, fmt.Errorf("failed to list manifestworks: %w", err)
 	}
 
-	// Delete ManifestWorks that belong to placements no longer in the spec
-	for _, mwRecord := range allManifestWorks.workByCluster {
-		if mwRecord.placements.Len() == 0 || mwRecord.placements.Difference(currentPlacementNames).Len() > 0 {
-			// This ManifestWork belongs to a placement that's no longer in the spec, delete it
-			err := d.workApplier.Delete(ctx, mwRecord.work.Namespace, mwRecord.work.Name)
+	// Delete duplicated works, see getManifestWorkInReplicaSet
+	for _, mw := range allManifestWorks.duplicates {
+		klog.FromContext(ctx).Info("Deleting duplicate manifestwork",
+			"manifestWorkReplicaSet", klog.KObj(mwrSet), "manifestWork", klog.KObj(mw))
+		err := d.workApplier.Delete(ctx, mw.Namespace, mw.Name)
+		if err != nil && !errors.IsNotFound(err) {
+			errs = append(errs, fmt.Errorf("failed to delete duplicate manifestwork %s/%s: %w", mw.Namespace, mw.Name, err))
+		}
+	}
+
+	// Delete ManifestWorks that belong to placements no longer in the spec. All works are checked:
+	// workByCluster holds one work per cluster, which can be the one of another placement.
+	for _, mw := range works {
+		placementName, ok := mw.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey]
+		if !ok || !currentPlacementNames.Has(placementName) {
+			err := d.workApplier.Delete(ctx, mw.Namespace, mw.Name)
 			if err != nil && !errors.IsNotFound(err) {
-				errs = append(errs, fmt.Errorf("failed to delete manifestwork %s/%s for removed placement: %w", mwRecord.work.Namespace, mwRecord.work.Name, err))
+				errs = append(errs, fmt.Errorf("failed to delete manifestwork %s/%s for removed placement: %w", mw.Namespace, mw.Name, err))
 			}
 		}
 	}
@@ -137,6 +153,15 @@ func (d *deployReconciler) reconcile(
 				if relatedManifestWork, ok := allManifestWorks.workByCluster[rolloutStatus.ClusterName]; ok {
 					if relatedManifestWork.placements.Has(placementRef.Name) {
 						workName = relatedManifestWork.work.Name
+					}
+				}
+				if workName == "" {
+					// The lister may not have the work created by a previous sync yet, and a create
+					// with generateName would add a duplicate, so check the API server first.
+					workName, err = d.workNameInCluster(ctx, mwrSet, rolloutStatus.ClusterName, placementRef.Name)
+					if err != nil {
+						errs = append(errs, err)
+						continue
 					}
 				}
 				mw := buildManifestWork(mwrSet, workName, rolloutStatus.ClusterName, placementRef.Name)
@@ -223,6 +248,30 @@ func (d *deployReconciler) reconcile(
 	}
 
 	return mwrSet, reconcileContinue, nil
+}
+
+// workNameInCluster lists the works of mwrSet and placementName in the cluster namespace from the
+// API server, and returns the name of the oldest one not being deleted, or "" if there is none.
+func (d *deployReconciler) workNameInCluster(ctx context.Context, mwrSet *workapiv1alpha1.ManifestWorkReplicaSet,
+	clusterName, placementName string) (string, error) {
+	selector := labels.SelectorFromSet(labels.Set{
+		helper.ManifestWorkReplicaSetOwnerKeyHashLabelKey:           ownerKeyHash(mwrSet.Namespace, mwrSet.Name),
+		workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey: placementName,
+	})
+	works, err := d.workClient.WorkV1().ManifestWorks(clusterName).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return "", fmt.Errorf("failed to list manifestworks in %s: %w", clusterName, err)
+	}
+	var current []*workv1.ManifestWork
+	for i := range works.Items {
+		if works.Items[i].DeletionTimestamp.IsZero() {
+			current = append(current, &works.Items[i])
+		}
+	}
+	if len(current) == 0 {
+		return "", nil
+	}
+	return slices.MinFunc(current, compareWorksByAge).Name, nil
 }
 
 func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifestWork workv1.ManifestWork) (clustersdkv1alpha1.ClusterRolloutStatus, error) {
