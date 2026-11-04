@@ -350,6 +350,91 @@ func TestStatusReconcileNewGeneration(t *testing.T) {
 	}
 }
 
+func TestStatusReconcileMissingPlacement(t *testing.T) {
+	for _, tt := range []struct {
+		name               string
+		total              int
+		observedGeneration int64
+		wantReason         string
+		wantStatus         metav1.ConditionStatus
+		wantMissingMessage bool
+	}{
+		{
+			name:               "current missing placement prevents success",
+			total:              1,
+			observedGeneration: 2,
+			wantReason:         workapiv1alpha1.ReasonNotAsExpected,
+			wantStatus:         metav1.ConditionFalse,
+			wantMissingMessage: true,
+		},
+		{
+			name:               "stale missing placement is ignored",
+			total:              1,
+			observedGeneration: 1,
+			wantReason:         workapiv1alpha1.ReasonAsExpected,
+			wantStatus:         metav1.ConditionTrue,
+		},
+		{
+			name:               "current missing placement with zero total preserves message",
+			observedGeneration: 2,
+			wantReason:         workapiv1alpha1.ReasonNotAsExpected,
+			wantStatus:         metav1.ConditionFalse,
+			wantMissingMessage: true,
+		},
+		{
+			name:               "stale missing placement with zero total does not propagate message",
+			observedGeneration: 1,
+			wantReason:         workapiv1alpha1.ReasonNotAsExpected,
+			wantStatus:         metav1.ConditionFalse,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			const placementName = "valid"
+			mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", placementName)
+			mwrSet.Generation = 2
+			mwrSet.Status.Summary.Total = tt.total
+			if tt.total > 0 {
+				mwrSet.Status.PlacementsSummary = []workapiv1alpha1.PlacementSummary{{
+					Name:    placementName,
+					Summary: workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: tt.total},
+				}}
+			}
+			message := "placements not found in namespace default: missing"
+			apimeta.SetStatusCondition(&mwrSet.Status.Conditions,
+				getPlacementDecisionVerified(tt.observedGeneration, workapiv1alpha1.ReasonPlacementDecisionNotFound, message))
+
+			workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeworkclient.NewSimpleClientset(), time.Second)
+			if tt.total > 0 {
+				mw := buildManifestWork(mwrSet, mwrSet.Name, "cls1", placementName)
+				apimeta.SetStatusCondition(&mw.Status.Conditions, getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue, 0))
+				apimeta.SetStatusCondition(&mw.Status.Conditions, getCondition(workv1.WorkAvailable, "", "", metav1.ConditionTrue, 0))
+				if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			reconciler := statusReconciler{manifestWorkLister: workInformerFactory.Work().V1().ManifestWorks().Lister()}
+			_, _, err := reconciler.reconcile(context.TODO(), mwrSet)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: tt.total, Applied: tt.total, Available: tt.total}, mwrSet.Status.Summary)
+			applied := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied)
+			if assert.NotNil(t, applied) {
+				assert.Equal(t, tt.wantStatus, applied.Status)
+				assert.Equal(t, tt.wantReason, applied.Reason)
+				assert.Equal(t, mwrSet.Generation, applied.ObservedGeneration)
+				wantMessage := ""
+				if tt.wantMissingMessage {
+					wantMessage = message
+				}
+				assert.Equal(t, wantMessage, applied.Message)
+			}
+		})
+	}
+}
+
 func TestStatusReconcileAsProcessing(t *testing.T) {
 	plcName := "place-test"
 	clusters := []string{"cls1", "cls2", "cls3", "cls4"}
