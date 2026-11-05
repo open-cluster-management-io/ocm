@@ -557,7 +557,6 @@ func (c *schedulingController) bind(
 	}
 
 	// delete redundant placementdecisions
-	errs = []error{}
 	for _, pd := range pds {
 		if placementDecisionNames.Has(pd.Name) {
 			continue

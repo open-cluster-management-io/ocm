@@ -688,7 +688,9 @@ func TestClusterToQueueKeys(t *testing.T) {
 			clusterInformers := clusterinformers.NewSharedInformerFactory(clusterClient, 0)
 
 			for _, set := range c.clusterSets {
-				clusterInformers.Cluster().V1beta2().ManagedClusterSets().Informer().GetStore().Add(set)
+				if err := clusterInformers.Cluster().V1beta2().ManagedClusterSets().Informer().GetStore().Add(set); err != nil {
+					t.Fatal(err)
+				}
 			}
 			// Add indexer for bindings
 			bindingInformer := clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings()
@@ -700,7 +702,9 @@ func TestClusterToQueueKeys(t *testing.T) {
 			}
 
 			for _, binding := range c.bindings {
-				bindingInformer.Informer().GetStore().Add(binding)
+				if err := bindingInformer.Informer().GetStore().Add(binding); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := &clusterProfileLifecycleController{
@@ -963,7 +967,9 @@ func TestClusterSetToQueueKeys(t *testing.T) {
 			}
 
 			for _, binding := range c.bindings {
-				bindingInformer.Informer().GetStore().Add(binding)
+				if err := bindingInformer.Informer().GetStore().Add(binding); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := &clusterProfileLifecycleController{
@@ -1150,7 +1156,9 @@ func BenchmarkClusterToQueueKeys(b *testing.B) {
 	clusterInformers := clusterinformers.NewSharedInformerFactory(clusterClient, 0)
 
 	for _, set := range clusterSets {
-		clusterInformers.Cluster().V1beta2().ManagedClusterSets().Informer().GetStore().Add(set)
+		if err := clusterInformers.Cluster().V1beta2().ManagedClusterSets().Informer().GetStore().Add(set); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	// Add indexer for bindings
@@ -1163,7 +1171,9 @@ func BenchmarkClusterToQueueKeys(b *testing.B) {
 	}
 
 	for _, binding := range bindings {
-		bindingInformer.Informer().GetStore().Add(binding)
+		if err := bindingInformer.Informer().GetStore().Add(binding); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	ctrl := &clusterProfileLifecycleController{

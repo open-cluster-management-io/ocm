@@ -133,7 +133,9 @@ func TestSignCSR(t *testing.T) {
 			csrInformers := informers.NewSharedInformerFactory(csrClient, 10*time.Minute)
 			csrInformer := csrInformers.Certificates().V1().CertificateSigningRequests()
 			for _, csr := range c.csrs {
-				csrInformer.Informer().GetStore().Add(csr)
+				if err := csrInformer.Informer().GetStore().Add(csr); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := &csrSignController{

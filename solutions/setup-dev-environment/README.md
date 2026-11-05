@@ -16,6 +16,13 @@ sudo chmod +x /usr/local/bin/clusteradm
 
 For other platforms (macOS, arm64), download the appropriate binary from the [clusteradm releases page](https://github.com/open-cluster-management-io/clusteradm/releases).
 
+## Configuration
+
+| Environment variable | Default | Purpose |
+| --- | --- | --- |
+| `BUILD_IMAGES` | `false` | `true` builds all five OCM images from this checkout, loads them into all three clusters and applies this checkout's operator RBAC. Otherwise, clusteradm selects its default released images. Requires Go, make and Docker or Podman. |
+| `HUB_FEATURE_GATES` | clusteradm defaults | Comma-separated feature gates for the hub, for example `ClusterProfile=true`. |
+
 ## Setup the clusters
 
 Run `./local-up.sh`, you will see three clusters registered on the hub cluster.

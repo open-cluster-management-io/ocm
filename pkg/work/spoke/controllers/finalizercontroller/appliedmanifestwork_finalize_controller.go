@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
@@ -105,8 +106,18 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	// We still need to run delete for every resource even with ownerref on it, since ownerref does not handle cluster
 	// scoped resource correctly.
 	reason := fmt.Sprintf("manifestwork %s is terminating", appliedManifestWork.Spec.ManifestWorkName)
+	resources := appliedManifestWork.Status.AppliedResources
+	var deferred []workapiv1.AppliedManifestResourceMeta
+	// Delete RBAC last, it may grant the agent access to the other resources.
+	if others, rbac := splitRBACResources(resources); len(others) != 0 {
+		resources, deferred = others, rbac
+	}
 	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
-		ctx, appliedManifestWork.Status.AppliedResources, reason, m.spokeDynamicClient, *owner)
+		ctx, resources, reason, m.spokeDynamicClient, *owner)
+	if len(errs) != 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+	resourcesPendingFinalization = append(resourcesPendingFinalization, deferred...)
 	appliedManifestWork.Status.AppliedResources = resourcesPendingFinalization
 	updatedAppliedManifestWork, err := m.patcher.PatchStatus(ctx, appliedManifestWork, appliedManifestWork.Status, originalManifestWork.Status)
 	if err != nil {
@@ -133,4 +144,15 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 		return fmt.Errorf("failed to remove finalizer from AppliedManifestWork %s: %w", appliedManifestWork.Name, err)
 	}
 	return nil
+}
+
+func splitRBACResources(resources []workapiv1.AppliedManifestResourceMeta) (others, rbac []workapiv1.AppliedManifestResourceMeta) {
+	for _, resource := range resources {
+		if resource.Group == rbacv1.GroupName {
+			rbac = append(rbac, resource)
+		} else {
+			others = append(others, resource)
+		}
+	}
+	return others, rbac
 }

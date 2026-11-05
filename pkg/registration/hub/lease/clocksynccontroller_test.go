@@ -15,7 +15,6 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	v1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
@@ -49,7 +48,7 @@ func TestClockSyncController(t *testing.T) {
 				}
 				testingcommon.AssertActions(t, clusterActions, "patch")
 				patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
-				managedCluster := &v1.ManagedCluster{}
+				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
@@ -74,7 +73,7 @@ func TestClockSyncController(t *testing.T) {
 				}
 				testingcommon.AssertActions(t, clusterActions, "patch")
 				patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
-				managedCluster := &v1.ManagedCluster{}
+				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
@@ -106,7 +105,7 @@ func TestClockSyncController(t *testing.T) {
 				}
 				testingcommon.AssertActions(t, clusterActions, "patch")
 				patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
-				managedCluster := &v1.ManagedCluster{}
+				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
@@ -138,7 +137,7 @@ func TestClockSyncController(t *testing.T) {
 				}
 				testingcommon.AssertActions(t, clusterActions, "patch")
 				patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
-				managedCluster := &v1.ManagedCluster{}
+				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)

@@ -7,7 +7,7 @@ import (
 func TestNewRegistrationWebhook(t *testing.T) {
 	cmd := NewRegistrationWebhook()
 	if cmd == nil {
-		t.Errorf("NewRegistrationWebhook() should not return nil")
+		t.Fatal("NewRegistrationWebhook() should not return nil")
 	}
 	if cmd.Use != "webhook-server" {
 		t.Errorf("expected webhook-server, but got %s", cmd.Use)

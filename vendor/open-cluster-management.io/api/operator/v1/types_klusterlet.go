@@ -100,6 +100,40 @@ type KlusterletSpec struct {
 	// is not available on the managed cluster.
 	// +optional
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// AgentConfiguration contains the configuration of the klusterlet agents,
+	// such as the bind ports of their health probe and metrics endpoints.
+	// +optional
+	AgentConfiguration *AgentConfiguration `json:"agentConfiguration,omitempty"`
+}
+
+// AgentConfiguration represents customization of the klusterlet agents.
+type AgentConfiguration struct {
+	// BindConfiguration represents the server bind configuration of the klusterlet agents.
+	// +optional
+	BindConfiguration *AgentBindConfiguration `json:"bindConfiguration,omitempty"`
+}
+
+// AgentBindConfiguration represents customization of the server bindings of the klusterlet agents.
+type AgentBindConfiguration struct {
+	// HealthProbePort represents the bind port of the agents' health check endpoint. The default value is 8443.
+	// Agents run as non-root, so privileged ports below 1024 are not allowed.
+	// +optional
+	// +kubebuilder:default=8443
+	// +kubebuilder:validation:Minimum=1024
+	// +kubebuilder:validation:Maximum=65535
+	HealthProbePort int32 `json:"healthProbePort,omitempty"`
+
+	// MetricsPort represents the bind port of the agents' metrics endpoint. The default value is 8080.
+	// Metrics may be disabled by setting a value less than or equal to 0.
+	// +optional
+	// +kubebuilder:default=8080
+	// +kubebuilder:validation:Maximum=65535
+	MetricsPort int32 `json:"metricsPort"`
+
+	// HostNetwork enables running the agent pods in host networking mode.
+	// +optional
+	HostNetwork bool `json:"hostNetwork,omitempty"`
 }
 
 // ServerURL represents the apiserver url and ca bundle that is accessible externally

@@ -210,7 +210,9 @@ func TestAvailableReconcileFailureReset(t *testing.T) {
 	})
 
 	// First failure: sets firstFailureTime
-	reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy())
+	if _, _, err := reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy()); err != nil {
+		t.Fatal(err)
+	}
 	if reconciler.firstFailureTime.IsZero() {
 		t.Fatal("expected firstFailureTime to be set after failure")
 	}
@@ -234,7 +236,9 @@ func TestAvailableReconcileFailureReset(t *testing.T) {
 
 	// Fail again: should start fresh, not carry over previous failure time
 	livez.Store(int32(http.StatusInternalServerError))
-	reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy())
+	if _, _, err = reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy()); err != nil {
+		t.Fatal(err)
+	}
 
 	// The failure just started, so even with many rapid calls it should not flip to False
 	for i := 0; i < 10; i++ {
@@ -267,7 +271,9 @@ func TestAvailableReconcileBurstEvents(t *testing.T) {
 	// Simulate a burst of watch events (node + cluster + namespace) firing together.
 	// All calls happen instantly, well within failureThreshold, so condition must stay True.
 	for i := 0; i < 20; i++ {
-		reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy())
+		if _, _, err := reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy()); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	updatedCluster, _, _ := reconciler.reconcile(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy())

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -54,10 +54,10 @@ func startHubOperator(ctx context.Context, mode operatorapiv1.InstallMode) {
 		EventRecorder:     util.NewIntegrationTestEventRecorder("integration"),
 		OperatorNamespace: metav1.NamespaceDefault,
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 }
 
-var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
+var _ = Describe("ClusterManager Default Mode", Ordered, func() {
 	var cancel context.CancelFunc
 	var hubRegistrationDeployment = fmt.Sprintf("%s-registration-controller", clusterManagerName)
 	var hubPlacementDeployment = fmt.Sprintf("%s-placement-controller", clusterManagerName)
@@ -77,84 +77,84 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 	var hubWorkControllerSA = "work-controller-sa"
 	var hubAddOnManagerSA = "addon-manager-controller-sa"
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
 		go startHubOperator(ctx, operatorapiv1.InstallModeDefault)
 	})
-	ginkgo.AfterEach(func() {
+	AfterEach(func() {
 		// delete deployment for clustermanager here so tests are not impacted with each other
 		err := kubeClient.AppsV1().Deployments(hubNamespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 		if cancel != nil {
 			cancel()
 		}
 	})
 
-	ginkgo.Context("Deploy and clean hub component", func() {
-		ginkgo.It("should have expected resource created successfully", func() {
+	Context("Deploy and clean hub component", func() {
+		It("should have expected resource created successfully", func() {
 			// Check namespace
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), hubNamespace, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 			// Check clusterrole/clusterrolebinding
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubRegistrationClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubRegistrationWebhookClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			gomega.Eventually(func() error {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
+			Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubWorkWebhookClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			gomega.Eventually(func() error {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
+			Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubWorkControllerClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			gomega.Eventually(func() error {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
+			Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubRegistrationClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			gomega.Eventually(func() error {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
+			Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubRegistrationWebhookClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubWorkWebhookClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubWorkControllerClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check service account
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				registrationControllerSA, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubRegistrationSA, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -164,87 +164,87 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("Annotation applicable to awsirsa registration only")
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			gomega.Eventually(func() error {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
+			Eventually(func() error {
 				if _, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubRegistrationWebhookSA, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			gomega.Eventually(func() error {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
+			Eventually(func() error {
 				if _, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubWorkWebhookSA, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			gomega.Eventually(func() error {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
+			Eventually(func() error {
 				if _, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubWorkControllerSA, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check deployment
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationWebhookDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubWorkWebhookDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubWorkControllerDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubAddOnManagerDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubAddOnWebhookDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check service
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.CoreV1().Services(hubNamespace).Get(context.Background(), "cluster-manager-registration-webhook", metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.CoreV1().Services(hubNamespace).Get(context.Background(), "cluster-manager-work-webhook", metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check webhook secret
 			registrationWebhookSecret := "registration-webhook-serving-cert"
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				s, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(), registrationWebhookSecret, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -257,11 +257,11 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("s.Data doesn't contain key 'tls.key'")
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// #nosec G101
 			workWebhookSecret := "work-webhook-serving-cert"
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				s, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(), workWebhookSecret, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -274,16 +274,16 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("s.Data doesn't contain key 'tls.key'")
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			ginkgo.By("Update the deployment status to fail to prevent other cases from interfering")
+			By("Update the deployment status to fail to prevent other cases from interfering")
 			// Ensure addon webhook deployment exists before updating status
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubAddOnWebhookDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			updateAllDeploymentsStatusFail(kubeClient, hubNamespace)
 
@@ -292,22 +292,22 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			// Should not apply the webhook config if the replica and observed is not set
 			_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
 				context.Background(), registrationValidatingWebhook, metav1.GetOptions{})
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			Expect(err).To(HaveOccurred())
 
 			workValidtingWebhook := "manifestworkvalidators.admission.work.open-cluster-management.io"
 			// Should not apply the webhook config if the replica and observed is not set
 			_, err = kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
 				context.Background(), workValidtingWebhook, metav1.GetOptions{})
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			Expect(err).To(HaveOccurred())
 
 			// Update ready replica of deployment
 			// Ensure addon webhook deployment exists before updating status
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubAddOnWebhookDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			updateAllDeploymentsStatusSuccess(kubeClient, hubNamespace)
 
@@ -315,7 +315,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			// This ensures the operator has reconciled all deployment status updates
 			// and avoids a race condition where the webhook check starts before the
 			// operator sees all deployments as ready.
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 					context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -329,26 +329,26 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("ConditionProgressing is %s, waiting for False", cond.Status)
 				}
 				return nil
-			}, eventuallyTimeout*2, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout*2, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
 					context.Background(), registrationValidatingWebhook, metav1.GetOptions{})
 				return err
-			}, eventuallyTimeout*10, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout*10, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
 					context.Background(), workValidtingWebhook, metav1.GetOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 			util.AssertClusterManagerCondition(clusterManagerName, operatorClient, "Applied", "ClusterManagerApplied", metav1.ConditionTrue)
 		})
 
-		ginkgo.It("should have expected resource created/deleted when feature gates manifestwork replicaset enabled/disabled", func() {
-			ginkgo.By("Disable manifestwork replicaset feature gate")
+		It("should have expected resource created/deleted when feature gates manifestwork replicaset enabled/disabled", func() {
+			By("Disable manifestwork replicaset feature gate")
 			// Check manifestwork replicaset disable
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 					context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -373,52 +373,52 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(
 					context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check clusterrole/clusterrolebinding
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				_, err := kubeClient.RbacV1().ClusterRoles().Get(
 					context.Background(), hubWorkControllerClusterRole, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
 				return errors.IsNotFound(err)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				_, err := kubeClient.RbacV1().ClusterRoleBindings().Get(
 					context.Background(), hubWorkControllerClusterRole, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
 				return errors.IsNotFound(err)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// Check service account
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				_, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(
 					context.Background(), hubWorkControllerSA, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
 				return errors.IsNotFound(err)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// Check deployment
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				_, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
 					context.Background(), hubWorkControllerDeployment, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
 				return errors.IsNotFound(err)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubAddOnManagerDeployment)
 
 			// Check if relatedResources are correct
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(
 					context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -429,10 +429,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-			ginkgo.By("Revert manifestwork replicaset to enable mode")
-			gomega.Eventually(func() error {
+			By("Revert manifestwork replicaset to enable mode")
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 					context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -457,47 +457,47 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(
 					context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check clusterrole/clusterrolebinding
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoles().Get(
 					context.Background(), hubWorkControllerClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			gomega.Eventually(func() error {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
+			Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(
 					context.Background(), hubWorkControllerClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check service account
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(
 					context.Background(), hubWorkControllerSA, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check deployment
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
 					context.Background(), hubWorkControllerDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 			// Check if relatedResources are correct
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(
 					context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -508,12 +508,12 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		ginkgo.It("should have expected work driver when work driver is updated", func() {
-			ginkgo.By("Update work driver to grpc")
-			gomega.Eventually(func() error {
+		It("should have expected work driver when work driver is updated", func() {
+			By("Update work driver to grpc")
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 					context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -544,9 +544,9 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(
 					context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			// gomega.Eventually(func() error {
+			// Eventually(func() error {
 			// 	actual, err := operatorClient.OperatorV1().ClusterManagers().Get(
 			// 		context.Background(), clusterManagerName, metav1.GetOptions{})
 			// 	if err != nil {
@@ -556,7 +556,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			// 		return fmt.Errorf("should get WorkDriverConfigSecretSynced condition false")
 			// 	}
 			// 	return nil
-			// }, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			// }, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			_, err := kubeClient.CoreV1().Secrets("default").Create(context.TODO(), &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -567,9 +567,9 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					"config.yaml": []byte("url: grpc.example.com:8443"),
 				},
 			}, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
-			// gomega.Eventually(func() error {
+			// Eventually(func() error {
 			// 	actual, err := operatorClient.OperatorV1().ClusterManagers().Get(
 			// 		context.Background(), clusterManagerName, metav1.GetOptions{})
 			// 	if err != nil {
@@ -579,9 +579,9 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			// 		return fmt.Errorf("should get WorkDriverConfigSecretSynced condition true")
 			// 	}
 			// 	return nil
-			// }, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			// }, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
 					hubWorkControllerDeployment, metav1.GetOptions{})
 				if err != nil {
@@ -606,9 +606,9 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("do not find the workdriverconfig volume, got %v", actual.Spec.Template.Spec.Volumes)
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				workConfigSecret, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(),
 					"work-driver-config", metav1.GetOptions{})
 				if err != nil {
@@ -618,10 +618,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("do not find the expected config.yaml, got %v", string(workConfigSecret.Data["config.yaml"]))
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			ginkgo.By("Revert work driver back to kube")
-			gomega.Eventually(func() error {
+			By("Revert work driver back to kube")
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 					context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -631,9 +631,9 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(
 					context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
 					hubWorkControllerDeployment, metav1.GetOptions{})
 				if err != nil {
@@ -645,16 +645,16 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					}
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			err = kubeClient.CoreV1().Secrets("default").Delete(context.Background(),
 				"work-driver-config", metav1.DeleteOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 
-		ginkgo.It("should have expected resource created/deleted successfully when feature gates AddOnManager enabled/disabled", func() {
-			ginkgo.By("Check addon manager disable mode")
-			gomega.Eventually(func() error {
+		It("should have expected resource created/deleted successfully when feature gates AddOnManager enabled/disabled", func() {
+			By("Check addon manager disable mode")
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -670,47 +670,47 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check clusterrole/clusterrolebinding
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				_, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
 				return errors.IsNotFound(err)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+			Eventually(func() bool {
 				_, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
 				return errors.IsNotFound(err)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// Check service account
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				_, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubAddOnManagerSA, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
 				return errors.IsNotFound(err)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// Check deployment
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				_, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubAddOnManagerDeployment, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
 				return errors.IsNotFound(err)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment)
 			// Check if relatedResources are correct
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -719,10 +719,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("should get 48 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-			ginkgo.By("Revert addon manager to enable mode")
-			gomega.Eventually(func() error {
+			By("Revert addon manager to enable mode")
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -731,42 +731,42 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				clusterManager.Spec.AddOnManagerConfiguration = nil
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 			// Check clusterrole/clusterrolebinding
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			gomega.Eventually(func() error {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
+			Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check service account
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubAddOnManagerSA, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check deployment
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubAddOnManagerDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 			// Check if relatedResources are correct
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -775,14 +775,14 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("should get 53 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		ginkgo.It("should have expected resource created/deleted when feature gates PlacementDebugServer enabled/disabled", func() {
+		It("should have expected resource created/deleted when feature gates PlacementDebugServer enabled/disabled", func() {
 			placementServiceName := clusterManagerName + "-placement"
 
-			ginkgo.By("Enable PlacementDebugServer feature gate")
-			gomega.Eventually(func() error {
+			By("Enable PlacementDebugServer feature gate")
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -798,16 +798,16 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check placement service is created
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				_, err := kubeClient.CoreV1().Services(hubNamespace).Get(context.Background(), placementServiceName, metav1.GetOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check placement deployment has debug-server container
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				deployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubPlacementDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -818,10 +818,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					}
 				}
 				return fmt.Errorf("debug-server container not found")
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			ginkgo.By("Disable PlacementDebugServer feature gate")
-			gomega.Eventually(func() error {
+			By("Disable PlacementDebugServer feature gate")
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -837,19 +837,19 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check placement service is deleted
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				_, err := kubeClient.CoreV1().Services(hubNamespace).Get(context.Background(), placementServiceName, metav1.GetOptions{})
 				if err == nil {
 					return false
 				}
 				return errors.IsNotFound(err)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// Check placement deployment has no debug-server container
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				deployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubPlacementDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -860,10 +860,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					}
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// remove PlacementConfiguration to not affect subsequent tests
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -871,12 +871,12 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				clusterManager.Spec.PlacementConfiguration = nil
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 		})
 
-		ginkgo.It("should have expected resource created/deleted when feature gates ClusterProfile enabled/disabled", func() {
-			ginkgo.By("Enable ClusterProfile feature gate")
-			gomega.Eventually(func() error {
+		It("should have expected resource created/deleted when feature gates ClusterProfile enabled/disabled", func() {
+			By("Enable ClusterProfile feature gate")
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 					context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -901,10 +901,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(
 					context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check clusterrole
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				cr, err := kubeClient.RbacV1().ClusterRoles().Get(
 					context.Background(), hubRegistrationClusterRole, metav1.GetOptions{})
 				if err != nil {
@@ -917,11 +917,11 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					}
 				}
 				return fmt.Errorf("expected multicluster.x-k8s.io rules to exist")
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			ginkgo.By("Revert ClusterProfile to disable mode")
+			By("Revert ClusterProfile to disable mode")
 			// Check ClusterProfile disable
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 					context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -946,9 +946,9 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(
 					context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				cr, err := kubeClient.RbacV1().ClusterRoles().Get(
 					context.Background(), hubRegistrationClusterRole, metav1.GetOptions{})
 				if err != nil {
@@ -961,13 +961,13 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					}
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 		})
 
-		ginkgo.It("should have expected resource created/deleted when feature gates ClusterImporter enabled/disabled", func() {
-			ginkgo.By("Enable ClusterImporter feature gate")
+		It("should have expected resource created/deleted when feature gates ClusterImporter enabled/disabled", func() {
+			By("Enable ClusterImporter feature gate")
 			os.Setenv("AGENT_IMAGE", "test-agent:latest")
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 					context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -992,10 +992,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(
 					context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check clusterrole
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				cr, err := kubeClient.RbacV1().ClusterRoles().Get(
 					context.Background(), hubRegistrationClusterRole, metav1.GetOptions{})
 				if err != nil {
@@ -1008,10 +1008,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					}
 				}
 				return fmt.Errorf("expected cluster.x-k8s.io rules to exist")
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// check deployment
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				deploy, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
 					context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
@@ -1022,11 +1022,11 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return nil
 				}
 				return fmt.Errorf("expected agent-image flag to be set")
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			ginkgo.By("Revert ClusterImporter to disable mode")
+			By("Revert ClusterImporter to disable mode")
 			// Check ClusterProfile disable
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 					context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -1051,10 +1051,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(
 					context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check deployment
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				deploy, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
 					context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
@@ -1065,10 +1065,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("expected agent-image flag not to be set")
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// check cluster role
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				cr, err := kubeClient.RbacV1().ClusterRoles().Get(
 					context.Background(), hubRegistrationClusterRole, metav1.GetOptions{})
 				if err != nil {
@@ -1081,18 +1081,18 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					}
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 		})
-		ginkgo.It("Deployment should be updated when clustermanager is changed", func() {
-			gomega.Eventually(func() error {
+		It("Deployment should be updated when clustermanager is changed", func() {
+			Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check if generations are correct
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1103,32 +1103,32 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				}
 
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			clusterManager.Spec.RegistrationImagePullSpec = testImage
 			_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
+				Expect(len(actual.Spec.Template.Spec.Containers)).Should(Equal(1))
 				if actual.Spec.Template.Spec.Containers[0].Image != testImage {
 					return fmt.Errorf("expected image to be testimage:latest but get %s", actual.Spec.Template.Spec.Containers[0].Image)
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 
 			// Check if generations are correct
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1139,10 +1139,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				}
 
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check if relatedResources are correct
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1151,11 +1151,11 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("should get 54 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		ginkgo.It("Deployment should be added nodeSelector and toleration when add nodePlacement into clustermanager", func() {
-			gomega.Eventually(func() error {
+		It("Deployment should be added nodeSelector and toleration when add nodePlacement into clustermanager", func() {
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1172,14 +1172,14 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
+				Expect(len(actual.Spec.Template.Spec.Containers)).Should(Equal(1))
 				if len(actual.Spec.Template.Spec.NodeSelector) == 0 {
 					return fmt.Errorf("length of node selector should not equals to 0")
 				}
@@ -1196,25 +1196,25 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				}
 
 				return fmt.Errorf("no key equals to node-role.kubernetes.io/infra")
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 		})
 
-		ginkgo.It("Deployment should be reconciled when manually updated", func() {
-			gomega.Eventually(func() error {
+		It("Deployment should be reconciled when manually updated", func() {
+			Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 			registrationoDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			registrationoDeployment.Spec.Template.Spec.Containers[0].Image = "testimage2:latest"
 			_, err = kubeClient.AppsV1().Deployments(hubNamespace).Update(context.Background(), registrationoDeployment, metav1.UpdateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Eventually(func() error {
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() error {
 				registrationoDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1223,10 +1223,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("image should be testimage:latest, but get %s", registrationoDeployment.Spec.Template.Spec.Containers[0].Image)
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check if generations are correct
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1243,12 +1243,12 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("expected LastGeneration shoud be %d, but get %d", actualGeneration.LastGeneration, deploymentGeneration.LastGeneration)
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 		})
 
-		ginkgo.It("should have auto approver user set on registration when configured", func() {
+		It("should have auto approver user set on registration when configured", func() {
 			// Update cluster manager configuration
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1261,26 +1261,26 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				clusterManager.Spec.RegistrationConfiguration.AutoApproveUsers = []string{"user1", "user2"}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
+				Expect(len(actual.Spec.Template.Spec.Containers)).Should(Equal(1))
 				for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
 					if arg == "--cluster-auto-approval-users=user1,user2" {
 						return nil
 					}
 				}
 				return fmt.Errorf("do not find the cluster-auto-approval-users args, got %v", actual.Spec.Template.Spec.Containers[0].Args)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 		})
 
-		ginkgo.It("should have auto approved csr users set on registration-controller if csr driver is present", func() {
+		It("should have auto approved csr users set on registration-controller if csr driver is present", func() {
 			// Update cluster manager configuration
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1300,24 +1300,24 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
+				Expect(len(actual.Spec.Template.Spec.Containers)).Should(Equal(1))
 				for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
 					if arg == "--auto-approved-csr-users=user3,user4" {
 						return nil
 					}
 				}
 				return fmt.Errorf("do not find the auto-approved-csr-users args, got %v", actual.Spec.Template.Spec.Containers[0].Args)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 		})
 
-		ginkgo.It("should have labels on resources created by clustermanager", func() {
+		It("should have labels on resources created by clustermanager", func() {
 
 			labels := map[string]string{helpers.AppLabelKey: "clustermanager", helpers.HubLabelKey: "hub",
 				helpers.LabelPrefix + "/cluster-name": "test", "test-label": "test-value", "test-label2": "test-value2"}
@@ -1325,7 +1325,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			expectedDeploymentLabels := map[string]string{helpers.AppLabelKey: "deployment name", helpers.HubLabelKey: clusterManagerName,
 				"test-label": "test-value", "test-label2": "test-value2"}
 			expectedRegistrationLabels := map[string]string{"test-label": "test-value", "test-label2": "test-value2"}
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1337,8 +1337,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			gomega.Eventually(func() error {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
+			Eventually(func() error {
 				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1349,10 +1349,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("expected registration-controller labels to be %v, but got %v", expectedDeploymentLabels, registrationDeployment.GetLabels())
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Ensure labels list string is present on registration-controller as command line args
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
 					return false
@@ -1360,10 +1360,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				commandLineArgs := registrationDeployment.Spec.Template.Spec.Containers[0].Args
 				labelsArg, present := findMatchingArg(commandLineArgs, "--labels")
 				return present && strings.SplitN(labelsArg, "=", 2)[1] == helpers.ConvertLabelsMapToString(expectedRegistrationLabels)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// Compare labels on registration-webhook
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
 					hubRegistrationWebhookDeployment, metav1.GetOptions{})
 				if err != nil {
@@ -1374,10 +1374,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("expected registration-webhook labels to be %v, but got %v", expectedDeploymentLabels, registrationDeployment.GetLabels())
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Compare labels on work-webhook
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubWorkWebhookDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1387,10 +1387,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("expected work-webhook labels to be %v, but got %v", expectedDeploymentLabels, registrationDeployment.GetLabels())
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Compare labels on placement-controller
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubPlacementDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1400,10 +1400,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("expected placement-controller labels to be %v, but got %v", expectedDeploymentLabels, registrationDeployment.GetLabels())
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Compare labels on addon-manager-controller
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubAddOnManagerDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1413,10 +1413,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("expected labels addon-manager-controller to be %v, but got %v", expectedDeploymentLabels, registrationDeployment.GetLabels())
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Compare labels on work-controller
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubWorkControllerDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1426,20 +1426,20 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return fmt.Errorf("expected work-controller labels to be %v, but got %v", expectedDeploymentLabels, registrationDeployment.GetLabels())
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 		})
 	})
 
-	ginkgo.Context("Cluster manager statuses", func() {
-		ginkgo.It("should have correct degraded conditions", func() {
-			gomega.Eventually(func() error {
+	Context("Cluster manager statuses", func() {
+		It("should have correct degraded conditions", func() {
+			Eventually(func() error {
 				_, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
 					context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// The cluster manager should be unavailable at first
 			util.AssertClusterManagerCondition(clusterManagerName, operatorClient,
@@ -1458,11 +1458,11 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 		})
 	})
 
-	ginkgo.Context("Serving cert rotation", func() {
-		ginkgo.It("should rotate both serving cert and signing cert before they become expired", func() {
+	Context("Serving cert rotation", func() {
+		It("should rotate both serving cert and signing cert before they become expired", func() {
 			secretNames := []string{"signer-secret", "registration-webhook-serving-cert", "work-webhook-serving-cert"}
 			// wait until all secrets and configmap are in place
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				for _, name := range secretNames {
 					if _, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
 						return err
@@ -1472,10 +1472,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// both serving cert and signing cert should always be valid
-			gomega.Consistently(func() error {
+			Consistently(func() error {
 				configmap, err := kubeClient.CoreV1().ConfigMaps(hubNamespace).Get(context.Background(), "ca-bundle-configmap", metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1532,14 +1532,14 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 					}
 				}
 				return nil
-			}, eventuallyTimeout*3, eventuallyInterval*3).Should(gomega.BeNil())
+			}, eventuallyTimeout*3, eventuallyInterval*3).Should(BeNil())
 		})
 	})
 
-	ginkgo.Context("Cluster manager feature gates", func() {
-		ginkgo.It("default should be set correctly", func() {
+	Context("Cluster manager feature gates", func() {
+		It("default should be set correctly", func() {
 			// remove cluster manager configuration
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -1547,10 +1547,21 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 
 				// Check addon manager enabled mode
 				clusterManager.Spec.RegistrationConfiguration = nil
+				// Earlier cases enable ManifestWorkReplicaSet explicitly. Keep only NilExecutorValidating
+				// so ManifestWorkReplicaSet falls back to its default.
+				clusterManager.Spec.WorkConfiguration = &operatorapiv1.WorkConfiguration{
+					WorkDriver: operatorapiv1.WorkDriverTypeKube,
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: string(feature.NilExecutorValidating),
+							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+						},
+					},
+				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			gomega.Eventually(func() error {
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
+			Eventually(func() error {
 				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
 					hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
@@ -1565,24 +1576,25 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				}
 
 				return nil // no matching argument found, which is the expected condition
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil(), "Expected '--feature-gates=DefaultClusterSet=true' to be absent in Args, but it was found")
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil(), "Expected '--feature-gates=DefaultClusterSet=true' to be absent in Args, but it was found")
 
 			util.AssertClusterManagerCondition(clusterManagerName, operatorClient,
 				helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue)
 
 			workDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
 				hubWorkWebhookDeployment, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(workDeployment.Spec.Template.Spec.Containers[0].Args).Should(
-				gomega.ContainElement("--feature-gates=NilExecutorValidating=true"))
-			gomega.Expect(workDeployment.Spec.Template.Spec.Containers[0].Args).Should(
-				gomega.ContainElement("--feature-gates=ManifestWorkReplicaSet=true"))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(workDeployment.Spec.Template.Spec.Containers[0].Args).Should(
+				ContainElement("--feature-gates=NilExecutorValidating=true"))
+			// ManifestWorkReplicaSet is enabled by default, so enabling it adds no flag.
+			Expect(workDeployment.Spec.Template.Spec.Containers[0].Args).ShouldNot(
+				ContainElement("--feature-gates=ManifestWorkReplicaSet=true"))
 
 			workHubControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
 				hubWorkControllerDeployment, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(workHubControllerDeployment.Spec.Template.Spec.Containers[0].Args).Should(
-				gomega.ContainElement("manager"))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(workHubControllerDeployment.Spec.Template.Spec.Containers[0].Args).Should(
+				ContainElement("manager"))
 		})
 	})
 
@@ -1590,7 +1602,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 
 // ClusterManager TLS profile tests verify that TLS flags are injected into all hub deployments
 // when the ocm-tls-profile ConfigMap is present at operator startup.
-var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
+var _ = Describe("ClusterManager TLS Profile", func() {
 	var cancel context.CancelFunc
 	var hubRegistrationDeployment = fmt.Sprintf("%s-registration-controller", clusterManagerName)
 	var hubPlacementDeployment = fmt.Sprintf("%s-placement-controller", clusterManagerName)
@@ -1600,9 +1612,9 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 	var hubWorkControllerDeployment = fmt.Sprintf("%s-work-controller", clusterManagerName)
 	var hubAddOnWebhookDeployment = fmt.Sprintf("%s-addon-webhook", clusterManagerName)
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		// Enable PlacementDebugServer feature gate
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 				context.Background(), clusterManagerName, metav1.GetOptions{})
 			if err != nil {
@@ -1619,7 +1631,7 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 			_, err = operatorClient.OperatorV1().ClusterManagers().Update(
 				context.Background(), clusterManager, metav1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 		// Create the ocm-tls-profile ConfigMap BEFORE starting the operator so that:
 		// 1. The watcher seeds its hash from the ConfigMap at startup (no change detected).
@@ -1639,29 +1651,29 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 		}
 		_, err := kubeClient.CoreV1().ConfigMaps(metav1.NamespaceDefault).Create(
 			context.Background(), tlsCM, metav1.CreateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
 		go startHubOperator(ctx, operatorapiv1.InstallModeDefault)
 	})
 
-	ginkgo.AfterEach(func() {
+	AfterEach(func() {
 		if cancel != nil {
 			cancel()
 		}
 		err := kubeClient.CoreV1().ConfigMaps(metav1.NamespaceDefault).Delete(
 			context.Background(), "ocm-tls-profile", metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			ginkgo.GinkgoT().Logf("failed to delete ocm-tls-profile ConfigMap: %v", err)
+			GinkgoT().Logf("failed to delete ocm-tls-profile ConfigMap: %v", err)
 		}
 		err = kubeClient.AppsV1().Deployments(hubNamespace).DeleteCollection(
 			context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// Clean up PlacementConfiguration and RegistrationConfiguration to avoid affecting other tests,
 		// but keep any existing feature gates (e.g. NetworkPolicies) intact.
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 				context.Background(), clusterManagerName, metav1.GetOptions{})
 			if err != nil {
@@ -1682,10 +1694,10 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 			_, err = operatorClient.OperatorV1().ClusterManagers().Update(
 				context.Background(), clusterManager, metav1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 	})
 
-	ginkgo.It("should inject tls-min-version into all hub deployments when ocm-tls-profile ConfigMap exists at startup", func() {
+	It("should inject tls-min-version into all hub deployments when ocm-tls-profile ConfigMap exists at startup", func() {
 		// All hub deployments that get TLS flags injected.
 		tlsDeployments := []string{
 			hubRegistrationDeployment,
@@ -1698,7 +1710,7 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 		}
 		for _, deployName := range tlsDeployments {
 			deployName := deployName // capture
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
 					context.Background(), deployName, metav1.GetOptions{})
 				if err != nil {
@@ -1718,18 +1730,18 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 					}
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 		}
 	})
 
-	ginkgo.It("should inject tls-min-version into gRPC server deployment when gRPC auth is enabled", func() {
+	It("should inject tls-min-version into gRPC server deployment when gRPC auth is enabled", func() {
 		// Enable gRPC auth so the operator creates the gRPC server deployment.
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			return enableGRPCAuth(operatorClient, clusterManagerName)
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		hubGRPCServerDeployment := fmt.Sprintf("%s-grpc-server", clusterManagerName)
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
 				context.Background(), hubGRPCServerDeployment, metav1.GetOptions{})
 			if err != nil {
@@ -1742,6 +1754,6 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 			}
 			return fmt.Errorf("deployment %s: --tls-min-version=VersionTLS13 not found in args %v",
 				hubGRPCServerDeployment, actual.Spec.Template.Spec.Containers[0].Args)
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 	})
 })

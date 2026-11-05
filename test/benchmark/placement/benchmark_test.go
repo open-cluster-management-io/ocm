@@ -126,10 +126,14 @@ func benchmarkSchedulePlacements(b *testing.B, pnum, cnum int) {
 	createAddOnPlacementScores("demo", cnum)
 
 	b.ResetTimer()
-	go controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
-		KubeConfig:    cfg,
-		EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
-	})
+	go func() {
+		if err := controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
+			KubeConfig:    cfg,
+			EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
+		}); err != nil {
+			klog.Fatalf("%v", err)
+		}
+	}()
 
 	go createPlacements(pnum)
 	assertPlacementDecisions(pnum, cancel)

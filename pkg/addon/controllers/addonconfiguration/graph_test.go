@@ -776,7 +776,9 @@ func TestConfigurationGraph(t *testing.T) {
 			}
 
 			for i := range c.placementStrategies {
-				graph.addPlacementNode(c.placementStrategies[i], c.installProgressions[i], placementLister, placementDecisionGetter)
+				if err := graph.addPlacementNode(c.placementStrategies[i], c.installProgressions[i], placementLister, placementDecisionGetter); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			err := graph.generateRolloutResult()

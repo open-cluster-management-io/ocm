@@ -817,11 +817,12 @@ func TestDeployWithMultiPlacementsReconcileAsExpected(t *testing.T) {
 		},
 	}
 	for _, plcSummary := range mwrSet.Status.PlacementsSummary {
-		if plcSummary.Name == placement1.Name { //nolint:gocritic
+		switch plcSummary.Name {
+		case placement1.Name:
 			assert.Equal(t, plcSummary, expectPlcSummary1)
-		} else if plcSummary.Name == placement2.Name {
+		case placement2.Name:
 			assert.Equal(t, plcSummary, expectPlcSummary2)
-		} else {
+		default:
 			t.Fatal("PlacementSummary Name not Exist")
 		}
 	}
@@ -872,6 +873,7 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	perGoupeRollOut := clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.ProgressivePerGroup}
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",
 		map[string]clusterv1alpha1.RolloutStrategy{placement.Name: perGoupeRollOut})
+	mwrSet.Generation = 1
 
 	var objs []runtime.Object
 	for i := 0; i < clsPerGroup; i++ {
@@ -938,6 +940,7 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	assert.NotNil(t, placeCondition)
 	assert.Equal(t, placeCondition.Status, metav1.ConditionTrue)
 	assert.Equal(t, placeCondition.Reason, workapiv1alpha1.ReasonAsExpected)
+	assert.Equal(t, int64(1), placeCondition.ObservedGeneration)
 
 	// Check the RollOut conditions - need to mark ManifestWorks as Succeeded first
 	rollOutCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut)
@@ -972,10 +975,12 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	assert.NotNil(t, rollOutCondition)
 	assert.Equal(t, rollOutCondition.Status, metav1.ConditionTrue)
 	assert.Equal(t, rollOutCondition.Reason, workapiv1alpha1.ReasonComplete)
+	assert.Equal(t, int64(1), rollOutCondition.ObservedGeneration)
 
 	// Change the mwrSet spec and re-run deploy.
 	mwTemplate := helpertest.CreateTestManifestWorkSpecWithSecret("v2", "test", "ns-test", "name-test")
 	mwTemplate.DeepCopyInto(&mwrSet.Spec.ManifestWorkTemplate)
+	mwrSet.Generation = 2
 
 	mwrSet, _, _ = pmwDeployController.reconcile(context.TODO(), mwrSet)
 	assert.Equal(t, len(mwrSet.Status.PlacementsSummary), len(mwrSet.Spec.PlacementRefs))
@@ -1011,6 +1016,7 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	assert.NotNil(t, rollOutCondition)
 	assert.Equal(t, rollOutCondition.Status, metav1.ConditionFalse)
 	assert.Equal(t, rollOutCondition.Reason, workapiv1alpha1.ReasonProgressing)
+	assert.Equal(t, int64(2), rollOutCondition.ObservedGeneration)
 }
 
 func TestRequeueWithProgressDeadline(t *testing.T) {
@@ -2232,7 +2238,7 @@ func TestOldLabelOnlyManifestWorkMigratesOnSpecChange(t *testing.T) {
 	newTemplate := helpertest.CreateTestManifestWorkSpecWithSecret("v2", "test", "ns-test", "name-test")
 	newTemplate.DeepCopyInto(&mwrSet.Spec.ManifestWorkTemplate)
 
-	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	_, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
 	assert.Nil(t, err)
 
 	// Step 4: Verify the MW in the fake client now has the new hash label and annotation,

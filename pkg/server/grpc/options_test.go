@@ -34,7 +34,7 @@ func TestGRPCServerOptionsAddFlags(t *testing.T) {
 	// Test that server-config flag is added
 	serverConfigFlag := fs.Lookup("server-config")
 	if serverConfigFlag == nil {
-		t.Error("Expected server-config flag to be added")
+		t.Fatal("Expected server-config flag to be added")
 	}
 
 	// Test that flag has correct description

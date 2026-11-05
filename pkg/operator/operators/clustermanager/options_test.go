@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -22,14 +22,14 @@ var testEnv *envtest.Environment
 var cfg *rest.Config
 
 func TestClusterManager(t *testing.T) {
-	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "ClusterManager Suite")
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "ClusterManager Suite")
 }
 
-var _ = ginkgo.BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
+var _ = BeforeSuite(func() {
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	ginkgo.By("bootstrapping test environment")
+	By("bootstrapping test environment")
 
 	var err error
 	// install operator CRDs and start a local kube-apiserver
@@ -43,26 +43,26 @@ var _ = ginkgo.BeforeSuite(func() {
 	cfg.QPS = 100
 	cfg.Burst = 200
 
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(cfg).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(cfg).ToNot(BeNil())
 })
 
-var _ = ginkgo.AfterSuite(func() {
-	ginkgo.By("tearing down the test environment")
+var _ = AfterSuite(func() {
+	By("tearing down the test environment")
 
 	err := testEnv.Stop()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 })
 
-var _ = ginkgo.Describe("start cluster manager", func() {
-	ginkgo.It("start hub manager", func() {
+var _ = Describe("start cluster manager", func() {
+	It("start hub manager", func() {
 		ctx, stopHub := context.WithCancel(context.Background())
 		var wg sync.WaitGroup
 		wg.Add(1)
 
 		// start hub controller
 		go func() {
-			defer ginkgo.GinkgoRecover()
+			defer GinkgoRecover()
 			defer wg.Done()
 			o := &Options{ImagePullSecretName: "my-registry-secret"}
 			err := o.RunClusterManagerOperator(ctx, &controllercmd.ControllerContext{
@@ -70,7 +70,7 @@ var _ = ginkgo.Describe("start cluster manager", func() {
 				EventRecorder:     util.NewIntegrationTestEventRecorder("integration"),
 				OperatorNamespace: metav1.NamespaceDefault,
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		}()
 		stopHub()
 		// Wait so AfterSuite does not stop envtest while ServerVersion is still dialing.

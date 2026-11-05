@@ -290,8 +290,12 @@ func TestIsHubKubeConfigValid(t *testing.T) {
 			name: "valid token file",
 			setupFunc: func() string {
 				dir := filepath.Join(tmpDir, "valid")
-				os.MkdirAll(dir, 0755)
-				os.WriteFile(filepath.Join(dir, TokenFile), []byte(validToken), 0644)
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(dir, TokenFile), []byte(validToken), 0644); err != nil {
+					t.Fatal(err)
+				}
 				return dir
 			},
 			wantValid: true,
@@ -309,8 +313,12 @@ func TestIsHubKubeConfigValid(t *testing.T) {
 			name: "expired token",
 			setupFunc: func() string {
 				dir := filepath.Join(tmpDir, "expired")
-				os.MkdirAll(dir, 0755)
-				os.WriteFile(filepath.Join(dir, TokenFile), []byte(expiredToken), 0644)
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(dir, TokenFile), []byte(expiredToken), 0644); err != nil {
+					t.Fatal(err)
+				}
 				return dir
 			},
 			wantValid: false,

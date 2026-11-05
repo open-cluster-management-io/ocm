@@ -10,7 +10,6 @@ import (
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	addonwebhook "open-cluster-management.io/ocm/pkg/addon/webhook"
@@ -51,7 +50,7 @@ func AddConversionForAddonAPI(ctx context.Context, apiExtClient apiextensionscli
 			Strategy: apiextensionsv1.WebhookConverter,
 			Webhook: &apiextensionsv1.WebhookConversion{
 				ClientConfig: &apiextensionsv1.WebhookClientConfig{
-					URL: pointer.String(fmt.Sprintf("https://%s:%d/convert",
+					URL: new(fmt.Sprintf("https://%s:%d/convert",
 						testEnv.WebhookInstallOptions.LocalServingHost,
 						testEnv.WebhookInstallOptions.LocalServingPort)),
 					CABundle: caBundle,

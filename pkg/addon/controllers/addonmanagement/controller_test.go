@@ -19,7 +19,6 @@ import (
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
@@ -523,12 +522,7 @@ func TestNewAddonManagementController(t *testing.T) {
 	)
 
 	if controller == nil {
-		t.Error("Expected controller to be created, got nil")
-	}
-
-	// Verify controller is of correct type
-	if _, ok := controller.(factory.Controller); !ok {
-		t.Error("Expected controller to implement factory.Controller interface")
+		t.Fatal("Expected controller to be created, got nil")
 	}
 }
 

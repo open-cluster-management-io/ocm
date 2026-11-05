@@ -204,7 +204,7 @@ func newGraph(desiredDefaultConfigs []addonv1beta1.AddOnConfig, defaultConfigRef
 	}
 
 	for _, desiredConfig := range desiredDefaultConfigs {
-		if desiredConfig.ConfigReferent.Name == "" || desiredConfig.ConfigReferent.Name == addonv1beta1.ReservedNoDefaultConfigName {
+		if desiredConfig.Name == "" || desiredConfig.Name == addonv1beta1.ReservedNoDefaultConfigName {
 			continue
 		}
 		gr := desiredConfig.ConfigGroupResource

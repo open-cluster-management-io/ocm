@@ -5,7 +5,8 @@ WORKDIR /go/src/open-cluster-management.io/ocm
 COPY . .
 ENV GO_PACKAGE open-cluster-management.io/ocm
 
-RUN GOOS=${OS} \
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    GOOS=${OS} \
     GOARCH=${ARCH} \
     GO_BUILD_PACKAGES=./cmd/addon \
     make build --warn-undefined-variables

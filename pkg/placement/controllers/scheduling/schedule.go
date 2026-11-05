@@ -356,10 +356,10 @@ func setRequeueAfter(requeueAfter, newRequeueAfter *time.Duration) *time.Duratio
 func getWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32,
 	placement *clusterapiv1beta1.Placement) (map[clusterapiv1beta1.ScoreCoordinate]int32, *framework.Status) {
 	mode := placement.Spec.PrioritizerPolicy.Mode
-	switch {
-	case mode == clusterapiv1beta1.PrioritizerPolicyModeExact:
+	switch mode {
+	case clusterapiv1beta1.PrioritizerPolicyModeExact:
 		return mergeWeights(nil, placement.Spec.PrioritizerPolicy.Configurations)
-	case mode == clusterapiv1beta1.PrioritizerPolicyModeAdditive || mode == "":
+	case clusterapiv1beta1.PrioritizerPolicyModeAdditive, "":
 		return mergeWeights(defaultWeight, placement.Spec.PrioritizerPolicy.Configurations)
 	default:
 		msg := fmt.Sprintf("incorrect prioritizer policy mode: %s", mode)
@@ -398,12 +398,12 @@ func getPrioritizers(weights map[clusterapiv1beta1.ScoreCoordinate]int32, handle
 			continue
 		}
 		if k.Type == clusterapiv1beta1.ScoreCoordinateTypeBuiltIn {
-			switch {
-			case k.BuiltIn == PrioritizerBalance:
+			switch k.BuiltIn {
+			case PrioritizerBalance:
 				result[k] = balance.New(handle)
-			case k.BuiltIn == PrioritizerSteady:
+			case PrioritizerSteady:
 				result[k] = steady.New(handle)
-			case k.BuiltIn == PrioritizerResourceAllocatableCPU || k.BuiltIn == PrioritizerResourceAllocatableMemory:
+			case PrioritizerResourceAllocatableCPU, PrioritizerResourceAllocatableMemory:
 				result[k] = resource.NewResourcePrioritizerBuilder(handle).WithPrioritizerName(k.BuiltIn).Build()
 			default:
 				msg := fmt.Sprintf("incorrect builtin prioritizer: %s", k.BuiltIn)

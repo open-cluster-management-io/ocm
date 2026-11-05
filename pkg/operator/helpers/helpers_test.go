@@ -686,6 +686,7 @@ func TestApplyDeployment(t *testing.T) {
 	}
 }
 
+//nolint:staticcheck // SA1019: bundled manifests still contain corev1.Endpoints.
 func TestApplyEndpoints(t *testing.T) {
 	tests := []struct {
 		name             string

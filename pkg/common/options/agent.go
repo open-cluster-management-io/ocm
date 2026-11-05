@@ -133,8 +133,8 @@ func (o *AgentOptions) getOrGenerateClusterAgentID() (string, string) {
 		// and then load the cluster name from the mounted secret
 		clusterNameFilePath := path.Join(o.HubKubeconfigDir, register.ClusterNameFile)
 		clusterNameBytes, err := os.ReadFile(path.Clean(clusterNameFilePath))
-		switch {
-		case err == nil:
+		switch err {
+		case nil:
 			// use cluster name load from the mounted secret
 			clusterName = string(clusterNameBytes)
 		default:
@@ -148,8 +148,8 @@ func (o *AgentOptions) getOrGenerateClusterAgentID() (string, string) {
 	if len(agentID) == 0 {
 		agentIDFilePath := path.Join(o.HubKubeconfigDir, register.AgentNameFile)
 		agentIDBytes, err := os.ReadFile(path.Clean(agentIDFilePath))
-		switch {
-		case err == nil:
+		switch err {
+		case nil:
 			// use agent name loaded from the mounted secret
 			agentID = string(agentIDBytes)
 		default:

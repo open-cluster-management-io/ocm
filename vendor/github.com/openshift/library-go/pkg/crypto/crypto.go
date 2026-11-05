@@ -395,6 +395,33 @@ func TLSGroupsToCurveIDs(groups []configv1.TLSGroup) ([]tls.CurveID, []configv1.
 	return curves, unrecognized
 }
 
+// TLSGroupsToCurvePreferences converts OpenShift TLS group names to the numeric
+// curve IDs accepted by Kubernetes SecureServingOptions. T permits both the
+// API's []TLSGroup and []string values stored in observed configuration.
+// Unrecognized groups are omitted from the curve preferences and returned to
+// the caller.
+func TLSGroupsToCurvePreferences[T ~string](groups []T) ([]int32, []T) {
+	tlsGroups := make([]configv1.TLSGroup, len(groups))
+	for i, group := range groups {
+		tlsGroups[i] = configv1.TLSGroup(group)
+	}
+
+	curveIDs, unrecognizedTLSGroups := TLSGroupsToCurveIDs(tlsGroups)
+	curvePreferences := make([]int32, len(curveIDs))
+	for i, curveID := range curveIDs {
+		curvePreferences[i] = int32(curveID)
+	}
+	// Preserve nil when every group is recognized, matching TLSGroupsToCurveIDs.
+	var unrecognizedGroups []T
+	if len(unrecognizedTLSGroups) > 0 {
+		unrecognizedGroups = make([]T, len(unrecognizedTLSGroups))
+		for i, group := range unrecognizedTLSGroups {
+			unrecognizedGroups[i] = T(group)
+		}
+	}
+	return curvePreferences, unrecognizedGroups
+}
+
 // ValidTLSGroups returns the recognized TLS group names, sorted alphabetically.
 func ValidTLSGroups() []configv1.TLSGroup {
 	groups := make([]configv1.TLSGroup, 0, len(tlsGroupToCurveID))

@@ -23,7 +23,7 @@ import (
 func TestSyncDelete(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "")
 	now := metav1.Now()
-	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
+	klusterlet.SetDeletionTimestamp(&now)
 	bootstrapKubeConfigSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 	bootstrapKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("testhost")
 	namespace := newNamespace("testns")
@@ -78,7 +78,7 @@ func TestSyncDeleteHosted(t *testing.T) {
 		Message: "Klusterlet is ready to apply",
 	})
 	now := metav1.Now()
-	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
+	klusterlet.SetDeletionTimestamp(&now)
 	agentNamespace := helpers.AgentNamespace(klusterlet)
 	bootstrapKubeConfigSecret := newSecret(helpers.BootstrapHubKubeConfig, agentNamespace)
 	bootstrapKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("testhost")
@@ -152,7 +152,7 @@ func TestSyncDeleteHostedDeleteAgentNamespace(t *testing.T) {
 		Message: fmt.Sprintf("Failed to build managed cluster clients: %v", "namespaces \"klusterlet\" not found"),
 	})
 	now := metav1.Now()
-	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
+	klusterlet.SetDeletionTimestamp(&now)
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestControllerHosted(t, klusterlet, nil).setDefaultManagedClusterClientsBuilder()
 
@@ -169,7 +169,7 @@ func TestSyncDeleteHostedDeleteAgentNamespace(t *testing.T) {
 func TestSyncDeleteHostedDeleteWaitKubeconfig(t *testing.T) {
 	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
 	now := metav1.Now()
-	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
+	klusterlet.SetDeletionTimestamp(&now)
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestControllerHosted(t, klusterlet, nil).setDefaultManagedClusterClientsBuilder()
 

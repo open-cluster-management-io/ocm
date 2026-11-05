@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +44,7 @@ func (r *IntegrationTestEventRecorder) WithContext(ctx context.Context) events.R
 }
 
 func (r *IntegrationTestEventRecorder) Event(reason, message string) {
-	fmt.Fprintf(ginkgo.GinkgoWriter, "Event: [%s] %v: %v \n", r.component, reason, message)
+	fmt.Fprintf(GinkgoWriter, "Event: [%s] %v: %v \n", r.component, reason, message)
 }
 
 func (r *IntegrationTestEventRecorder) Eventf(reason, messageFmt string, args ...interface{}) {
@@ -52,7 +52,7 @@ func (r *IntegrationTestEventRecorder) Eventf(reason, messageFmt string, args ..
 }
 
 func (r *IntegrationTestEventRecorder) Warning(reason, message string) {
-	fmt.Fprintf(ginkgo.GinkgoWriter, "Warning: [%s] %v: %v \n", r.component, reason, message)
+	fmt.Fprintf(GinkgoWriter, "Warning: [%s] %v: %v \n", r.component, reason, message)
 }
 
 func (r *IntegrationTestEventRecorder) Warningf(reason, messageFmt string, args ...interface{}) {
@@ -97,11 +97,11 @@ func CheckExpectedConditions(conditions []metav1.Condition, expectedConditions .
 		switch expected.Status {
 		case ConditionNotFound:
 			if condition != nil {
-				errs = append(errs, fmt.Errorf("Expected not to find condition %s, got %+v", expected.Type, condition))
+				errs = append(errs, fmt.Errorf("expected not to find condition %s, got %+v", expected.Type, condition))
 			}
 		default:
 			if condition == nil || !MatchCondition(*condition, expected) {
-				errs = append(errs, fmt.Errorf("Expected to find condition %+v, got %+v", expected, condition))
+				errs = append(errs, fmt.Errorf("expected to find condition %+v, got %+v", expected, condition))
 			}
 		}
 	}

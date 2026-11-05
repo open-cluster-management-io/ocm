@@ -726,7 +726,7 @@ func TestSyncDeployWithoutCaBundle(t *testing.T) {
 func TestSyncDelete(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
 	now := metav1.Now()
-	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
+	clusterManager.SetDeletionTimestamp(&now)
 
 	assertDeletion(t, clusterManager, 32, 16)
 }
@@ -744,7 +744,7 @@ func TestSyncDeleteWithGRPCAuthEnabled(t *testing.T) {
 		},
 	}
 	now := metav1.Now()
-	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
+	clusterManager.SetDeletionTimestamp(&now)
 	assertDeletion(t, clusterManager, 36, 16)
 }
 
@@ -752,7 +752,7 @@ func TestSyncDeleteWithGRPCAuthEnabled(t *testing.T) {
 func TestDeleteCRD(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
 	now := metav1.Now()
-	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
+	clusterManager.SetDeletionTimestamp(&now)
 	crd := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "clustermanagementaddons.addon.open-cluster-management.io",
@@ -1353,18 +1353,26 @@ func TestWorkControllerEnabledByFeatureGates(t *testing.T) {
 			description:            "Work controller should be disabled when both feature gates are disabled",
 		},
 		{
+			name: "ManifestWorkReplicaSet disabled only",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: string(ocmfeature.ManifestWorkReplicaSet), Mode: operatorapiv1.FeatureGateModeTypeDisable},
+			},
+			expectedWorkController: false,
+			description:            "Work controller should be disabled when ManifestWorkReplicaSet is explicitly disabled and CleanUpCompletedManifestWork is off by default",
+		},
+		{
 			name: "Only other feature gates enabled",
 			featureGates: []operatorapiv1.FeatureGate{
 				{Feature: string(ocmfeature.CloudEventsDrivers), Mode: operatorapiv1.FeatureGateModeTypeEnable},
 			},
-			expectedWorkController: false,
-			description:            "Work controller should be disabled when only unrelated feature gates are enabled",
+			expectedWorkController: true,
+			description:            "Work controller should be enabled because ManifestWorkReplicaSet is enabled by default",
 		},
 		{
 			name:                   "No work feature gates specified",
 			featureGates:           []operatorapiv1.FeatureGate{},
-			expectedWorkController: false,
-			description:            "Work controller should be disabled when no work feature gates are specified",
+			expectedWorkController: true,
+			description:            "Work controller should be enabled because ManifestWorkReplicaSet is enabled by default",
 		},
 		{
 			name: "ManifestWorkReplicaSet enabled with other feature gates",

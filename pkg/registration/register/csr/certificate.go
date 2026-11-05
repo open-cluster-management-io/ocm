@@ -174,9 +174,10 @@ func (v *v1CSRControl) IsApproved(name string) (bool, error) {
 	v1CSR := csr.(*certificates.CertificateSigningRequest)
 	approved := false
 	for _, condition := range v1CSR.Status.Conditions {
-		if condition.Type == certificates.CertificateDenied {
+		switch condition.Type {
+		case certificates.CertificateDenied:
 			return false, nil
-		} else if condition.Type == certificates.CertificateApproved {
+		case certificates.CertificateApproved:
 			approved = true
 		}
 	}

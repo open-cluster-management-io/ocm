@@ -604,12 +604,12 @@ func TestNewCSRDriver(t *testing.T) {
 		ClusterName: "cluster1",
 		AgentName:   "agent1",
 	}
-	driver, err := NewCSRDriver(NewCSROption(), secretOpts)
+	_, err := NewCSRDriver(NewCSROption(), secretOpts)
 	if err == nil {
 		t.Errorf("expect error, but got nil")
 	}
 	secretOpts.BootStrapKubeConfigFile = "bootstrap-kubeconfig"
-	driver, err = NewCSRDriver(NewCSROption(), secretOpts)
+	driver, err := NewCSRDriver(NewCSROption(), secretOpts)
 	if err != nil {
 		t.Fatal(err)
 	}

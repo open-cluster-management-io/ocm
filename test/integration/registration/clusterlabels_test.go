@@ -5,8 +5,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	registerfactory "open-cluster-management.io/ocm/pkg/registration/register/factory"
@@ -14,8 +14,8 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Cluster Labels", func() {
-	ginkgo.It("Cluster Labels should be created on the managed cluster", func() {
+var _ = Describe("Cluster Labels", func() {
+	It("Cluster Labels should be created on the managed cluster", func() {
 		managedClusterName := "clusterlabels-spokecluster"
 		//#nosec G101
 		hubKubeconfigSecret := "clusterlabels-hub-kubeconfig-secret"
@@ -41,7 +41,7 @@ var _ = ginkgo.Describe("Cluster Labels", func() {
 		defer cancel()
 
 		// after bootstrap the spokecluster and csr should be created
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			mc, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -54,6 +54,6 @@ var _ = ginkgo.Describe("Cluster Labels", func() {
 				return fmt.Errorf("expected label region=us-west-2, got %s", mc.Labels["region"])
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 	})
 })

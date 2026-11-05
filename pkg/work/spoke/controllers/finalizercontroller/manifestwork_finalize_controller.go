@@ -32,7 +32,7 @@ type ManifestWorkFinalizeController struct {
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
 	appliedManifestWorkLister worklister.AppliedManifestWorkLister
 	hubHash                   string
-	rateLimiter               workqueue.RateLimiter
+	rateLimiter               workqueue.TypedRateLimiter[string]
 }
 
 func NewManifestWorkFinalizeController(
@@ -52,7 +52,7 @@ func NewManifestWorkFinalizeController(
 		appliedManifestWorkClient: appliedManifestWorkClient,
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
 		hubHash:                   hubHash,
-		rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+		rateLimiter:               workqueue.NewTypedItemExponentialFailureRateLimiter[string](5*time.Millisecond, 1000*time.Second),
 	}
 
 	return factory.New().

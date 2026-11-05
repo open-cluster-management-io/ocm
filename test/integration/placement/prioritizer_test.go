@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,7 +18,7 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Prioritizers", func() {
+var _ = Describe("Prioritizers", func() {
 	var cancel context.CancelFunc
 	var namespace string
 	var placementName string
@@ -26,7 +26,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 	var clusterSet1Name string
 	var suffix string
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		suffix = rand.String(5)
 		namespace = fmt.Sprintf("ns-%s", suffix)
 		placementName = fmt.Sprintf("placement-%s", suffix)
@@ -40,27 +40,31 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			},
 		}
 		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		// start controller manager
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
-		go controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
-			KubeConfig:    restConfig,
-			EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
-		})
+		go func() {
+			defer GinkgoRecover()
+			err := controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
+				KubeConfig:    restConfig,
+				EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
+			})
+			Expect(err).NotTo(HaveOccurred())
+		}()
 	})
 
-	ginkgo.AfterEach(func() {
+	AfterEach(func() {
 		if cancel != nil {
 			cancel()
 		}
 		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
-	ginkgo.Context("BuiltinPlugin", func() {
-		ginkgo.It("Should schedule successfully with default SchedulePolicy", func() {
+	Context("BuiltinPlugin", func() {
+		It("Should schedule successfully with default SchedulePolicy", func() {
 			clusterResources := make([][]string, 3)
 			clusterResources[0] = []string{"10", "10", "50", "100"}
 			clusterResources[1] = []string{"7", "10", "90", "100"}
@@ -79,7 +83,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[1]})
 		})
 
-		ginkgo.It("Should schedule successfully based on SchedulePolicy ResourceAllocatableCPU & ResourceAllocatableMemory", func() {
+		It("Should schedule successfully based on SchedulePolicy ResourceAllocatableCPU & ResourceAllocatableMemory", func() {
 			// cluster settings
 			clusterResources := make([][]string, 3)
 			clusterResources[0] = []string{"10", "10", "50", "100"}
@@ -103,7 +107,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 
 		})
 
-		ginkgo.It("Should keep steady successfully even placementdecisions' balance and cluster situation changes", func() {
+		It("Should keep steady successfully even placementdecisions' balance and cluster situation changes", func() {
 			// cluster settings
 			clusterResources := make([][]string, 3)
 			clusterResources[0] = []string{"10", "10", "50", "100"}
@@ -126,9 +130,9 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			assertCreatingPlacementWithDecision(placement, 2, 1)
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[2]})
 
-			ginkgo.By("Adding fake placement decisions")
+			By("Adding fake placement decisions")
 			assertCreatingPlacementDecision(placementName+"-1", namespace, []string{clusterNames[1]})
-			ginkgo.By("Adding a new cluster with resources")
+			By("Adding a new cluster with resources")
 			clusterNames = append(clusterNames, clusterName+"-4")
 			newClusterResources := []string{"10", "10", "100", "100"}
 			newClusters := assertCreatingClusters(clusterSet1Name, 1)
@@ -138,7 +142,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[2]})
 		})
 
-		ginkgo.It("Should schedule successfully based on SchedulePolicy balance", func() {
+		It("Should schedule successfully based on SchedulePolicy balance", func() {
 			// cluster settings
 			clusterResources := make([][]string, 3)
 			clusterResources[0] = []string{"10", "10", "50", "100"}
@@ -152,7 +156,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 				assertPatchingClusterStatusWithResources(name, clusterResources[i])
 			}
 
-			ginkgo.By("Adding fake placement decisions")
+			By("Adding fake placement decisions")
 			assertCreatingPlacementDecision("fake-1", namespace, []string{clusterNames[0]})
 
 			// Checking the result of the placement
@@ -164,7 +168,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[1], clusterNames[2]})
 		})
 
-		ginkgo.It("Should re-schedule successfully once a new cluster with resources added/deleted", func() {
+		It("Should re-schedule successfully once a new cluster with resources added/deleted", func() {
 			// cluster settings
 			clusterResources := make([][]string, 3)
 			clusterResources[0] = []string{"10", "10", "50", "100"}
@@ -186,7 +190,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			assertCreatingPlacementWithDecision(placement, 2, 1)
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[2]})
 
-			ginkgo.By("Adding a new cluster with resources")
+			By("Adding a new cluster with resources")
 			clusterNames = append(clusterNames, clusterName+"-4")
 			newClusterResources := []string{"10", "10", "100", "100"}
 			newClusters := assertCreatingClusters(clusterSet1Name, 1)
@@ -195,7 +199,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			// Checking the result of the placement
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[2], newClusters[0]})
 
-			ginkgo.By("Deleting the cluster")
+			By("Deleting the cluster")
 			assertDeletingClusters(newClusters[0])
 
 			// Checking the result of the placement
@@ -203,8 +207,8 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 		})
 	})
 
-	ginkgo.Context("AddonScore", func() {
-		ginkgo.It("Should schedule successfully based on AddOnPlacementScore", func() {
+	Context("AddonScore", func() {
+		It("Should schedule successfully based on AddOnPlacementScore", func() {
 			// cluster settings
 
 			// Creating the clusters with resources
@@ -222,7 +226,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[1], clusterNames[2]})
 		})
 
-		ginkgo.It("Should reschedule every ResyncInterval and update desicion when AddOnPlacementScore changes", func() {
+		It("Should reschedule every ResyncInterval and update desicion when AddOnPlacementScore changes", func() {
 			// Creating the clusters with resources
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 3)

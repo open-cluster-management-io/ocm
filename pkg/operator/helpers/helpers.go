@@ -115,7 +115,7 @@ func CleanUpStaticObject(
 		err = client.CoreV1().Namespaces().Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *appsv1.Deployment:
 		err = client.AppsV1().Deployments(t.Namespace).Delete(ctx, t.Name, metav1.DeleteOptions{})
-	case *corev1.Endpoints:
+	case *corev1.Endpoints: //nolint:staticcheck // SA1019: bundled manifests still contain Endpoints.
 		err = client.CoreV1().Endpoints(t.Namespace).Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *corev1.Service:
 		err = client.CoreV1().Services(t.Namespace).Delete(ctx, t.Name, metav1.DeleteOptions{})
@@ -172,7 +172,7 @@ func ApplyValidatingWebhookConfiguration(
 		return nil, false, err
 	}
 
-	modified := resourcemerge.BoolPtr(false)
+	modified := new(false)
 	existingCopy := existing.DeepCopy()
 	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
 	if !equality.Semantic.DeepEqual(existingCopy.Webhooks, required.Webhooks) {
@@ -198,7 +198,7 @@ func ApplyMutatingWebhookConfiguration(
 		return nil, false, err
 	}
 
-	modified := resourcemerge.BoolPtr(false)
+	modified := new(false)
 	existingCopy := existing.DeepCopy()
 	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
 	if !equality.Semantic.DeepEqual(existingCopy.Webhooks, required.Webhooks) {
@@ -249,12 +249,13 @@ func ApplyDeployment(
 	}
 
 	if updated {
-		generationStatus.LastGeneration = updatedDeployment.ObjectMeta.Generation
+		generationStatus.LastGeneration = updatedDeployment.Generation
 	}
 
 	return updatedDeployment, generationStatus, nil
 }
 
+//nolint:staticcheck // SA1019: bundled manifests still contain corev1.Endpoints.
 func ApplyEndpoints(ctx context.Context, client coreclientv1.EndpointsGetter, required *corev1.Endpoints) (*corev1.Endpoints, bool, error) {
 	existing, err := client.Endpoints(required.Namespace).Get(ctx, required.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
@@ -266,7 +267,7 @@ func ApplyEndpoints(ctx context.Context, client coreclientv1.EndpointsGetter, re
 		return nil, false, err
 	}
 
-	modified := resourcemerge.BoolPtr(false)
+	modified := new(false)
 	existingCopy := existing.DeepCopy()
 	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
 
@@ -316,7 +317,7 @@ func ApplyDirectly(
 		case *admissionv1.MutatingWebhookConfiguration:
 			result.Result, result.Changed, result.Error = ApplyMutatingWebhookConfiguration(
 				client.AdmissionregistrationV1(), t)
-		case *corev1.Endpoints:
+		case *corev1.Endpoints: //nolint:staticcheck // SA1019: bundled manifests still contain Endpoints.
 			result.Result, result.Changed, result.Error = ApplyEndpoints(context.TODO(), client.CoreV1(), t)
 		default:
 			genericApplyFiles = append(genericApplyFiles, file)
@@ -484,7 +485,7 @@ func GenerateRelatedResource(objBytes []byte) (operatorapiv1.RelatedResourceMeta
 		relatedResource = newRelatedResource(appsv1.SchemeGroupVersion.WithResource("deployments"), requiredObj)
 	case *corev1.Namespace:
 		relatedResource = newRelatedResource(corev1.SchemeGroupVersion.WithResource("namespaces"), requiredObj)
-	case *corev1.Endpoints:
+	case *corev1.Endpoints: //nolint:staticcheck // SA1019: bundled manifests still contain Endpoints.
 		relatedResource = newRelatedResource(corev1.SchemeGroupVersion.WithResource("endpoints"), requiredObj)
 	case *corev1.Service:
 		relatedResource = newRelatedResource(corev1.SchemeGroupVersion.WithResource("services"), requiredObj)

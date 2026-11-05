@@ -8,13 +8,13 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	generate "k8s.io/kubectl/pkg/generate"
 	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
 	cpinformerv1alpha2 "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
 
@@ -233,7 +233,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	labelsMap := make(map[string]string)
 	if m.Labels != "" {
 		var err error
-		labelsMap, err = generate.ParseLabels(m.Labels)
+		labelsMap, err = labels.ConvertSelectorToLabelsMap(m.Labels)
 		if err != nil {
 			return err
 		}

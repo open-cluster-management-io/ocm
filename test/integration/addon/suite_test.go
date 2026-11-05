@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -56,16 +56,16 @@ var addonManager addonmanager.AddonManager
 
 func init() {
 	klog.InitFlags(nil)
-	klog.SetOutput(ginkgo.GinkgoWriter)
+	klog.SetOutput(GinkgoWriter)
 }
 
 func TestIntegration(t *testing.T) {
-	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "Integration Suite")
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Integration Suite")
 }
 
-var _ = ginkgo.BeforeSuite(func() {
-	ginkgo.By("bootstrapping test environment")
+var _ = BeforeSuite(func() {
+	By("bootstrapping test environment")
 
 	// start a kube-apiserver
 	testEnv = &envtest.Environment{
@@ -80,34 +80,34 @@ var _ = ginkgo.BeforeSuite(func() {
 	}
 
 	cfg, err := testEnv.Start()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(cfg).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(cfg).ToNot(BeNil())
 
 	// Configure conversion webhooks for addon CRDs so the API server can convert between
 	// v1alpha1 (storage version) and v1beta1 (used by controllers).
 	apiExtClient, err := apiextensionsclient.NewForConfig(cfg)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 	err = util.AddConversionForAddonAPI(context.TODO(), apiExtClient, testEnv,
 		"clustermanagementaddons.addon.open-cluster-management.io",
 		"managedclusteraddons.addon.open-cluster-management.io")
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	var webhookCtx context.Context
 	webhookCtx, stopWebhook = context.WithCancel(context.Background())
 	go func() {
-		defer ginkgo.GinkgoRecover()
+		defer GinkgoRecover()
 		err := util.StartWebhook(webhookCtx, testEnv, cfg)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 	}()
 
 	hubWorkClient, err = workclientset.NewForConfig(cfg)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 	hubClusterClient, err = clusterv1client.NewForConfig(cfg)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 	hubAddonClient, err = addonclient.NewForConfig(cfg)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 	hubKubeClient, err = kubernetes.NewForConfig(cfg)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	testAddonImpl = &testAddon{
 		name:          "test",
@@ -126,27 +126,27 @@ var _ = ginkgo.BeforeSuite(func() {
 	// start hub controller
 	go func() {
 		addonManager, err = addonmanager.New(cfg)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		err = addonManager.AddAgent(testAddonImpl)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 		err = addonManager.AddAgent(testAddOnConfigsImpl)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		err = addonManager.Start(mgrContext)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		err = addon.RunManager(mgrContext, &controllercmd.ControllerContext{
 			KubeConfig:    cfg,
 			EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
 		})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 	}()
 
 })
 
-var _ = ginkgo.AfterSuite(func() {
-	ginkgo.By("tearing down the test environment")
+var _ = AfterSuite(func() {
+	By("tearing down the test environment")
 
 	cancel()
 	err := testEnv.Stop()
@@ -158,7 +158,7 @@ var _ = ginkgo.AfterSuite(func() {
 	if stopWebhook != nil {
 		stopWebhook()
 	}
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 })
 
 type testAddon struct {

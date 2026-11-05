@@ -144,8 +144,8 @@ func (b *PlacementBuilder) WithSatisfiedCondition(numbOfScheduledDecisions, numb
 	condition := metav1.Condition{
 		Type: clusterapiv1beta1.PlacementConditionSatisfied,
 	}
-	switch {
-	case numbOfUnscheduledDecisions == 0:
+	switch numbOfUnscheduledDecisions {
+	case 0:
 		condition.Status = metav1.ConditionTrue
 		condition.Reason = "AllDecisionsScheduled"
 		condition.Message = "All cluster decisions scheduled"

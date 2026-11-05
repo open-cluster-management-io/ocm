@@ -224,12 +224,18 @@ func TestClusterManagementAddonByPlacementQueueKey(t *testing.T) {
 	informerFactory := addoninformers.NewSharedInformerFactory(fakeClient, 0)
 	cmaInformer := informerFactory.Addon().V1beta1().ClusterManagementAddOns()
 
-	cmaInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
+	if err := cmaInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 		ClusterManagementAddonByPlacement: IndexClusterManagementAddonByPlacement,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
-	cmaInformer.Informer().GetStore().Add(cma1)
-	cmaInformer.Informer().GetStore().Add(cma2)
+	if err := cmaInformer.Informer().GetStore().Add(cma1); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmaInformer.Informer().GetStore().Add(cma2); err != nil {
+		t.Fatal(err)
+	}
 
 	queueKeyFunc := ClusterManagementAddonByPlacementQueueKey(cmaInformer)
 
@@ -313,11 +319,15 @@ func TestClusterManagementAddonByPlacementDecisionQueueKey(t *testing.T) {
 	informerFactory := addoninformers.NewSharedInformerFactory(fakeClient, 0)
 	cmaInformer := informerFactory.Addon().V1beta1().ClusterManagementAddOns()
 
-	cmaInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
+	if err := cmaInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 		ClusterManagementAddonByPlacement: IndexClusterManagementAddonByPlacement,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
-	cmaInformer.Informer().GetStore().Add(cma1)
+	if err := cmaInformer.Informer().GetStore().Add(cma1); err != nil {
+		t.Fatal(err)
+	}
 
 	queueKeyFunc := ClusterManagementAddonByPlacementDecisionQueueKey(cmaInformer)
 
@@ -392,12 +402,18 @@ func TestManagedClusterAddonByNameQueueKey(t *testing.T) {
 	informerFactory := addoninformers.NewSharedInformerFactory(fakeClient, 0)
 	mcaInformer := informerFactory.Addon().V1beta1().ManagedClusterAddOns()
 
-	mcaInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
+	if err := mcaInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 		ManagedClusterAddonByName: IndexManagedClusterAddonByName,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
-	mcaInformer.Informer().GetStore().Add(mca1)
-	mcaInformer.Informer().GetStore().Add(mca2)
+	if err := mcaInformer.Informer().GetStore().Add(mca1); err != nil {
+		t.Fatal(err)
+	}
+	if err := mcaInformer.Informer().GetStore().Add(mca2); err != nil {
+		t.Fatal(err)
+	}
 
 	queueKeyFunc := ManagedClusterAddonByNameQueueKey(mcaInformer)
 

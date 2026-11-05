@@ -36,3 +36,6 @@ _output/
 
 # VSCode workspace files
 .vscode/
+
+# MacOS
+.DS_Store
