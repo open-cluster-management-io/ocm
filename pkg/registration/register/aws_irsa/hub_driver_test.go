@@ -195,6 +195,40 @@ func TestRenderTemplate(t *testing.T) {
 	}
 }
 
+// EKS Pod Identity session tags are transitive, so a spoke agent running with Pod Identity
+// credentials carries them into the hub role session. STS then requires sts:TagSession on the
+// hub role, and the spoke's Pod Identity trust policy depends on those tags to scope the role.
+func TestRenderTrustPolicyAllowsTagSession(t *testing.T) {
+	trustPolicy, err := renderTemplate(trustPolicyTemplatePath, map[string]interface{}{
+		"hubClusterArn":               "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+		"managedClusterAccountId":     "123456789013",
+		"managedClusterPartition":     "aws",
+		"managedClusterIamRoleSuffix": "suffix",
+		"hubAccountId":                "123456789012",
+		"hubClusterName":              "hub-cluster",
+		"managedClusterName":          "managed-cluster",
+	})
+	if err != nil {
+		t.Fatalf("failed to render trust policy: %v", err)
+	}
+
+	var doc struct {
+		Statement []struct {
+			Action []string `json:"Action"`
+		} `json:"Statement"`
+	}
+	if err := json.Unmarshal([]byte(trustPolicy), &doc); err != nil {
+		t.Fatalf("rendered trust policy is not valid JSON: %v", err)
+	}
+	if len(doc.Statement) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(doc.Statement))
+	}
+	want := []string{"sts:AssumeRole", "sts:TagSession"}
+	if !reflect.DeepEqual(doc.Statement[0].Action, want) {
+		t.Errorf("expected trust policy actions %v, got %v", want, doc.Statement[0].Action)
+	}
+}
+
 // The trust policy names the managed cluster role as the principal, so it has to be
 // rendered in the managed cluster's own partition -- IAM rejects a cross-partition principal.
 func TestRenderTrustPolicyUsesManagedClusterPartition(t *testing.T) {

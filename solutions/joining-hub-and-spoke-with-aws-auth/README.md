@@ -107,27 +107,29 @@ The default is `IRSA`, so existing setups keep working unchanged. While a Pod Id
 
 1. Install the [EKS Pod Identity Agent](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-agent-setup.html) add-on on the hub and spoke clusters.
 
-2. On the spoke, create `$SPOKE_ROLE_NAME` as in step 2 above, but use the Pod Identity trust policy. The permission policy and the four role tags are still required, because the hub role's trust policy checks the tags through `aws:PrincipalTag` conditions:
+2. On the spoke, create `$SPOKE_ROLE_NAME` as in step 2 above, but use the Pod Identity trust policy. The trust policy only accepts the agent service accounts in `open-cluster-management-agent` on `$SPOKE_CLUSTER_NAME`, using the session tags that Pod Identity adds. The permission policy and the four role tags are still required, because the hub role's trust policy checks the tags through `aws:PrincipalTag` conditions:
    ```bash
-   aws iam create-role --role-name $SPOKE_ROLE_NAME --assume-role-policy-document file://templates/Template-Pod-Identity-Trust-Policy.json
+   sed -e "s/SPOKE_REGION/$SPOKE_REGION/g" -e "s/SPOKE_ACCOUNT_ID/$SPOKE_ACCOUNT_ID/g" -e "s/SPOKE_CLUSTER_NAME/$SPOKE_CLUSTER_NAME/g" \
+     templates/Template-Spoke-Pod-Identity-Trust-Policy.json > templates/Spoke-Pod-Identity-Trust-Policy.json
+   aws iam create-role --role-name $SPOKE_ROLE_NAME --assume-role-policy-document file://templates/Spoke-Pod-Identity-Trust-Policy.json
    # then run the put-role-policy and tag-role commands from step 2
    ```
    Associate the role with the agent service accounts. In `Default` mode these are `klusterlet-registration-sa` and `klusterlet-work-sa`. In `Singleton` mode only `klusterlet-work-sa` is used.
 
-   Pass `--disable-session-tags`. Pod Identity session tags are transitive, so when the agents assume the hub role they also need `sts:TagSession`, which the hub role's trust policy doesn't grant. Without the flag the agents fail with `AccessDenied ... not authorized to perform: sts:TagSession`.
+   Keep session tags enabled, which is the default. Don't pass `--disable-session-tags`: the trust policy relies on the tags to restrict which pods can use the role, so associations without them are denied. The tags are transitive, so the hub role's trust policy also grants `sts:TagSession` to the spoke role.
    ```bash
    for sa in klusterlet-registration-sa klusterlet-work-sa; do
      aws eks create-pod-identity-association --cluster-name $SPOKE_CLUSTER_NAME --region $SPOKE_REGION \
        --namespace open-cluster-management-agent --service-account $sa \
-       --role-arn arn:aws:iam::$SPOKE_ACCOUNT_ID:role/$SPOKE_ROLE_NAME \
-       --disable-session-tags
+       --role-arn arn:aws:iam::$SPOKE_ACCOUNT_ID:role/$SPOKE_ROLE_NAME
    done
    ```
-   If you add the flag to an existing association with `aws eks update-pod-identity-association`, the Pod Identity Agent keeps handing out the tagged credentials it has cached. Restart it with `kubectl -n kube-system rollout restart daemonset/eks-pod-identity-agent` so the agents get fresh credentials.
 
-3. On the hub, create `$IDENTITY_CREATOR_ROLE_NAME` as in step 3 above, but use the Pod Identity trust policy, then associate it with `registration-controller-sa`:
+3. On the hub, create `$IDENTITY_CREATOR_ROLE_NAME` as in step 3 above, but use the Pod Identity trust policy, which only accepts `registration-controller-sa` in `open-cluster-management-hub` on `$HUB_CLUSTER_NAME`. Then associate the role with that service account:
    ```bash
-   aws iam create-role --role-name $IDENTITY_CREATOR_ROLE_NAME --assume-role-policy-document file://templates/Template-Pod-Identity-Trust-Policy.json
+   sed -e "s/HUB_REGION/$HUB_REGION/g" -e "s/HUB_ACCOUNT_ID/$HUB_ACCOUNT_ID/g" -e "s/HUB_CLUSTER_NAME/$HUB_CLUSTER_NAME/g" \
+     templates/Template-Identity-Creator-Pod-Identity-Trust-Policy.json > templates/Identity-Creator-Pod-Identity-Trust-Policy.json
+   aws iam create-role --role-name $IDENTITY_CREATOR_ROLE_NAME --assume-role-policy-document file://templates/Identity-Creator-Pod-Identity-Trust-Policy.json
    # then run the put-role-policy command from step 3
    aws eks create-pod-identity-association --cluster-name $HUB_CLUSTER_NAME --region $HUB_REGION \
      --namespace open-cluster-management-hub --service-account registration-controller-sa \
@@ -168,3 +170,5 @@ The default is `IRSA`, so existing setups keep working unchanged. While a Pod Id
    Adjust the `registrationDrivers` index if `awsirsa` is not the first driver.
 
 5. Continue with steps 6 and 7.
+
+Creating a Pod Identity association requires `iam:PassRole` on the role. Grant `iam:PassRole` for `$SPOKE_ROLE_NAME` and `$IDENTITY_CREATOR_ROLE_NAME` only to the administrators who set up OCM. The trust policies limit which service accounts can use the roles, and `iam:PassRole` limits who can create the associations.

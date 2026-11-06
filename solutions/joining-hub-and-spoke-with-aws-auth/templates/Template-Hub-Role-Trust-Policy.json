@@ -6,7 +6,10 @@
       "Principal": {
         "AWS": "arn:aws:iam::SPOKE_ACCOUNT_ID:role/ROLE_NAME"
       },
-      "Action": "sts:AssumeRole",
+      "Action": [
+        "sts:AssumeRole",
+        "sts:TagSession"
+      ],
       "Condition": {
         "StringEquals": {
           "aws:PrincipalTag/hub_cluster_account_id":"HUB_ACCOUNT_ID",
