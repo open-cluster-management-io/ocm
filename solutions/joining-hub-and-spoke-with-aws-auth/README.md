@@ -79,9 +79,12 @@ The hub and spoke can be joined using AWS IAM based authentication by running fo
    export HUB_API_SERVER="https://C66946AA519C4818E2189CE5A9324551.wk7.us-west-2.eks.amazonaws.com"
    ``` 
 
-5. Login to spoke EKS clusters and join with hub, note the new command line options on second line:
+5. Login to spoke EKS clusters and join with hub, note the new command line options on second line. EKS doesn't publish the `kube-public/cluster-info` ConfigMap that `clusteradm join` normally reads the hub CA from, so pass the hub CA with `--ca-file`. Without it, the join fails with `x509: certificate signed by unknown authority`.
    ```shell
-   clusteradm join --hub-token $TOKEN --hub-apiserver $HUB_API_SERVER \
+   aws eks describe-cluster --name $HUB_CLUSTER_NAME --region $HUB_REGION \
+     --query cluster.certificateAuthority.data --output text | base64 -d > hub-ca.crt
+
+   clusteradm join --hub-token $TOKEN --hub-apiserver $HUB_API_SERVER --ca-file hub-ca.crt \
    --wait --cluster-name $SPOKE_CLUSTER_NAME --singleton \
    --registration-auth awsirsa \
    --hub-cluster-arn arn:aws:eks:$HUB_REGION:"$HUB_ACCOUNT_ID":cluster/$HUB_CLUSTER_NAME
@@ -98,9 +101,9 @@ The hub and spoke can be joined using AWS IAM based authentication by running fo
 
 The `awsirsa` registration driver can also get its AWS credentials from [EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html). With Pod Identity, neither cluster needs an IAM OIDC provider. Configure both the hub and the spoke to use it.
 
-Set `credentialSource: PodIdentity` on both CRs. The operators then stop annotating the OCM service accounts with `eks.amazonaws.com/role-arn`. That annotation makes EKS inject web identity credentials, which take precedence over Pod Identity in the AWS default credential chain. If the annotation is already there, for example on an existing IRSA setup, the operators remove it and restart the affected pods.
+Set `credentialSource: PodIdentity` on both CRs. The operators then stop annotating the OCM service accounts with `eks.amazonaws.com/role-arn`, so the service accounts no longer depend on IRSA. If the annotation is already there, for example on an existing IRSA setup, the operators remove it and restart the affected pods.
 
-The default is `IRSA`, so existing setups keep working unchanged.
+The default is `IRSA`, so existing setups keep working unchanged. While a Pod Identity association exists for a service account, EKS gives its pods Pod Identity credentials even if the IRSA annotation is present. To switch back to IRSA, set `credentialSource: IRSA`, delete the associations, and restart the OCM pods.
 
 1. Install the [EKS Pod Identity Agent](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-agent-setup.html) add-on on the hub and spoke clusters.
 
@@ -110,13 +113,17 @@ The default is `IRSA`, so existing setups keep working unchanged.
    # then run the put-role-policy and tag-role commands from step 2
    ```
    Associate the role with the agent service accounts. In `Default` mode these are `klusterlet-registration-sa` and `klusterlet-work-sa`. In `Singleton` mode only `klusterlet-work-sa` is used.
+
+   Pass `--disable-session-tags`. Pod Identity session tags are transitive, so when the agents assume the hub role they also need `sts:TagSession`, which the hub role's trust policy doesn't grant. Without the flag the agents fail with `AccessDenied ... not authorized to perform: sts:TagSession`.
    ```bash
    for sa in klusterlet-registration-sa klusterlet-work-sa; do
      aws eks create-pod-identity-association --cluster-name $SPOKE_CLUSTER_NAME --region $SPOKE_REGION \
        --namespace open-cluster-management-agent --service-account $sa \
-       --role-arn arn:aws:iam::$SPOKE_ACCOUNT_ID:role/$SPOKE_ROLE_NAME
+       --role-arn arn:aws:iam::$SPOKE_ACCOUNT_ID:role/$SPOKE_ROLE_NAME \
+       --disable-session-tags
    done
    ```
+   If you add the flag to an existing association with `aws eks update-pod-identity-association`, the Pod Identity Agent keeps handing out the tagged credentials it has cached. Restart it with `kubectl -n kube-system rollout restart daemonset/eks-pod-identity-agent` so the agents get fresh credentials.
 
 3. On the hub, create `$IDENTITY_CREATOR_ROLE_NAME` as in step 3 above, but use the Pod Identity trust policy, then associate it with `registration-controller-sa`:
    ```bash
