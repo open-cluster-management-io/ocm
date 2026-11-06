@@ -216,6 +216,8 @@ For each managed cluster, create:
   The trust policy allows `sts:AssumeRole` and `sts:TagSession`. Spokes that use Pod Identity keep session tags on, as described [above](#using-eks-pod-identity-instead-of-irsa), and those tags are transitive, so the hub role must grant `sts:TagSession`.
 
   IAM stores the spoke role's unique ID in the trust policy. If the spoke role is deleted and recreated, re-apply the hub role's trust policy. In `Managed` mode the hub does this itself.
+
+  EKS likewise binds the access entry below to the hub role's unique ID. If the hub role is deleted and recreated, delete and recreate its access entry. The old entry still shows the expected username and group, so registration succeeds, but the spoke cannot authenticate to the hub.
 - **The access entry** on the hub cluster, of type `STANDARD`, with username `<spokeClusterName>`, Kubernetes group `open-cluster-management:<spokeClusterName>`, and no access policy:
   ```bash
   aws eks create-access-entry --cluster-name $HUB_CLUSTER_NAME --region $HUB_REGION \
