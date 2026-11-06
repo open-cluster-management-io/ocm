@@ -86,13 +86,14 @@ The hub and spoke can be joined using AWS IAM based authentication by running fo
    # it will be used by spoke
    export TOKEN=""
    export HUB_API_SERVER="https://C66946AA519C4818E2189CE5A9324551.wk7.us-west-2.eks.amazonaws.com"
-   ``` 
 
-5. Login to spoke EKS clusters and join with hub, note the new command line options on second line. EKS doesn't publish the `kube-public/cluster-info` ConfigMap that `clusteradm join` normally reads the hub CA from, so pass the hub CA with `--ca-file`. Without it, the join fails with `x509: certificate signed by unknown authority`.
-   ```shell
+   # the spoke needs the hub CA to join (see step 5); copy hub-ca.crt to the spoke session
    aws eks describe-cluster --name $HUB_CLUSTER_NAME --region $HUB_REGION \
      --query cluster.certificateAuthority.data --output text | base64 -d > hub-ca.crt
+   ``` 
 
+5. Login to spoke EKS clusters and join with hub, note the new command line options on second line. EKS doesn't publish the `kube-public/cluster-info` ConfigMap that `clusteradm join` normally reads the hub CA from, so pass the `hub-ca.crt` retrieved in step 4 with `--ca-file`. Without it, the join fails with `x509: certificate signed by unknown authority`.
+   ```shell
    clusteradm join --hub-token $TOKEN --hub-apiserver $HUB_API_SERVER --ca-file hub-ca.crt \
    --wait --cluster-name $SPOKE_CLUSTER_NAME --singleton \
    --registration-auth awsirsa \
@@ -222,7 +223,11 @@ For each managed cluster, create:
     --username $SPOKE_CLUSTER_NAME --kubernetes-groups open-cluster-management:$SPOKE_CLUSTER_NAME
   ```
 
-In step 3, use [`templates/Template-Identity-Creator-Permission-Policy-UseExisting.json`](templates/Template-Identity-Creator-Permission-Policy-UseExisting.json) for the identity-creator role. It grants only `eks:DescribeAccessEntry`.
+In step 3, use [`templates/Template-Identity-Creator-Permission-Policy-UseExisting.json`](templates/Template-Identity-Creator-Permission-Policy-UseExisting.json) for the identity-creator role. It grants only `eks:DescribeAccessEntry`, scoped to the hub cluster's access entries:
+```bash
+sed -e "s/HUB_ACCOUNT_ID/$HUB_ACCOUNT_ID/g" -e "s/HUB_REGION/$HUB_REGION/g" -e "s/HUB_CLUSTER_NAME/$HUB_CLUSTER_NAME/g" \
+  templates/Template-Identity-Creator-Permission-Policy-UseExisting.json > templates/Identity-Creator-Permission-Policy.json
+```
 
 Then set `resourceManagement` on the ClusterManager:
 ```yaml

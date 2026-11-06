@@ -7,7 +7,7 @@
         "eks:DescribeAccessEntry"
       ],
       "Resource": [
-        "arn:aws:eks:HUB_REGION:HUB_ACCOUNT_ID:access-entry/*"
+        "arn:aws:eks:HUB_REGION:HUB_ACCOUNT_ID:access-entry/HUB_CLUSTER_NAME/*"
       ]
     }
   ]
