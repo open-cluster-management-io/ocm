@@ -100,6 +100,9 @@ spec:
           {{if .AwsResourceTags}}
           - "--aws-resource-tags={{ .AwsResourceTags }}"
           {{end}}
+          {{if and .AwsResourceManagement (ne .AwsResourceManagement "Managed")}}
+          - "--aws-resource-management={{ .AwsResourceManagement }}"
+          {{end}}
           {{if .GRPCAuthEnabled}}
           - "--grpc-ca-file=/var/run/secrets/hub/grpc/certs/tls.crt"
           - "--grpc-key-file=/var/run/secrets/hub/grpc/certs/tls.key"

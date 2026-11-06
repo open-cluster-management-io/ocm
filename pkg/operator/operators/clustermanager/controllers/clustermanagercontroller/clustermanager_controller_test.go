@@ -1851,3 +1851,68 @@ func TestGetIdentityCreatorRoleAndTags(t *testing.T) {
 		})
 	}
 }
+
+func TestAwsResourceManagementArg(t *testing.T) {
+	cases := []struct {
+		name               string
+		resourceManagement operatorapiv1.AwsResourceManagement
+		expectedArg        string
+	}{
+		{name: "unset"},
+		{name: "Managed is the default and is not rendered", resourceManagement: operatorapiv1.AwsResourceManagementManaged},
+		{
+			name:               "UseExisting",
+			resourceManagement: operatorapiv1.AwsResourceManagementUseExisting,
+			expectedArg:        "--aws-resource-management=UseExisting",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cm := newClusterManager("testhub")
+			cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+				RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{{
+					AuthType: operatorapiv1.AwsIrsaAuthType,
+					AwsIrsa: &operatorapiv1.AwsIrsaConfig{
+						HubClusterArn:      "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+						ResourceManagement: c.resourceManagement,
+					},
+				}},
+			}
+			tc := newTestController(t, cm)
+			clusterManagerNamespace := helpers.ClusterManagerNamespace(cm.Name, cm.Spec.DeployOption.Mode)
+			setup(t, tc, setDeployment(cm.Name, clusterManagerNamespace))
+
+			if err := tc.clusterManagerController.sync(ctx, testingcommon.NewFakeSyncContext(t, cm.Name), cm.Name); err != nil {
+				t.Fatalf("Expected no error when sync, %v", err)
+			}
+
+			var deployment *appsv1.Deployment
+			for _, action := range append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...) {
+				var object runtime.Object
+				switch a := action.(type) {
+				case clienttesting.CreateActionImpl:
+					object = a.Object
+				case clienttesting.UpdateActionImpl:
+					object = a.Object
+				}
+				if d, ok := object.(*appsv1.Deployment); ok && d.Name == cm.Name+"-registration-controller" {
+					deployment = d
+				}
+			}
+			if deployment == nil {
+				t.Fatal("registration controller deployment was not created")
+			}
+
+			var gotArg string
+			for _, arg := range deployment.Spec.Template.Spec.Containers[0].Args {
+				if strings.HasPrefix(arg, "--aws-resource-management") {
+					gotArg = arg
+				}
+			}
+			if gotArg != c.expectedArg {
+				t.Errorf("expected arg %q, got %q", c.expectedArg, gotArg)
+			}
+		})
+	}
+}

@@ -55,6 +55,7 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 								"product:v1:tenant:created-by=Team-1",
 							},
 							AutoApprovedIdentities: []string{"arn:aws:eks:us-west-2:123456789013:cluster/.*", "arn:aws:eks:us-west-2:123456789012:cluster/.*"},
+							ResourceManagement:     operatorapiv1.AwsResourceManagementUseExisting,
 						},
 					},
 				}
@@ -169,6 +170,18 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 				return present && strings.SplitN(tagsArg, "=", 2)[1] == tags
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
+		It("registration-controller should have command line option aws-resource-management when set to UseExisting", func() {
+			Eventually(func() bool {
+				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
+					Get(context.Background(), fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				commandLineArgs := registrationControllerDeployment.Spec.Template.Spec.Containers[0].Args
+				arg, present := findMatchingArg(commandLineArgs, "--aws-resource-management")
+				return present && arg == "--aws-resource-management=UseExisting"
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+		})
 		It("should have auto approved arn patterns separated by comma with awsirsa", func() {
 			Eventually(func() bool {
 				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
@@ -243,6 +256,18 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 				commandLineArgs := registrationControllerDeployment.Spec.Template.Spec.Containers[0].Args
 				_, present := findMatchingArg(commandLineArgs, "--aws-resource-tags")
 
+				return !present
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+		})
+		It("registration-controller should not have command line option aws-resource-management when it defaults to Managed", func() {
+			Eventually(func() bool {
+				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
+					Get(context.Background(), fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				commandLineArgs := registrationControllerDeployment.Spec.Template.Spec.Containers[0].Args
+				_, present := findMatchingArg(commandLineArgs, "--aws-resource-management")
 				return !present
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})

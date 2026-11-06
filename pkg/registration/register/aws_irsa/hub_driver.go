@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/url"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -41,6 +43,7 @@ type AWSIRSAHubDriver struct {
 	cfg                     aws.Config
 	autoApprovedARNPatterns []*regexp.Regexp
 	awsResourceTags         []string
+	resourceManagement      operatorv1.AwsResourceManagement
 }
 
 func (a *AWSIRSAHubDriver) Accept(cluster *clusterv1.ManagedCluster) bool {
@@ -71,6 +74,12 @@ func (c *AWSIRSAHubDriver) Cleanup(ctx context.Context, managedCluster *clusterv
 
 	if !isManagedClusterArnPresent && !isManagedClusterIamRoleSuffixPresent {
 		logger.V(4).Info("No Op Cleanup since managedcluster annotations are not present for awsirsa.")
+		return nil
+	}
+
+	if c.resourceManagement == operatorv1.AwsResourceManagementUseExisting {
+		logger.V(4).Info("Skipping cleanup of the IAM role and access entry because they are not managed by the hub",
+			"ManagedCluster", managedCluster.Name)
 		return nil
 	}
 
@@ -114,6 +123,9 @@ func (a *AWSIRSAHubDriver) CreatePermissions(ctx context.Context, cluster *clust
 
 	// Create an EKS client
 	eksClient := eks.NewFromConfig(a.cfg)
+	if a.resourceManagement == operatorv1.AwsResourceManagementUseExisting {
+		return verifyAccessEntry(ctx, eksClient, a.hubClusterArn, cluster)
+	}
 	hubClusterName, roleArn, err := createIAMRoleAndPolicy(ctx, a.hubClusterArn, cluster, a.cfg, a.awsResourceTags)
 	if err != nil {
 		return err
@@ -158,10 +170,7 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 
 	if hubClusterArn != "" && isManagedClusterIamRoleSuffixPresent && isManagedClusterArnPresent {
 
-		// Check if hash is the same
-		hash := commonhelpers.Md5HashSuffix(hubAccountId, hubClusterName, managedClusterAccountId, managedClusterName)
-		if hash != managedClusterIamRoleSuffix {
-			err := fmt.Errorf("HubClusterARN provided during join by ManagedCluster %s is different from the current hub cluster", managedClusterName)
+		if err := validateIAMRoleSuffix(hubClusterArn, managedCluster); err != nil {
 			return hubClusterName, roleArn, err
 		}
 
@@ -209,6 +218,71 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 		}
 	}
 	return hubClusterName, roleArn, nil
+}
+
+// validateIAMRoleSuffix rejects a ManagedCluster whose role suffix was computed against a different hub.
+func validateIAMRoleSuffix(hubClusterArn string, managedCluster *clusterv1.ManagedCluster) error {
+	managedClusterIamRoleSuffix := managedCluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix]
+	managedClusterArn := managedCluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn]
+
+	hubAccountId, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(hubClusterArn)
+	managedClusterAccountId, managedClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterArn)
+
+	hash := commonhelpers.Md5HashSuffix(hubAccountId, hubClusterName, managedClusterAccountId, managedClusterName)
+	if hash != managedClusterIamRoleSuffix {
+		return fmt.Errorf("HubClusterARN provided during join by ManagedCluster %s is different from the current hub cluster", managedClusterName)
+	}
+	return nil
+}
+
+// verifyAccessEntry checks that a pre-provisioned access entry maps the hub role to the identity the hub
+// grants RBAC to. Without this check a missing or misconfigured entry only shows up as an authentication
+// or authorization failure on the managed cluster.
+func verifyAccessEntry(ctx context.Context, eksClient *eks.Client, hubClusterArn string, managedCluster *clusterv1.ManagedCluster) error {
+	logger := klog.FromContext(ctx)
+
+	if hubClusterArn == "" {
+		return fmt.Errorf("--hub-cluster-arn is required when AWS resource management is %s",
+			operatorv1.AwsResourceManagementUseExisting)
+	}
+	if err := validateIAMRoleSuffix(hubClusterArn, managedCluster); err != nil {
+		return err
+	}
+
+	hubAccountId, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(hubClusterArn)
+	roleName := fmt.Sprintf("ocm-hub-%s", managedCluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix])
+	roleArn := commonhelpers.BuildIamRoleArn(commonhelpers.GetAwsPartition(hubClusterArn), hubAccountId, roleName)
+	expectedUsername := managedCluster.Name
+	expectedGroup := fmt.Sprintf("open-cluster-management:%s", managedCluster.Name)
+
+	output, err := eksClient.DescribeAccessEntry(ctx, &eks.DescribeAccessEntryInput{
+		ClusterName:  aws.String(hubClusterName),
+		PrincipalArn: aws.String(roleArn),
+	})
+	if err != nil {
+		var notFound *types.ResourceNotFoundException
+		if errors.As(err, &notFound) {
+			return fmt.Errorf("access entry for principal %s not found on EKS cluster %s; with AWS resource management %s it must be "+
+				"pre-created with username %q and Kubernetes group %q",
+				roleArn, hubClusterName, operatorv1.AwsResourceManagementUseExisting, expectedUsername, expectedGroup)
+		}
+		return fmt.Errorf("failed to describe access entry for principal %s on EKS cluster %s: %w", roleArn, hubClusterName, err)
+	}
+
+	var username string
+	var groups []string
+	if output.AccessEntry != nil {
+		username = aws.ToString(output.AccessEntry.Username)
+		groups = output.AccessEntry.KubernetesGroups
+	}
+	if username != expectedUsername || !slices.Contains(groups, expectedGroup) {
+		return fmt.Errorf("access entry for principal %s on EKS cluster %s has username %q and Kubernetes groups %v; "+
+			"expected username %q and Kubernetes group %q", roleArn, hubClusterName, username, groups, expectedUsername, expectedGroup)
+	}
+
+	logger.V(4).Info("Pre-provisioned access entry verified", "AccessEntry", aws.ToString(output.AccessEntry.AccessEntryArn),
+		"ManagedCluster", managedCluster.Name)
+	return nil
 }
 
 // reconcileTrustPolicy makes sure an existing hub role trusts the managed cluster role that
@@ -433,8 +507,19 @@ func parseTagsForRolesAndPolicies(tags []string) ([]iamtypes.Tag, error) {
 }
 
 func NewAWSIRSAHubDriver(ctx context.Context, hubClusterArn string, autoApprovedIdentityPatterns []string,
-	awsResourceTags []string) (register.HubDriver, error) {
+	awsResourceTags []string, resourceManagement string) (register.HubDriver, error) {
 	logger := klog.FromContext(ctx)
+
+	management := operatorv1.AwsResourceManagement(resourceManagement)
+	switch management {
+	case "":
+		management = operatorv1.AwsResourceManagementManaged
+	case operatorv1.AwsResourceManagementManaged, operatorv1.AwsResourceManagementUseExisting:
+	default:
+		return nil, fmt.Errorf("invalid AWS resource management %q, must be %s or %s", resourceManagement,
+			operatorv1.AwsResourceManagementManaged, operatorv1.AwsResourceManagementUseExisting)
+	}
+
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		logger.Error(err, "Failed to load aws config")
@@ -455,6 +540,7 @@ func NewAWSIRSAHubDriver(ctx context.Context, hubClusterArn string, autoApproved
 		cfg:                     cfg,
 		autoApprovedARNPatterns: compiledPatterns,
 		awsResourceTags:         awsResourceTags,
+		resourceManagement:      management,
 	}
 
 	return awsIRSADriverForHub, nil

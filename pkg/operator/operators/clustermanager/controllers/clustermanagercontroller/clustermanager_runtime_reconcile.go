@@ -108,6 +108,7 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 					config.HubClusterArn = registrationDriver.AwsIrsa.HubClusterArn
 					config.AutoApprovedARNPatterns = strings.Join(registrationDriver.AwsIrsa.AutoApprovedIdentities, ",")
 					config.AwsResourceTags = strings.Join(registrationDriver.AwsIrsa.Tags, ",")
+					config.AwsResourceManagement = string(registrationDriver.AwsIrsa.ResourceManagement)
 				}
 			case operatorapiv1.CSRAuthType:
 				if registrationDriver.CSR != nil {

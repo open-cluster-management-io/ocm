@@ -1,0 +1,14 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "eks:DescribeAccessEntry"
+      ],
+      "Resource": [
+        "arn:aws:eks:HUB_REGION:HUB_ACCOUNT_ID:access-entry/*"
+      ]
+    }
+  ]
+}
