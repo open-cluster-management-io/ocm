@@ -55,6 +55,7 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 								"product:v1:tenant:created-by=Team-1",
 							},
 							AutoApprovedIdentities: []string{"arn:aws:eks:us-west-2:123456789013:cluster/.*", "arn:aws:eks:us-west-2:123456789012:cluster/.*"},
+							ResourceManagement:     operatorapiv1.AwsResourceManagementUseExisting,
 						},
 					},
 				}
@@ -98,6 +99,50 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 				return annotation == "arn:aws:iam::123456789012:role/hub-cluster_managed-cluster-identity-creator"
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
+		It("should remove IAM role annotation and roll the registration-controller when switched to PodIdentity", func() {
+			Eventually(func() bool {
+				registrationControllerSA, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(
+					context.Background(), hubRegistrationSA, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				_, ok := registrationControllerSA.Annotations["eks.amazonaws.com/role-arn"]
+				return ok
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+
+			Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(),
+					clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers[0].AwsIrsa.CredentialSource =
+					operatorapiv1.AwsCredentialSourcePodIdentity
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
+					clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
+
+			Eventually(func() bool {
+				registrationControllerSA, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(
+					context.Background(), hubRegistrationSA, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				_, ok := registrationControllerSA.Annotations["eks.amazonaws.com/role-arn"]
+				return !ok
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+
+			Eventually(func() bool {
+				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
+					Get(context.Background(), fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				return registrationControllerDeployment.Spec.Template.Annotations["open-cluster-management.io/aws-credential-source"] ==
+					string(operatorapiv1.AwsCredentialSourcePodIdentity)
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+		})
 		It("registration-controller should have command line option hub cluster arn when initialized with awsirsa", func() {
 			Eventually(func() bool {
 
@@ -123,6 +168,18 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 				tagsArg, present := findMatchingArg(commandLineArgs, "--aws-resource-tags")
 
 				return present && strings.SplitN(tagsArg, "=", 2)[1] == tags
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+		})
+		It("registration-controller should have command line option aws-resource-management when set to UseExisting", func() {
+			Eventually(func() bool {
+				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
+					Get(context.Background(), fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				commandLineArgs := registrationControllerDeployment.Spec.Template.Spec.Containers[0].Args
+				arg, present := findMatchingArg(commandLineArgs, "--aws-resource-management")
+				return present && arg == "--aws-resource-management=UseExisting"
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 		It("should have auto approved arn patterns separated by comma with awsirsa", func() {
@@ -199,6 +256,18 @@ var _ = Describe("ClusterManager Default Mode with aws registration", func() {
 				commandLineArgs := registrationControllerDeployment.Spec.Template.Spec.Containers[0].Args
 				_, present := findMatchingArg(commandLineArgs, "--aws-resource-tags")
 
+				return !present
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+		})
+		It("registration-controller should not have command line option aws-resource-management when it defaults to Managed", func() {
+			Eventually(func() bool {
+				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
+					Get(context.Background(), fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				commandLineArgs := registrationControllerDeployment.Spec.Template.Spec.Containers[0].Args
+				_, present := findMatchingArg(commandLineArgs, "--aws-resource-management")
 				return !present
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})

@@ -1794,9 +1794,10 @@ func TestNetworkPolicyFeatureGate(t *testing.T) {
 
 func TestGetIdentityCreatorRoleAndTags(t *testing.T) {
 	cases := []struct {
-		name          string
-		hubClusterArn string
-		expected      string
+		name             string
+		hubClusterArn    string
+		credentialSource operatorapiv1.AwsCredentialSource
+		expected         string
 	}{
 		{
 			name:          "commercial partition",
@@ -1813,6 +1814,18 @@ func TestGetIdentityCreatorRoleAndTags(t *testing.T) {
 			hubClusterArn: "arn:aws-iso:eks:us-iso-east-1:123456789012:cluster/hub-cluster",
 			expected:      "arn:aws-iso:iam::123456789012:role/hub-cluster_managed-cluster-identity-creator",
 		},
+		{
+			name:             "explicit IRSA credential source",
+			hubClusterArn:    "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+			credentialSource: operatorapiv1.AwsCredentialSourceIRSA,
+			expected:         "arn:aws:iam::123456789012:role/hub-cluster_managed-cluster-identity-creator",
+		},
+		{
+			name:             "PodIdentity credential source skips the annotation",
+			hubClusterArn:    "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+			credentialSource: operatorapiv1.AwsCredentialSourcePodIdentity,
+			expected:         "",
+		},
 	}
 
 	for _, c := range cases {
@@ -1824,7 +1837,8 @@ func TestGetIdentityCreatorRoleAndTags(t *testing.T) {
 							{
 								AuthType: operatorapiv1.AwsIrsaAuthType,
 								AwsIrsa: &operatorapiv1.AwsIrsaConfig{
-									HubClusterArn: c.hubClusterArn,
+									HubClusterArn:    c.hubClusterArn,
+									CredentialSource: c.credentialSource,
 								},
 							},
 						},
@@ -1833,6 +1847,71 @@ func TestGetIdentityCreatorRoleAndTags(t *testing.T) {
 			}
 			if roleArn := getIdentityCreatorRoleAndTags(cm); roleArn != c.expected {
 				t.Errorf("expected role arn %q, but got %q", c.expected, roleArn)
+			}
+		})
+	}
+}
+
+func TestAwsResourceManagementArg(t *testing.T) {
+	cases := []struct {
+		name               string
+		resourceManagement operatorapiv1.AwsResourceManagement
+		expectedArg        string
+	}{
+		{name: "unset"},
+		{name: "Managed is the default and is not rendered", resourceManagement: operatorapiv1.AwsResourceManagementManaged},
+		{
+			name:               "UseExisting",
+			resourceManagement: operatorapiv1.AwsResourceManagementUseExisting,
+			expectedArg:        "--aws-resource-management=UseExisting",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cm := newClusterManager("testhub")
+			cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+				RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{{
+					AuthType: operatorapiv1.AwsIrsaAuthType,
+					AwsIrsa: &operatorapiv1.AwsIrsaConfig{
+						HubClusterArn:      "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+						ResourceManagement: c.resourceManagement,
+					},
+				}},
+			}
+			tc := newTestController(t, cm)
+			clusterManagerNamespace := helpers.ClusterManagerNamespace(cm.Name, cm.Spec.DeployOption.Mode)
+			setup(t, tc, setDeployment(cm.Name, clusterManagerNamespace))
+
+			if err := tc.clusterManagerController.sync(ctx, testingcommon.NewFakeSyncContext(t, cm.Name), cm.Name); err != nil {
+				t.Fatalf("Expected no error when sync, %v", err)
+			}
+
+			var deployment *appsv1.Deployment
+			for _, action := range append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...) {
+				var object runtime.Object
+				switch a := action.(type) {
+				case clienttesting.CreateActionImpl:
+					object = a.Object
+				case clienttesting.UpdateActionImpl:
+					object = a.Object
+				}
+				if d, ok := object.(*appsv1.Deployment); ok && d.Name == cm.Name+"-registration-controller" {
+					deployment = d
+				}
+			}
+			if deployment == nil {
+				t.Fatal("registration controller deployment was not created")
+			}
+
+			var gotArg string
+			for _, arg := range deployment.Spec.Template.Spec.Containers[0].Args {
+				if strings.HasPrefix(arg, "--aws-resource-management") {
+					gotArg = arg
+				}
+			}
+			if gotArg != c.expectedArg {
+				t.Errorf("expected arg %q, got %q", c.expectedArg, gotArg)
 			}
 		})
 	}

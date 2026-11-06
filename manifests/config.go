@@ -43,11 +43,13 @@ type HubConfig struct {
 	// The type has to be []byte to use "indent" template function.
 	ResourceRequirements              []byte
 	ManagedClusterIdentityCreatorRole string
+	AwsCredentialSource               string
 	HubClusterArn                     string
 	EnabledRegistrationDrivers        string
 	AutoApprovedCSRUsers              string
 	AutoApprovedARNPatterns           string
 	AwsResourceTags                   string
+	AwsResourceManagement             string
 	Labels                            map[string]string
 	LabelsString                      string
 	GRPCAuthEnabled                   bool

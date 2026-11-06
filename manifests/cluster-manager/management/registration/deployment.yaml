@@ -17,6 +17,10 @@ spec:
       app: clustermanager-registration-controller
   template:
     metadata:
+      {{ if eq .AwsCredentialSource "PodIdentity" }}
+      annotations:
+        open-cluster-management.io/aws-credential-source: PodIdentity
+      {{ end }}
       labels:
         app: clustermanager-registration-controller
         {{ if gt (len .Labels) 0 }}
@@ -95,6 +99,9 @@ spec:
           {{ end }}
           {{if .AwsResourceTags}}
           - "--aws-resource-tags={{ .AwsResourceTags }}"
+          {{end}}
+          {{if and .AwsResourceManagement (ne .AwsResourceManagement "Managed")}}
+          - "--aws-resource-management={{ .AwsResourceManagement }}"
           {{end}}
           {{if .GRPCAuthEnabled}}
           - "--grpc-ca-file=/var/run/secrets/hub/grpc/certs/tls.crt"
