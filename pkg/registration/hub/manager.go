@@ -62,6 +62,7 @@ type HubManagerOptions struct {
 	AutoApprovedCSRUsers       []string
 	AutoApprovedARNPatterns    []string
 	AwsResourceTags            []string
+	AwsResourceManagement      string
 	Labels                     string
 	// TODO (skeeey) introduce hub options for different drives to group these options
 	AutoApprovedGRPCUsers []string
@@ -103,6 +104,9 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&m.AutoApprovedGRPCUsers, "auto-approved-grpc-users", m.AutoApprovedGRPCUsers,
 		"A bootstrap user list via gRPC whose cluster registration requests can be automatically approved.")
 	fs.StringSliceVar(&m.AwsResourceTags, "aws-resource-tags", m.AwsResourceTags, "A list of tags to apply to AWS resources created through the OCM controllers")
+	fs.StringVar(&m.AwsResourceManagement, "aws-resource-management", m.AwsResourceManagement,
+		"Whether the hub creates and deletes the per-cluster IAM roles and EKS access entries (Managed), "+
+			"or only verifies pre-provisioned access entries (UseExisting). Defaults to Managed.")
 	fs.StringVar(&m.Labels, "labels", m.Labels,
 		"Labels to be added to the resources created by registration controller. The format is key1=value1,key2=value2.")
 	fs.StringVar(&m.GRPCCAFile, "grpc-ca-file", m.GRPCCAFile, "ca file to sign client cert for grpc")
@@ -213,7 +217,8 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 			}
 			drivers = append(drivers, csrDriver)
 		case operatorv1.AwsIrsaAuthType:
-			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn, m.AutoApprovedARNPatterns, m.AwsResourceTags)
+			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn, m.AutoApprovedARNPatterns, m.AwsResourceTags,
+				m.AwsResourceManagement)
 			if err != nil {
 				return err
 			}

@@ -57,6 +57,15 @@ The hub and spoke can be joined using AWS IAM based authentication by running fo
 
    aws iam tag-role --role-name $SPOKE_ROLE_NAME --tags '[{"Key":"hub_cluster_account_id", "Value":"'$HUB_ACCOUNT_ID'"},{"Key":"hub_cluster_name", "Value":"'$HUB_CLUSTER_NAME'"},{"Key":"managed_cluster_account_id", "Value":"'$SPOKE_ACCOUNT_ID'"},{"Key":"managed_cluster_name", "Value":"'$SPOKE_CLUSTER_NAME'"}]'
    ```
+   <a id="spoke-role-tags"></a>
+   > **Note:** The four tags are required. The hub role's trust policy checks them through `aws:PrincipalTag` conditions, so without them the spoke cannot assume the hub role. If you manage the spoke role with IaC, set exactly these keys and values:
+   >
+   > | Key | Value |
+   > |---|---|
+   > | `hub_cluster_account_id` | `$HUB_ACCOUNT_ID` |
+   > | `hub_cluster_name` | `$HUB_CLUSTER_NAME` |
+   > | `managed_cluster_account_id` | `$SPOKE_ACCOUNT_ID` |
+   > | `managed_cluster_name` | `$SPOKE_CLUSTER_NAME` |
 
 3. Login into hub aws account and create identity-creator hub role using following script:
    ```shell
@@ -118,7 +127,7 @@ The default is `IRSA`, so existing setups keep working unchanged. While a Pod Id
 
 1. Install the [EKS Pod Identity Agent](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-agent-setup.html) add-on on the hub and spoke clusters.
 
-2. On the spoke, create `$SPOKE_ROLE_NAME` as in step 2 above, but use the Pod Identity trust policy. The trust policy only accepts the agent service accounts in `open-cluster-management-agent` on `$SPOKE_CLUSTER_NAME`, using the session tags that Pod Identity adds. The permission policy and the four role tags are still required, because the hub role's trust policy checks the tags through `aws:PrincipalTag` conditions:
+2. On the spoke, create `$SPOKE_ROLE_NAME` as in step 2 above, but use the Pod Identity trust policy. The trust policy only accepts the agent service accounts in `open-cluster-management-agent` on `$SPOKE_CLUSTER_NAME`, using the session tags that Pod Identity adds. The permission policy and the [four role tags](#spoke-role-tags) are still required:
    ```bash
    sed -e "s/SPOKE_REGION/$SPOKE_REGION/g" -e "s/SPOKE_ACCOUNT_ID/$SPOKE_ACCOUNT_ID/g" -e "s/SPOKE_CLUSTER_NAME/$SPOKE_CLUSTER_NAME/g" \
      templates/Template-Spoke-Pod-Identity-Trust-Policy.json > templates/Spoke-Pod-Identity-Trust-Policy.json
@@ -183,3 +192,51 @@ The default is `IRSA`, so existing setups keep working unchanged. While a Pod Id
 5. Continue with steps 6 and 7.
 
 Creating a Pod Identity association requires `iam:PassRole` on the role. Grant `iam:PassRole` for `$SPOKE_ROLE_NAME` and `$IDENTITY_CREATOR_ROLE_NAME` only to the administrators who set up OCM. The trust policies limit which service accounts can use the roles, and `iam:PassRole` limits who can create the associations.
+
+# Pre-provisioned hub resources (`resourceManagement: UseExisting`)
+
+By default (`resourceManagement: Managed`), the hub creates an `ocm-hub-<md5hash>` IAM role and an EKS access entry for each accepted cluster, and deletes both when the cluster is removed. This is why the identity-creator role needs IAM write permissions.
+
+With `resourceManagement: UseExisting`, the hub never creates, changes, or deletes IAM roles or access entries. You provision both ahead of time, for example with IaC. The hub only calls `eks:DescribeAccessEntry` to check that the access entry exists and maps to the expected username and group. If the check fails, the error shows up on the ManagedCluster's `HubAccepted` condition. This works with both IRSA and Pod Identity for `registration-controller-sa`.
+
+For each managed cluster, create:
+
+- **The hub role** `ocm-hub-<md5hash>` in the hub account. `<md5hash>` is the lowercase hex md5 of `<hubAccountId>#<hubClusterName>#<spokeAccountId>#<spokeClusterName>`, the same suffix the spoke role uses:
+  ```bash
+  printf '%s' "$HUB_ACCOUNT_ID#$HUB_CLUSTER_NAME#$SPOKE_ACCOUNT_ID#$SPOKE_CLUSTER_NAME" | md5sum   # macOS: md5 -q
+  ```
+  Its trust policy must match [`templates/Template-Hub-Role-Trust-Policy.json`](templates/Template-Hub-Role-Trust-Policy.json), which is what the hub applies in `Managed` mode. The role needs no permission policy.
+  ```bash
+  sed -e "s/SPOKE_ACCOUNT_ID/$SPOKE_ACCOUNT_ID/g" -e "s/HUB_ACCOUNT_ID/$HUB_ACCOUNT_ID/g" \
+    -e "s/HUB_CLUSTER_NAME/$HUB_CLUSTER_NAME/g" -e "s/SPOKE_CLUSTER_NAME/$SPOKE_CLUSTER_NAME/g" \
+    -e "s/ROLE_NAME/$SPOKE_ROLE_NAME/g" templates/Template-Hub-Role-Trust-Policy.json > templates/Hub-Role-Trust-Policy.json
+  aws iam create-role --role-name $HUB_ROLE_NAME --assume-role-policy-document file://templates/Hub-Role-Trust-Policy.json
+  ```
+  The trust policy allows `sts:AssumeRole` and `sts:TagSession`. Spokes that use Pod Identity keep session tags on, as described [above](#using-eks-pod-identity-instead-of-irsa), and those tags are transitive, so the hub role must grant `sts:TagSession`.
+
+  IAM stores the spoke role's unique ID in the trust policy. If the spoke role is deleted and recreated, re-apply the hub role's trust policy. In `Managed` mode the hub does this itself.
+- **The access entry** on the hub cluster, of type `STANDARD`, with username `<spokeClusterName>`, Kubernetes group `open-cluster-management:<spokeClusterName>`, and no access policy:
+  ```bash
+  aws eks create-access-entry --cluster-name $HUB_CLUSTER_NAME --region $HUB_REGION \
+    --principal-arn arn:aws:iam::$HUB_ACCOUNT_ID:role/$HUB_ROLE_NAME \
+    --username $SPOKE_CLUSTER_NAME --kubernetes-groups open-cluster-management:$SPOKE_CLUSTER_NAME
+  ```
+
+In step 3, use [`templates/Template-Identity-Creator-Permission-Policy-UseExisting.json`](templates/Template-Identity-Creator-Permission-Policy-UseExisting.json) for the identity-creator role. It grants only `eks:DescribeAccessEntry`.
+
+Then set `resourceManagement` on the ClusterManager:
+```yaml
+spec:
+  registrationConfiguration:
+    registrationDrivers:
+    - authType: awsirsa
+      awsirsa:
+        hubClusterArn: arn:aws:eks:us-west-2:123456789012:cluster/hub
+        resourceManagement: UseExisting
+```
+
+Things to keep in mind:
+
+- The `tags` setting is ignored in this mode. Tag the role and access entry yourself.
+- Deleting a ManagedCluster or setting `hubAcceptsClient: false` still removes the hub-side RBAC, but it leaves the IAM role and access entry in place. Revoke AWS-level access through your IaC.
+- Clusters that joined in `Managed` mode keep the role and access entry the hub created for them. After you switch to `UseExisting`, the hub no longer deletes them, so import them into your IaC or delete them yourself.
