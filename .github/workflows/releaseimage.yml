@@ -58,14 +58,28 @@ jobs:
           cache: false
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
-      - name: pull base image
-        run: docker pull registry.access.redhat.com/ubi9/ubi-micro:latest --platform=linux/${{ matrix.arch }}
+      # imagebuilder has no platform flag: it uses whatever the local tag points to and pulls the
+      # runner's amd64 variant if the tag is missing. Pre-pull every final-stage base image for the
+      # target arch. Builder stages (FROM ... AS ...) stay native because they cross-compile.
+      - name: pull base images
+        run: |
+          for image in $(awk 'toupper($1) == "FROM" && toupper($3) != "AS" {print $2}' build/Dockerfile.* | sort -u); do
+            docker pull "${image}" --platform=linux/${{ matrix.arch }}
+          done
       - name: images
         run: |
           IMAGE_TAG=${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }} \
           IMAGE_REGISTRY=quay.io/open-cluster-management \
           IMAGE_BUILD_EXTRA_FLAGS="--build-arg OS=linux --build-arg ARCH=${{ matrix.arch }}" \
             make image-${{ matrix.image-name }}
+      - name: verify image architecture
+        run: |
+          image=quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
+          arch=$(docker image inspect --format '{{.Architecture}}' "${image}")
+          if [ "${arch}" != "${{ matrix.arch }}" ]; then
+            echo "::error::${image} was built with architecture ${arch}, expected ${{ matrix.arch }}. Check that every base image in build/Dockerfile.* is pre-pulled for linux/${{ matrix.arch }}."
+            exit 1
+          fi
       - name: push
         run: |
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login quay.io --username ${{ secrets.DOCKER_USER }} --password-stdin
