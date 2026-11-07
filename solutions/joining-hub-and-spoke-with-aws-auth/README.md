@@ -97,6 +97,17 @@ The hub and spoke can be joined using AWS IAM based authentication by running fo
 
 7. Create a sample manifestwork in hub. Confirm that resources are pushed to spoke.
 
+# Upgrading a hub installed with v1.4.0 or earlier
+
+Before upgrading, re-apply the identity-creator permission policy from step 3. It now includes `iam:GetRole` and `iam:UpdateAssumeRolePolicy`, which the hub uses to keep the trust policy of each existing `ocm-hub-*` role up to date:
+
+```shell
+sed -e "s/HUB_ACCOUNT_ID/$HUB_ACCOUNT_ID/g" -e "s/HUB_REGION/$HUB_REGION/g" templates/Template-Identity-Creator-Permission-Policy.json > templates/Identity-Creator-Permission-Policy.json
+aws iam put-role-policy --role-name $IDENTITY_CREATOR_ROLE_NAME --policy-name $HUB_POLICY_NAME --policy-document file://templates/Identity-Creator-Permission-Policy.json
+```
+
+Without these permissions, existing IRSA clusters keep working, but the hub logs an error for each cluster and skips the update. A cluster whose `ocm-managed-cluster-*` role was deleted and recreated, or a spoke that switches to EKS Pod Identity, can't authenticate until the policy is applied.
+
 # Using EKS Pod Identity instead of IRSA
 
 The `awsirsa` registration driver can also get its AWS credentials from [EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html). With Pod Identity, neither cluster needs an IAM OIDC provider. Configure both the hub and the spoke to use it.

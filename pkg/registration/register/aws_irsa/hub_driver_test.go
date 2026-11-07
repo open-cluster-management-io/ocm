@@ -18,6 +18,7 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -745,7 +746,7 @@ func TestCreateIAMRole(t *testing.T) {
 			name: "test existing IAM Role with stale trust policy reports failed update",
 			args: args{
 				ctx:                context.Background(),
-				withAPIOptionsFunc: existingRoleMock(staleTrustPolicyEncoded, fmt.Errorf("AccessDenied"), &iamCalls),
+				withAPIOptionsFunc: existingRoleMock(staleTrustPolicyEncoded, fmt.Errorf("ServiceFailure"), &iamCalls),
 			},
 			managedClusterAnnotations: map[string]string{
 				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
@@ -753,8 +754,39 @@ func TestCreateIAMRole(t *testing.T) {
 			},
 			wantIAMCalls: []string{"CreateRole", "GetRole", "UpdateAssumeRolePolicy"},
 			want: fmt.Errorf("failed to update trust policy of IAM role ocm-hub-960c4e56c25ba0b571ddcdaa7edc943e for ManagedCluster spoke-cluster: " +
-				"operation error IAM: UpdateAssumeRolePolicy, AccessDenied"),
+				"operation error IAM: UpdateAssumeRolePolicy, ServiceFailure"),
 			wantErr: true,
+		},
+		{
+			// A v1.4.0 identity-creator policy has no iam:UpdateAssumeRolePolicy. Failing would stop
+			// every existing cluster from being accepted after a hub upgrade.
+			name: "test existing IAM Role with stale trust policy tolerates AccessDenied on update",
+			args: args{
+				ctx:                context.Background(),
+				withAPIOptionsFunc: existingRoleMock(staleTrustPolicyEncoded, accessDenied, &iamCalls),
+			},
+			managedClusterAnnotations: map[string]string{
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			wantIAMCalls: []string{"CreateRole", "GetRole", "UpdateAssumeRolePolicy"},
+			want:         nil,
+			wantErr:      false,
+		},
+		{
+			// A v1.4.0 identity-creator policy has no iam:GetRole either.
+			name: "test existing IAM Role tolerates AccessDenied on GetRole",
+			args: args{
+				ctx:                context.Background(),
+				withAPIOptionsFunc: getRoleErrorMock(accessDenied, &iamCalls),
+			},
+			managedClusterAnnotations: map[string]string{
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			wantIAMCalls: []string{"CreateRole", "GetRole"},
+			want:         nil,
+			wantErr:      false,
 		},
 		{
 			name: "test existing IAM Role reports failed GetRole",
@@ -769,7 +801,7 @@ func TestCreateIAMRole(t *testing.T) {
 								case "CreateRole":
 									return middleware.FinalizeOutput{}, middleware.Metadata{}, fmt.Errorf("failed to create IAM role, EntityAlreadyExists")
 								case "GetRole":
-									return middleware.FinalizeOutput{}, middleware.Metadata{}, fmt.Errorf("AccessDenied")
+									return middleware.FinalizeOutput{}, middleware.Metadata{}, fmt.Errorf("ServiceFailure")
 								}
 								return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
 							},
@@ -783,7 +815,7 @@ func TestCreateIAMRole(t *testing.T) {
 				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want: fmt.Errorf("failed to get IAM role ocm-hub-960c4e56c25ba0b571ddcdaa7edc943e to verify its trust policy for ManagedCluster spoke-cluster: " +
-				"operation error IAM: GetRole, AccessDenied"),
+				"operation error IAM: GetRole, ServiceFailure"),
 			wantErr: true,
 		},
 		{
@@ -901,6 +933,32 @@ func expectedTrustPolicyEncoded(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return url.QueryEscape(string(compact))
+}
+
+// accessDenied is the error IAM returns when the caller's policy does not allow the action.
+var accessDenied = &smithy.GenericAPIError{Code: "AccessDenied", Message: "not authorized to perform this action"}
+
+// getRoleErrorMock is like existingRoleMock, but GetRole fails with getRoleErr.
+func getRoleErrorMock(getRoleErr error, calls *[]string) func(*middleware.Stack) error {
+	return func(stack *middleware.Stack) error {
+		return stack.Finalize.Add(
+			middleware.FinalizeMiddlewareFunc(
+				"GetRoleErrorMock",
+				func(ctx context.Context, input middleware.FinalizeInput, handler middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+					operationName := middleware.GetOperationName(ctx)
+					*calls = append(*calls, operationName)
+					switch operationName {
+					case "CreateRole":
+						return middleware.FinalizeOutput{}, middleware.Metadata{}, fmt.Errorf("failed to create IAM role, EntityAlreadyExists")
+					case "GetRole":
+						return middleware.FinalizeOutput{}, middleware.Metadata{}, getRoleErr
+					}
+					return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
+				},
+			),
+			middleware.Before,
+		)
+	}
 }
 
 // existingRoleMock stands in for IAM when ocm-hub-<suffix> already exists: CreateRole fails with

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/url"
@@ -19,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/smithy-go"
 	"k8s.io/klog/v2"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -214,10 +216,19 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 // reconcileTrustPolicy makes sure an existing hub role trusts the managed cluster role that
 // TrustPolicy.tmpl renders. Errors are returned rather than logged so the hub controller surfaces
 // them on the ManagedCluster's HubAccepted condition.
+//
+// AccessDenied is the exception. Identity-creator policies written for v1.4.0 and earlier do not
+// grant iam:GetRole or iam:UpdateAssumeRolePolicy, and failing here would mark every existing
+// cluster not accepted after a hub upgrade. Those clusters joined with a trust policy that already
+// works for IRSA, so the driver keeps it and logs what permission is missing.
 func reconcileTrustPolicy(ctx context.Context, iamClient *iam.Client, roleName, desiredTrustPolicy, managedClusterName string) error {
 	logger := klog.FromContext(ctx)
 
 	getRoleOutput, err := iamClient.GetRole(ctx, &iam.GetRoleInput{RoleName: aws.String(roleName)})
+	if isAccessDenied(err) {
+		logTrustPolicySkipped(logger, err, "iam:GetRole", roleName, managedClusterName)
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("failed to get IAM role %s to verify its trust policy for ManagedCluster %s: %w", roleName, managedClusterName, err)
 	}
@@ -241,11 +252,31 @@ func reconcileTrustPolicy(ctx context.Context, iamClient *iam.Client, roleName, 
 		RoleName:       aws.String(roleName),
 		PolicyDocument: aws.String(desiredTrustPolicy),
 	})
+	if isAccessDenied(err) {
+		logTrustPolicySkipped(logger, err, "iam:UpdateAssumeRolePolicy", roleName, managedClusterName)
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("failed to update trust policy of IAM role %s for ManagedCluster %s: %w", roleName, managedClusterName, err)
 	}
 	logger.Info("Trust policy of existing IAM role updated", "IAMRole", roleName, "ManagedCluster", managedClusterName)
 	return nil
+}
+
+func isAccessDenied(err error) bool {
+	var apiErr smithy.APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	code := apiErr.ErrorCode()
+	return code == "AccessDenied" || code == "AccessDeniedException"
+}
+
+func logTrustPolicySkipped(logger klog.Logger, err error, permission, roleName, managedClusterName string) {
+	logger.Error(err, "Skipping trust policy reconcile of existing IAM role: the hub's identity-creator role lacks "+
+		permission+". Existing IRSA clusters keep working; add iam:GetRole and iam:UpdateAssumeRolePolicy to the "+
+		"identity-creator policy so recreated managed-cluster roles and EKS Pod Identity spokes are trusted.",
+		"IAMRole", roleName, "ManagedCluster", managedClusterName)
 }
 
 // trustPolicyMatches compares the trust policy IAM stores on a role with the one the driver wants.
