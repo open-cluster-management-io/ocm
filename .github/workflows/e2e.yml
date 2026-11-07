@@ -88,14 +88,17 @@ jobs:
             make_vars: KLUSTERLET_DEPLOY_MODE=Singleton
           - mode: grpc
             make_vars: REGISTRATION_DRIVER=grpc
-          # The addon management and addon lease specs take about half of the suite's time.
-          # Ginkgo matches each value as a regexp against the spec's file path.
+          # The addon shard runs the ADDON_SPEC_FILES specs and the core shard runs everything else.
           - shard: addon
-            ginkgo_args: --ginkgo.focus-file=addonmanagement --ginkgo.focus-file=addon_lease
+            file_filter: focus
           - shard: core
-            ginkgo_args: --ginkgo.skip-file=addonmanagement --ginkgo.skip-file=addon_lease
+            file_filter: skip
     env:
       JOB_NAME: e2e-${{ matrix.mode }}-${{ matrix.shard }}
+      # The addon management and addon lease specs take about half of the suite's time. One list for
+      # both shards, so they can't drift apart. Ginkgo matches each value as a regexp against the
+      # spec's file path.
+      ADDON_SPEC_FILES: addonmanagement addon_lease
     steps:
       - name: Check build
         if: ${{ needs.e2e-build.result != 'success' }}
@@ -152,8 +155,12 @@ jobs:
           chmod +x e2e.test
       - name: Test E2E
         run: |
+          file_args=""
+          for file in ${ADDON_SPEC_FILES}; do
+            file_args+=" --ginkgo.${{ matrix.file_filter }}-file=${file}"
+          done
           make test-e2e SKIP_IMAGE_BUILD=true SKIP_E2E_BUILD=true ${{ matrix.make_vars }} \
-            ARGS="${{ matrix.ginkgo_args }} --ginkgo.junit-report=${GITHUB_WORKSPACE}/e2e-result/junit.xml"
+            ARGS="${file_args} --ginkgo.junit-report=${GITHUB_WORKSPACE}/e2e-result/junit.xml"
         env:
           KUBECONFIG: /home/runner/.kube/config
           # Failed specs and AfterSuite save agent logs here before cleanup removes the agents.

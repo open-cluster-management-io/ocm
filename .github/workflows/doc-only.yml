@@ -43,27 +43,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: 'echo "Not required"'
-  e2e-default-addon:
-    runs-on: ubuntu-latest
-    steps:
-      - run: 'echo "Not required"'
-  e2e-default-core:
-    runs-on: ubuntu-latest
-    steps:
-      - run: 'echo "Not required"'
-  e2e-hosted-addon:
-    runs-on: ubuntu-latest
-    steps:
-      - run: 'echo "Not required"'
-  e2e-hosted-core:
-    runs-on: ubuntu-latest
-    steps:
-      - run: 'echo "Not required"'
-  e2e-singleton-addon:
-    runs-on: ubuntu-latest
-    steps:
-      - run: 'echo "Not required"'
-  e2e-singleton-core:
+  e2e:
+    # Same check names as the required jobs in e2e.yml (grpc isn't required).
+    name: e2e-${{ matrix.mode }}-${{ matrix.shard }}
+    strategy:
+      matrix:
+        mode: [default, hosted, singleton]
+        shard: [addon, core]
     runs-on: ubuntu-latest
     steps:
       - run: 'echo "Not required"'
