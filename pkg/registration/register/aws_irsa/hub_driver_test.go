@@ -18,6 +18,7 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -192,6 +193,40 @@ func TestRenderTemplate(t *testing.T) {
 	if trustPolicy != TrustPolicy {
 		t.Errorf("TrustPolicy not rendered as expected")
 		return
+	}
+}
+
+// EKS Pod Identity session tags are transitive, so a spoke agent running with Pod Identity
+// credentials carries them into the hub role session. STS then requires sts:TagSession on the
+// hub role, and the spoke's Pod Identity trust policy depends on those tags to scope the role.
+func TestRenderTrustPolicyAllowsTagSession(t *testing.T) {
+	trustPolicy, err := renderTemplate(trustPolicyTemplatePath, map[string]interface{}{
+		"hubClusterArn":               "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+		"managedClusterAccountId":     "123456789013",
+		"managedClusterPartition":     "aws",
+		"managedClusterIamRoleSuffix": "suffix",
+		"hubAccountId":                "123456789012",
+		"hubClusterName":              "hub-cluster",
+		"managedClusterName":          "managed-cluster",
+	})
+	if err != nil {
+		t.Fatalf("failed to render trust policy: %v", err)
+	}
+
+	var doc struct {
+		Statement []struct {
+			Action []string `json:"Action"`
+		} `json:"Statement"`
+	}
+	if err := json.Unmarshal([]byte(trustPolicy), &doc); err != nil {
+		t.Fatalf("rendered trust policy is not valid JSON: %v", err)
+	}
+	if len(doc.Statement) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(doc.Statement))
+	}
+	want := []string{"sts:AssumeRole", "sts:TagSession"}
+	if !reflect.DeepEqual(doc.Statement[0].Action, want) {
+		t.Errorf("expected trust policy actions %v, got %v", want, doc.Statement[0].Action)
 	}
 }
 
@@ -406,6 +441,47 @@ func mockSuccessfulDeletionBehaviour(stack *middleware.Stack) error {
 		return err
 	}
 	return nil
+}
+
+func TestGetRoleNameAndArnAccountID(t *testing.T) {
+	hubClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster"
+	managedCluster := testinghelpers.NewManagedCluster()
+	managedCluster.Annotations = map[string]string{
+		operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+	}
+
+	cases := []struct {
+		name      string
+		accountID string
+		expected  string
+	}{
+		{
+			name:      "account ID from credentials",
+			accountID: "210987654321",
+			expected:  "arn:aws:iam::210987654321:role/ocm-hub-960c4e56c25ba0b571ddcdaa7edc943e",
+		},
+		{
+			name:     "falls back to hub cluster account when credentials have no account ID",
+			expected: "arn:aws:iam::123456789012:role/ocm-hub-960c4e56c25ba0b571ddcdaa7edc943e",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cfg := aws.Config{
+				Credentials: aws.CredentialsProviderFunc(func(context.Context) (aws.Credentials, error) {
+					return aws.Credentials{AccessKeyID: "test", SecretAccessKey: "test", AccountID: c.accountID}, nil
+				}),
+			}
+			_, roleArn, err := getRoleNameAndArn(context.Background(), managedCluster, cfg, hubClusterArn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if roleArn != c.expected {
+				t.Errorf("expected role arn %q, got %q", c.expected, roleArn)
+			}
+		})
+	}
 }
 
 func TestDeleteAccessEntry(t *testing.T) {
@@ -670,7 +746,7 @@ func TestCreateIAMRole(t *testing.T) {
 			name: "test existing IAM Role with stale trust policy reports failed update",
 			args: args{
 				ctx:                context.Background(),
-				withAPIOptionsFunc: existingRoleMock(staleTrustPolicyEncoded, fmt.Errorf("AccessDenied"), &iamCalls),
+				withAPIOptionsFunc: existingRoleMock(staleTrustPolicyEncoded, fmt.Errorf("ServiceFailure"), &iamCalls),
 			},
 			managedClusterAnnotations: map[string]string{
 				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
@@ -678,8 +754,39 @@ func TestCreateIAMRole(t *testing.T) {
 			},
 			wantIAMCalls: []string{"CreateRole", "GetRole", "UpdateAssumeRolePolicy"},
 			want: fmt.Errorf("failed to update trust policy of IAM role ocm-hub-960c4e56c25ba0b571ddcdaa7edc943e for ManagedCluster spoke-cluster: " +
-				"operation error IAM: UpdateAssumeRolePolicy, AccessDenied"),
+				"operation error IAM: UpdateAssumeRolePolicy, ServiceFailure"),
 			wantErr: true,
+		},
+		{
+			// A v1.4.0 identity-creator policy has no iam:UpdateAssumeRolePolicy. Failing would stop
+			// every existing cluster from being accepted after a hub upgrade.
+			name: "test existing IAM Role with stale trust policy tolerates AccessDenied on update",
+			args: args{
+				ctx:                context.Background(),
+				withAPIOptionsFunc: existingRoleMock(staleTrustPolicyEncoded, accessDenied, &iamCalls),
+			},
+			managedClusterAnnotations: map[string]string{
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			wantIAMCalls: []string{"CreateRole", "GetRole", "UpdateAssumeRolePolicy"},
+			want:         nil,
+			wantErr:      false,
+		},
+		{
+			// A v1.4.0 identity-creator policy has no iam:GetRole either.
+			name: "test existing IAM Role tolerates AccessDenied on GetRole",
+			args: args{
+				ctx:                context.Background(),
+				withAPIOptionsFunc: getRoleErrorMock(accessDenied, &iamCalls),
+			},
+			managedClusterAnnotations: map[string]string{
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			wantIAMCalls: []string{"CreateRole", "GetRole"},
+			want:         nil,
+			wantErr:      false,
 		},
 		{
 			name: "test existing IAM Role reports failed GetRole",
@@ -694,7 +801,7 @@ func TestCreateIAMRole(t *testing.T) {
 								case "CreateRole":
 									return middleware.FinalizeOutput{}, middleware.Metadata{}, fmt.Errorf("failed to create IAM role, EntityAlreadyExists")
 								case "GetRole":
-									return middleware.FinalizeOutput{}, middleware.Metadata{}, fmt.Errorf("AccessDenied")
+									return middleware.FinalizeOutput{}, middleware.Metadata{}, fmt.Errorf("ServiceFailure")
 								}
 								return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
 							},
@@ -708,7 +815,7 @@ func TestCreateIAMRole(t *testing.T) {
 				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want: fmt.Errorf("failed to get IAM role ocm-hub-960c4e56c25ba0b571ddcdaa7edc943e to verify its trust policy for ManagedCluster spoke-cluster: " +
-				"operation error IAM: GetRole, AccessDenied"),
+				"operation error IAM: GetRole, ServiceFailure"),
 			wantErr: true,
 		},
 		{
@@ -826,6 +933,32 @@ func expectedTrustPolicyEncoded(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return url.QueryEscape(string(compact))
+}
+
+// accessDenied is the error IAM returns when the caller's policy does not allow the action.
+var accessDenied = &smithy.GenericAPIError{Code: "AccessDenied", Message: "not authorized to perform this action"}
+
+// getRoleErrorMock is like existingRoleMock, but GetRole fails with getRoleErr.
+func getRoleErrorMock(getRoleErr error, calls *[]string) func(*middleware.Stack) error {
+	return func(stack *middleware.Stack) error {
+		return stack.Finalize.Add(
+			middleware.FinalizeMiddlewareFunc(
+				"GetRoleErrorMock",
+				func(ctx context.Context, input middleware.FinalizeInput, handler middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+					operationName := middleware.GetOperationName(ctx)
+					*calls = append(*calls, operationName)
+					switch operationName {
+					case "CreateRole":
+						return middleware.FinalizeOutput{}, middleware.Metadata{}, fmt.Errorf("failed to create IAM role, EntityAlreadyExists")
+					case "GetRole":
+						return middleware.FinalizeOutput{}, middleware.Metadata{}, getRoleErr
+					}
+					return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
+				},
+			),
+			middleware.Before,
+		)
+	}
 }
 
 // existingRoleMock stands in for IAM when ocm-hub-<suffix> already exists: CreateRole fails with

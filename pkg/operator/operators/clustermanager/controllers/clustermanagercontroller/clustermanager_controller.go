@@ -244,6 +244,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	// Compute and populate the value of managed cluster identity creator role to be used in cluster manager registration service account
 	config.ManagedClusterIdentityCreatorRole = getIdentityCreatorRoleAndTags(*clusterManager)
+	if awsIrsa := getAwsIrsaConfig(*clusterManager); awsIrsa != nil {
+		config.AwsCredentialSource = string(awsIrsa.CredentialSource)
+	}
 
 	config.Labels = helpers.GetClusterManagerHubLabels(clusterManager, n.enableSyncLabels)
 	config.LabelsString = helpers.GetRegistrationLabelString(config.Labels)
@@ -569,16 +572,24 @@ func (n *clusterManagerController) getImagePullSecret(ctx context.Context) (stri
 	return n.imagePullSecretName, nil
 }
 
-func getIdentityCreatorRoleAndTags(cm operatorapiv1.ClusterManager) string {
+func getAwsIrsaConfig(cm operatorapiv1.ClusterManager) *operatorapiv1.AwsIrsaConfig {
 	if cm.Spec.RegistrationConfiguration != nil {
 		for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
 			if registrationDriver.AuthType == operatorapiv1.AwsIrsaAuthType && registrationDriver.AwsIrsa != nil {
-				hubClusterArn := registrationDriver.AwsIrsa.HubClusterArn
-				hubClusterAccountId, hubClusterName := commonhelper.GetAwsAccountIdAndClusterName(hubClusterArn)
-				return commonhelper.BuildIamRoleArn(commonhelper.GetAwsPartition(hubClusterArn), hubClusterAccountId,
-					hubClusterName+"_managed-cluster-identity-creator")
+				return registrationDriver.AwsIrsa
 			}
 		}
 	}
-	return ""
+	return nil
+}
+
+func getIdentityCreatorRoleAndTags(cm operatorapiv1.ClusterManager) string {
+	awsIrsa := getAwsIrsaConfig(cm)
+	// With Pod Identity the role comes from the association; the IRSA annotation would take precedence over it.
+	if awsIrsa == nil || awsIrsa.CredentialSource == operatorapiv1.AwsCredentialSourcePodIdentity {
+		return ""
+	}
+	hubClusterAccountId, hubClusterName := commonhelper.GetAwsAccountIdAndClusterName(awsIrsa.HubClusterArn)
+	return commonhelper.BuildIamRoleArn(commonhelper.GetAwsPartition(awsIrsa.HubClusterArn), hubClusterAccountId,
+		hubClusterName+"_managed-cluster-identity-creator")
 }

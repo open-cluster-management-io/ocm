@@ -19,6 +19,9 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        {{ if and (eq .RegistrationDriver.AuthType "awsirsa") (eq .RegistrationDriver.AwsIrsa.CredentialSource "PodIdentity") }}
+        open-cluster-management.io/aws-credential-source: PodIdentity
+        {{ end }}
       labels:
         app: klusterlet-registration-agent
         {{ if gt (len .Labels) 0 }}
