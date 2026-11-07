@@ -46,6 +46,12 @@ jobs:
       matrix:
         arch: [ amd64, arm64 ]
         image-name: [ registration-operator, registration, work, placement, addon-manager ]
+    # The Makefile reads IMAGE_REGISTRY, IMAGE_TAG and IMAGE_BUILD_EXTRA_FLAGS from the environment.
+    env:
+      IMAGE_REGISTRY: quay.io/open-cluster-management
+      IMAGE_TAG: latest-${{ matrix.arch }}
+      IMAGE_REF: quay.io/open-cluster-management/${{ matrix.image-name }}:latest-${{ matrix.arch }}
+      IMAGE_BUILD_EXTRA_FLAGS: --build-arg OS=linux --build-arg ARCH=${{ matrix.arch }}
     steps:
       - name: checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,37 +68,35 @@ jobs:
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
       # imagebuilder has no platform flag: it uses whatever the local tag points to and pulls the
-      # runner's amd64 variant if the tag is missing. Pre-pull every final-stage base image for the
-      # target arch. Builder stages (FROM ... AS ...) stay native because they cross-compile.
+      # runner's amd64 variant if the tag is missing. Pre-pull each Dockerfile's final-stage base
+      # image for the target arch. Earlier stages stay native because they cross-compile.
       - name: pull base images
         run: |
-          for image in $(awk 'toupper($1) == "FROM" && toupper($3) != "AS" {print $2}' build/Dockerfile.* | sort -u); do
+          images=$(for file in build/Dockerfile*; do
+            awk 'toupper($1) == "FROM" { print $2 }' "${file}" | tail -n 1
+          done | sort -u)
+          for image in ${images}; do
             docker pull "${image}" --platform=linux/${{ matrix.arch }}
           done
       - name: images
-        run: |
-          IMAGE_TAG=latest-${{ matrix.arch }} \
-          IMAGE_REGISTRY=quay.io/open-cluster-management \
-          IMAGE_BUILD_EXTRA_FLAGS="--build-arg OS=linux --build-arg ARCH=${{ matrix.arch }}" \
-            make image-${{ matrix.image-name }}
+        run: make image-${{ matrix.image-name }}
       - name: verify image architecture
         run: |
-          image=quay.io/open-cluster-management/${{ matrix.image-name }}:latest-${{ matrix.arch }}
-          arch=$(docker image inspect --format '{{.Architecture}}' "${image}")
+          arch=$(docker image inspect --format '{{.Architecture}}' "${IMAGE_REF}")
           if [ "${arch}" != "${{ matrix.arch }}" ]; then
-            echo "::error::${image} was built with architecture ${arch}, expected ${{ matrix.arch }}. Check that every base image in build/Dockerfile.* is pre-pulled for linux/${{ matrix.arch }}."
+            echo "::error::${IMAGE_REF} was built with architecture ${arch}, expected ${{ matrix.arch }}. Check that every base image in build/Dockerfile.* is pre-pulled for linux/${{ matrix.arch }}."
             exit 1
           fi
       - name: push
         run: |
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login quay.io --username ${{ secrets.DOCKER_USER }} --password-stdin
-          docker push quay.io/open-cluster-management/${{ matrix.image-name }}:latest-${{ matrix.arch }}
-          image_digest=$(docker inspect --format='{{index .RepoDigests 0}}' "quay.io/open-cluster-management/${{ matrix.image-name }}:latest-${{ matrix.arch }}" | cut -d'@' -f2)
+          docker push "${IMAGE_REF}"
+          image_digest=$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REF}" | cut -d'@' -f2)
           echo "IMAGE_DIGEST=${image_digest}" >> $GITHUB_ENV
       - name: Generate SBOM
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
-          image: quay.io/open-cluster-management/${{ matrix.image-name }}:latest-${{ matrix.arch }}
+          image: ${{ env.IMAGE_REF }}
           format: 'spdx-json'
           output-file: 'sbom.spdx.json'
       - name: Attest
