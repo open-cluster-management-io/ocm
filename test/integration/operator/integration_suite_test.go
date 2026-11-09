@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -29,8 +29,8 @@ import (
 )
 
 func TestIntegration(t *testing.T) {
-	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "Integration Suite")
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Integration Suite")
 }
 
 const (
@@ -62,10 +62,10 @@ var (
 var envCancel context.CancelFunc
 var envCtx context.Context
 
-var _ = ginkgo.BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
+var _ = BeforeSuite(func() {
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	ginkgo.By("bootstrapping test environment")
+	By("bootstrapping test environment")
 
 	// crank up the sync speed
 	ssarcontroller.SSARReSyncTime = 1 * time.Second
@@ -84,21 +84,21 @@ var _ = ginkgo.BeforeSuite(func() {
 	cfg.QPS = 100
 	cfg.Burst = 200
 
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(cfg).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(cfg).ToNot(BeNil())
 
 	// prepare clients
 	kubeClient, err = kubernetes.NewForConfig(cfg)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(kubeClient).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(kubeClient).ToNot(BeNil())
 
 	apiExtensionClient, err = apiextensionsclient.NewForConfig(cfg)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(apiExtensionClient).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(apiExtensionClient).ToNot(BeNil())
 
 	operatorClient, err = operatorclient.NewForConfig(cfg)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(operatorClient).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(operatorClient).ToNot(BeNil())
 
 	// start a local kube-apiserver as the hub/managed cluster for Hosted mode.
 	hostedTestEnv = &envtest.Environment{
@@ -109,21 +109,21 @@ var _ = ginkgo.BeforeSuite(func() {
 		},
 	}
 	hostedConfig, err := hostedTestEnv.Start()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(cfg).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(cfg).ToNot(BeNil())
 
 	// prepare clients
 	hostedKubeClient, err = kubernetes.NewForConfig(hostedConfig)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(kubeClient).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(kubeClient).ToNot(BeNil())
 
 	hostedAPIExtensionClient, err = apiextensionsclient.NewForConfig(hostedConfig)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(apiExtensionClient).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(apiExtensionClient).ToNot(BeNil())
 
 	hostedOperatorClient, err = operatorclient.NewForConfig(hostedConfig)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(operatorClient).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(operatorClient).ToNot(BeNil())
 
 	// prepare a ClusterManager
 	_, err = operatorClient.OperatorV1().ClusterManagers().Create(context.Background(), &operatorapiv1.ClusterManager{
@@ -161,7 +161,7 @@ var _ = ginkgo.BeforeSuite(func() {
 			},
 		},
 	}, metav1.CreateOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Create(context.Background(), &operatorapiv1.ClusterManager{
 		ObjectMeta: metav1.ObjectMeta{
@@ -204,7 +204,7 @@ var _ = ginkgo.BeforeSuite(func() {
 			},
 		},
 	}, metav1.CreateOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	restConfig = cfg
 	hostedRestConfig = hostedConfig
@@ -215,8 +215,8 @@ var _ = ginkgo.BeforeSuite(func() {
 	go ServiceAccountCtl(envCtx, hostedKubeClient)
 })
 
-var _ = ginkgo.AfterSuite(func() {
-	ginkgo.By("tearing down the test environment")
+var _ = AfterSuite(func() {
+	By("tearing down the test environment")
 
 	if envCancel != nil {
 		envCancel()
@@ -224,19 +224,19 @@ var _ = ginkgo.AfterSuite(func() {
 
 	if testEnv != nil {
 		err := testEnv.Stop()
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 	}
 
 	if hostedTestEnv != nil {
 		err := hostedTestEnv.Stop()
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 	}
 })
 
 // ServiceAccountCtl watch service accounts and create a corresponding secret for it.
 func ServiceAccountCtl(ctx context.Context, kubeClient kubernetes.Interface) {
 	w, err := kubeClient.CoreV1().ServiceAccounts("").Watch(ctx, metav1.ListOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 	klog.Infof("service account controller start")
 
 	for {
@@ -276,11 +276,11 @@ func ServiceAccountCtl(ctx context.Context, kubeClient kubernetes.Interface) {
 			if errors.IsAlreadyExists(err) {
 				klog.Infof("secret %s/%s already exist", secret.Namespace, secret.Name)
 			} else {
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 			}
 
 			_, err = kubeClient.CoreV1().Secrets(sa.Namespace).Get(ctx, secret.Name, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			err := retry.OnError(retry.DefaultBackoff,
 				func(e error) bool {
@@ -300,7 +300,7 @@ func ServiceAccountCtl(ctx context.Context, kubeClient kubernetes.Interface) {
 					_, err = kubeClient.CoreV1().ServiceAccounts(serviceAccount.Namespace).Update(ctx, serviceAccount, metav1.UpdateOptions{})
 					return err
 				})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		case <-ctx.Done():
 			klog.Infof("service account controller exit")
 			return

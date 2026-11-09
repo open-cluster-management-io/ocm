@@ -151,7 +151,7 @@ func (d *deployReconciler) reconcile(
 
 		for _, cls := range rolloutResult.ClustersRemoved {
 			// Delete manifestWork for removed clusters
-			clusterWorks, _ := allManifestWorks.workByPlacement[placementRef.Name]
+			clusterWorks := allManifestWorks.workByPlacement[placementRef.Name]
 			for _, mw := range clusterWorks {
 				if mw.Namespace != cls.ClusterName {
 					continue

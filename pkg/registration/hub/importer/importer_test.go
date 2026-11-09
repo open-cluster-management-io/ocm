@@ -24,7 +24,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
-	cloudproviders "open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
 )
 
 func TestSync(t *testing.T) {
@@ -129,7 +128,7 @@ func TestSync(t *testing.T) {
 				t.Fatal(err)
 			}
 			importer := &Importer{
-				providers:     []cloudproviders.Interface{c.provider},
+				providers:     []providers.Interface{c.provider},
 				clusterClient: clusterClient,
 				clusterLister: clusterInformer.Lister(),
 				patcher: patcher.NewPatcher[

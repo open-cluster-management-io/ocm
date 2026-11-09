@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -23,34 +23,34 @@ import (
 
 const availableLabelValue = "available"
 
-var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-lease"), func() {
-	ginkgo.Context("Checking addon lease on managed cluster to update addon status", func() {
+var _ = Describe("Addon Health Check (v1beta1)", Label("addon-lease"), func() {
+	Context("Checking addon lease on managed cluster to update addon status", func() {
 		var addOnName string
-		ginkgo.BeforeEach(func() {
+		BeforeEach(func() {
 			// create an addon on created managed cluster
 			addOnName = fmt.Sprintf("addon-%s", rand.String(6))
-			ginkgo.By(fmt.Sprintf("Creating managed cluster addon %q", addOnName))
+			By(fmt.Sprintf("Creating managed cluster addon %q", addOnName))
 			err := hub.CreateManagedClusterAddOnV1Beta1(universalClusterName, addOnName, addOnName)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// create addon installation namespace
-			ginkgo.By(fmt.Sprintf("Creating managed cluster addon installation namespace %q", addOnName))
+			By(fmt.Sprintf("Creating managed cluster addon installation namespace %q", addOnName))
 			_, err = spoke.KubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: addOnName,
 				},
 			}, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
-		ginkgo.AfterEach(func() {
-			ginkgo.By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
+		AfterEach(func() {
+			By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
 			err := spoke.KubeClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
-		ginkgo.It("Should keep addon status to available", func() {
-			ginkgo.By(fmt.Sprintf("Creating lease %q for managed cluster addon %q", addOnName, addOnName))
+		It("Should keep addon status to available", func() {
+			By(fmt.Sprintf("Creating lease %q for managed cluster addon %q", addOnName, addOnName))
 			_, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Create(context.TODO(), &coordv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      addOnName,
@@ -60,9 +60,9 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 					RenewTime: &metav1.MicroTime{Time: time.Now()},
 				},
 			}, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				found, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -71,10 +71,10 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 					return fmt.Errorf("condition should be available, got %v", found.Status.Conditions)
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
 			// check if the cluster has a label for addon with expected value
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
@@ -84,11 +84,11 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
 				return cluster.Labels[key] == availableLabelValue
-			}).Should(gomega.BeTrue())
+			}).Should(BeTrue())
 		})
 
-		ginkgo.It("Should update addon status to unavailable if addon stops to update its lease", func() {
-			ginkgo.By(fmt.Sprintf("Creating lease %q for managed cluster addon %q", addOnName, addOnName))
+		It("Should update addon status to unavailable if addon stops to update its lease", func() {
+			By(fmt.Sprintf("Creating lease %q for managed cluster addon %q", addOnName, addOnName))
 			_, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Create(context.TODO(), &coordv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      addOnName,
@@ -98,9 +98,9 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 					RenewTime: &metav1.MicroTime{Time: time.Now()},
 				},
 			}, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				found, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -109,10 +109,10 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 					return fmt.Errorf("condition should be available")
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
 			// check if the cluster has a label for addon with expected value
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
@@ -122,16 +122,16 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
 				return cluster.Labels[key] == availableLabelValue
-			}).Should(gomega.BeTrue())
+			}).Should(BeTrue())
 
-			ginkgo.By(fmt.Sprintf("Updating lease %q with a past time", addOnName))
+			By(fmt.Sprintf("Updating lease %q with a past time", addOnName))
 			lease, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Get(context.TODO(), addOnName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			lease.Spec.RenewTime = &metav1.MicroTime{Time: time.Now().Add(-10 * time.Minute)}
 			_, err = spoke.KubeClient.CoordinationV1().Leases(addOnName).Update(context.TODO(), lease, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				found, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -140,10 +140,10 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 					return fmt.Errorf("condition should be available")
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
 			// check if the cluster has a label for addon with expected value
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
@@ -153,11 +153,11 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
 				return cluster.Labels[key] == "unhealthy"
-			}).Should(gomega.BeTrue())
+			}).Should(BeTrue())
 		})
 
-		ginkgo.It("Should update addon status to unknown if there is no lease for this addon", func() {
-			ginkgo.By(fmt.Sprintf("Creating lease %q for managed cluster addon %q", addOnName, addOnName))
+		It("Should update addon status to unknown if there is no lease for this addon", func() {
+			By(fmt.Sprintf("Creating lease %q for managed cluster addon %q", addOnName, addOnName))
 			_, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Create(context.TODO(), &coordv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      addOnName,
@@ -167,9 +167,9 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 					RenewTime: &metav1.MicroTime{Time: time.Now()},
 				},
 			}, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				found, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -178,10 +178,10 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 					return fmt.Errorf("condition should be available")
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
 			// check if the cluster has a label for addon with expected value
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
@@ -191,13 +191,13 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
 				return cluster.Labels[key] == availableLabelValue
-			}).Should(gomega.BeTrue())
+			}).Should(BeTrue())
 
-			ginkgo.By(fmt.Sprintf("Deleting lease %q", addOnName))
+			By(fmt.Sprintf("Deleting lease %q", addOnName))
 			err = spoke.KubeClient.CoordinationV1().Leases(addOnName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				found, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -206,10 +206,10 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 					return fmt.Errorf("condition should be available")
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
 			// check if the cluster has a label for addon with expected value
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
@@ -219,13 +219,13 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
 				return cluster.Labels[key] == "unreachable"
-			}).Should(gomega.BeTrue())
+			}).Should(BeTrue())
 		})
 	})
 
-	ginkgo.Context("Checking managed cluster status to update addon status", func() {
+	Context("Checking managed cluster status to update addon status", func() {
 		var klusterletName, clusterName, addOnName string
-		ginkgo.BeforeEach(func() {
+		BeforeEach(func() {
 			klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
 			clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
 			agentNamespace := fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
@@ -234,29 +234,29 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 				klusterletName, clusterName, agentNamespace, operatorapiv1.InstallMode(klusterletDeployMode), bootstrapHubKubeConfigSecret, images, registrationDriver)
 			// create an addon on created managed cluster
 			addOnName = fmt.Sprintf("addon-%s", rand.String(6))
-			ginkgo.By(fmt.Sprintf("Creating managed cluster addon %q", addOnName))
-			gomega.Expect(hub.CreateManagedClusterAddOnV1Beta1(clusterName, addOnName, addOnName)).ToNot(gomega.HaveOccurred())
+			By(fmt.Sprintf("Creating managed cluster addon %q", addOnName))
+			Expect(hub.CreateManagedClusterAddOnV1Beta1(clusterName, addOnName, addOnName)).ToNot(HaveOccurred())
 
 			// create addon installation namespace
-			ginkgo.By(fmt.Sprintf("Creating managed cluster addon installation namespace %q", addOnName))
+			By(fmt.Sprintf("Creating managed cluster addon installation namespace %q", addOnName))
 			_, err := spoke.KubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: addOnName,
 				},
 			}, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
-		ginkgo.AfterEach(func() {
-			ginkgo.By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
+		AfterEach(func() {
+			By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
 			err := hub.KubeClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			ginkgo.By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
+			Expect(err).ToNot(HaveOccurred())
+			By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
 			framework.CleanKlusterletRelatedResources(hub, spoke, klusterletName, clusterName)
 		})
 
-		ginkgo.It("Should update addon status to unknown if managed cluster stops to update its lease", func() {
-			ginkgo.By(fmt.Sprintf("Creating lease %q for managed cluster addon %q", addOnName, addOnName))
+		It("Should update addon status to unknown if managed cluster stops to update its lease", func() {
+			By(fmt.Sprintf("Creating lease %q for managed cluster addon %q", addOnName, addOnName))
 			_, err := spoke.KubeClient.CoordinationV1().Leases(addOnName).Create(context.TODO(), &coordv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      addOnName,
@@ -266,9 +266,9 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 					RenewTime: &metav1.MicroTime{Time: time.Now()},
 				},
 			}, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				found, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -281,14 +281,14 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 					return fmt.Errorf("available status should be true")
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
 			// delete registration agent to stop agent update its status
-			ginkgo.By("Stoping klusterlet")
+			By("Stoping klusterlet")
 			err = spoke.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(), klusterletName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				_, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(), klusterletName, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
 					klog.Infof("klusterlet %s deleted successfully", klusterletName)
@@ -299,12 +299,12 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 					return err
 				}
 				return fmt.Errorf("klusterlet is still deleting")
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
 			// for speeding up test, update managed cluster status to unknown manually
-			ginkgo.By(fmt.Sprintf("Updating managed cluster %s status to unknown", clusterName))
+			By(fmt.Sprintf("Updating managed cluster %s status to unknown", clusterName))
 			found, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			found.Status = clusterv1.ManagedClusterStatus{
 				Conditions: []metav1.Condition{
 					{
@@ -317,9 +317,9 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 				},
 			}
 			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.TODO(), found, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				found, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -332,7 +332,7 @@ var _ = ginkgo.Describe("Addon Health Check (v1beta1)", ginkgo.Label("addon-leas
 					return fmt.Errorf("available status should be unknown")
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 		})
 	})
 })

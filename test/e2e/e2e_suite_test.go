@@ -133,8 +133,8 @@ var _ = BeforeSuite(func() {
 		Get(context.TODO(), helpers.BootstrapHubKubeConfig, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	// The secret will used via copy and create another secret in other ns, so we need to clean the resourceVersion and namespace
-	bootstrapHubKubeConfigSecret.ObjectMeta.ResourceVersion = ""
-	bootstrapHubKubeConfigSecret.ObjectMeta.Namespace = ""
+	bootstrapHubKubeConfigSecret.ResourceVersion = ""
+	bootstrapHubKubeConfigSecret.Namespace = ""
 
 	By("Calculate Hub Hash")
 	kubeconfigData, err := clientcmd.Load(bootstrapHubKubeConfigSecret.Data["kubeconfig"])
@@ -160,10 +160,7 @@ var _ = BeforeSuite(func() {
 		}).Should(Succeed())
 	}
 
-	By("Enable ManifestWorkReplicaSet Feature")
-	Eventually(func() error {
-		return hub.EnableHubWorkFeature("ManifestWorkReplicaSet")
-	}).Should(Succeed())
+	// ManifestWorkReplicaSet is enabled by default; not enabling it here verifies that default.
 
 	By("Enable ClusterImporter Feature")
 	Eventually(func() error {
@@ -228,6 +225,8 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
+	// Cleanup below removes the universal klusterlet; save its agents' state first in case cleanup fails.
+	saveDiagnosticsIfEnabled("aftersuite-before-cleanup")
 	By(fmt.Sprintf("clean klusterlet %v resources after the test case", universalKlusterletName))
 	framework.CleanKlusterletRelatedResources(hub, spoke, universalKlusterletName, universalClusterName)
 })

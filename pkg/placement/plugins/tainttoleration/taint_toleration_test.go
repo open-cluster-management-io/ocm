@@ -774,8 +774,8 @@ func TestMatchWithClusterTaintToleration(t *testing.T) {
 			requeueResult, _ := p.RequeueAfter(context.TODO(), c.placement)
 			expectedRequeueTime := c.expectedRequeueResult.RequeueTime
 			actualRequeueTime := requeueResult.RequeueTime
-			if !((expectedRequeueTime == nil && actualRequeueTime == nil) ||
-				(expectedRequeueTime != nil && actualRequeueTime != nil && expectedRequeueTime.Equal(*actualRequeueTime))) {
+			if (expectedRequeueTime != nil || actualRequeueTime != nil) &&
+				(expectedRequeueTime == nil || actualRequeueTime == nil || !expectedRequeueTime.Equal(*actualRequeueTime)) {
 				t.Errorf(
 					"expected clusters requeued at: %s, but actual requeue at %s",
 					expectedRequeueTime,

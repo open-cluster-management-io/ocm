@@ -166,7 +166,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	}
 
 	// Apply appliedManifestWork
-	appliedManifestWork, err := m.applyAppliedManifestWork(ctx, manifestWork.Name, m.hubHash, m.agentID, manifestWork.ObjectMeta.Labels)
+	appliedManifestWork, err := m.applyAppliedManifestWork(ctx, manifestWork.Name, m.hubHash, m.agentID, manifestWork.Labels)
 	if err != nil {
 		return err
 	}

@@ -7,8 +7,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -40,7 +40,7 @@ type DebugResponse struct {
 	Error                   string                       `json:"error,omitempty"`
 }
 
-var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", "sanity-check"), func() {
+var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"), func() {
 	var namespace string
 	var placementName string
 	var clusterSetName string
@@ -49,7 +49,7 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 	var suffix string
 	var token string
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		suffix = rand.String(5)
 		namespace = fmt.Sprintf("debugger-test-%s", suffix)
 		placementName = fmt.Sprintf("test-placement-%s", suffix)
@@ -57,7 +57,7 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 		clusterName = fmt.Sprintf("test-cluster-%s", suffix)
 		serviceAccountName = fmt.Sprintf("test-sa-%s", suffix)
 
-		ginkgo.By(fmt.Sprintf("Creating test namespace: %s", namespace))
+		By(fmt.Sprintf("Creating test namespace: %s", namespace))
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: namespace,
@@ -67,9 +67,9 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 			},
 		}
 		_, err := hub.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By(fmt.Sprintf("Creating ManagedClusterSet: %s", clusterSetName))
+		By(fmt.Sprintf("Creating ManagedClusterSet: %s", clusterSetName))
 		clusterSet := &clusterapiv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterSetName,
@@ -79,9 +79,9 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 			},
 		}
 		_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterSet, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By(fmt.Sprintf("Creating ManagedClusterSetBinding in namespace: %s", namespace))
+		By(fmt.Sprintf("Creating ManagedClusterSetBinding in namespace: %s", namespace))
 		binding := &clusterapiv1beta2.ManagedClusterSetBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      clusterSetName,
@@ -92,9 +92,9 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 			},
 		}
 		_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), binding, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By(fmt.Sprintf("Creating ManagedCluster: %s", clusterName))
+		By(fmt.Sprintf("Creating ManagedCluster: %s", clusterName))
 		cluster := &clusterapiv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterName,
@@ -109,9 +109,9 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 			},
 		}
 		_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By(fmt.Sprintf("Creating Placement: %s", placementName))
+		By(fmt.Sprintf("Creating Placement: %s", placementName))
 		placement := &clusterapiv1beta1.Placement{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      placementName,
@@ -132,9 +132,9 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 			},
 		}
 		_, err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By(fmt.Sprintf("Creating ServiceAccount: %s", serviceAccountName))
+		By(fmt.Sprintf("Creating ServiceAccount: %s", serviceAccountName))
 		sa := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceAccountName,
@@ -142,9 +142,9 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 			},
 		}
 		_, err = hub.KubeClient.CoreV1().ServiceAccounts(namespace).Create(context.Background(), sa, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By("Creating Role with placement permissions")
+		By("Creating Role with placement permissions")
 		role := &rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "placement-reader",
@@ -159,9 +159,9 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 			},
 		}
 		_, err = hub.KubeClient.RbacV1().Roles(namespace).Create(context.Background(), role, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By("Creating RoleBinding")
+		By("Creating RoleBinding")
 		roleBinding := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "placement-reader-binding",
@@ -181,9 +181,9 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 			},
 		}
 		_, err = hub.KubeClient.RbacV1().RoleBindings(namespace).Create(context.Background(), roleBinding, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By("Creating ClusterRole for debug path access")
+		By("Creating ClusterRole for debug path access")
 		clusterRoleName := fmt.Sprintf("debug-access-%s", namespace)
 		clusterRole := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
@@ -200,9 +200,9 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 			},
 		}
 		_, err = hub.KubeClient.RbacV1().ClusterRoles().Create(context.Background(), clusterRole, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By("Creating ClusterRoleBinding")
+		By("Creating ClusterRoleBinding")
 		clusterRoleBinding := &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("debug-access-%s-binding", namespace),
@@ -224,9 +224,9 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 			},
 		}
 		_, err = hub.KubeClient.RbacV1().ClusterRoleBindings().Create(context.Background(), clusterRoleBinding, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By("Creating ServiceAccount token")
+		By("Creating ServiceAccount token")
 		tokenRequest := &authv1.TokenRequest{
 			Spec: authv1.TokenRequestSpec{
 				ExpirationSeconds: func(i int64) *int64 { return &i }(3600),
@@ -238,65 +238,65 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 			tokenRequest,
 			metav1.CreateOptions{},
 		)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		token = tokenResp.Status.Token
-		gomega.Expect(token).ToNot(gomega.BeEmpty())
+		Expect(token).ToNot(BeEmpty())
 
 		// Wait a bit for RBAC to propagate
 		time.Sleep(5 * time.Second)
 	})
 
-	ginkgo.AfterEach(func() {
-		ginkgo.By("Cleaning up test resources")
+	AfterEach(func() {
+		By("Cleaning up test resources")
 
 		// Delete namespace
 		err := hub.KubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			ginkgo.GinkgoLogr.Error(err, "Failed to delete namespace", "namespace", namespace)
+			GinkgoLogr.Error(err, "Failed to delete namespace", "namespace", namespace)
 		}
 
 		// Delete ManagedCluster
 		err = hub.ClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			ginkgo.GinkgoLogr.Error(err, "Failed to delete ManagedCluster", "cluster", clusterName)
+			GinkgoLogr.Error(err, "Failed to delete ManagedCluster", "cluster", clusterName)
 		}
 
 		// Delete ManagedClusterSet
 		err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			ginkgo.GinkgoLogr.Error(err, "Failed to delete ManagedClusterSet", "clusterSet", clusterSetName)
+			GinkgoLogr.Error(err, "Failed to delete ManagedClusterSet", "clusterSet", clusterSetName)
 		}
 
 		// Delete ClusterRole and ClusterRoleBinding
 		clusterRoleName := fmt.Sprintf("debug-access-%s", namespace)
 		err = hub.KubeClient.RbacV1().ClusterRoles().Delete(context.Background(), clusterRoleName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			ginkgo.GinkgoLogr.Error(err, "Failed to delete ClusterRole", "clusterRole", clusterRoleName)
+			GinkgoLogr.Error(err, "Failed to delete ClusterRole", "clusterRole", clusterRoleName)
 		}
 
 		clusterRoleBindingName := fmt.Sprintf("debug-access-%s-binding", namespace)
 		err = hub.KubeClient.RbacV1().ClusterRoleBindings().Delete(context.Background(), clusterRoleBindingName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			ginkgo.GinkgoLogr.Error(err, "Failed to delete ClusterRoleBinding", "clusterRoleBinding", clusterRoleBindingName)
+			GinkgoLogr.Error(err, "Failed to delete ClusterRoleBinding", "clusterRoleBinding", clusterRoleBindingName)
 		}
 	})
 
-	ginkgo.It("Should debug placement with GET method using curl pod", func() {
-		ginkgo.By("Creating a curl pod to test the debugger service")
+	It("Should debug placement with GET method using curl pod", func() {
+		By("Creating a curl pod to test the debugger service")
 
 		debugPath := fmt.Sprintf("/debug/placements/%s/%s", namespace, placementName)
 		response := callDebugServiceWithPod(hub, namespace, "GET", debugPath, token, nil)
 
-		ginkgo.By("Validating GET response")
-		gomega.Expect(response.Placement).ToNot(gomega.BeNil())
-		gomega.Expect(response.Placement.Name).To(gomega.Equal(placementName))
-		gomega.Expect(response.Placement.Namespace).To(gomega.Equal(namespace))
-		gomega.Expect(response.FilteredPipelineResults).ToNot(gomega.BeNil())
-		gomega.Expect(response.Error).To(gomega.BeEmpty())
+		By("Validating GET response")
+		Expect(response.Placement).ToNot(BeNil())
+		Expect(response.Placement.Name).To(Equal(placementName))
+		Expect(response.Placement.Namespace).To(Equal(namespace))
+		Expect(response.FilteredPipelineResults).ToNot(BeNil())
+		Expect(response.Error).To(BeEmpty())
 	})
 
-	ginkgo.It("Should debug placement with POST method using curl pod", func() {
-		ginkgo.By("Creating a curl pod to test the debugger service")
+	It("Should debug placement with POST method using curl pod", func() {
+		By("Creating a curl pod to test the debugger service")
 
 		placementPayload := &clusterapiv1beta1.Placement{
 			TypeMeta: metav1.TypeMeta{
@@ -325,12 +325,12 @@ var _ = ginkgo.Describe("PlacementDebugger", ginkgo.Label("placement-debugger", 
 		debugPath := "/debug/placements/"
 		response := callDebugServiceWithPod(hub, namespace, "POST", debugPath, token, placementPayload)
 
-		ginkgo.By("Validating POST response")
-		gomega.Expect(response.Placement).ToNot(gomega.BeNil())
-		gomega.Expect(response.Placement.Name).To(gomega.Equal("test-post-placement"))
-		gomega.Expect(response.Placement.Namespace).To(gomega.Equal(namespace))
-		gomega.Expect(response.FilteredPipelineResults).ToNot(gomega.BeNil())
-		gomega.Expect(response.Error).To(gomega.BeEmpty())
+		By("Validating POST response")
+		Expect(response.Placement).ToNot(BeNil())
+		Expect(response.Placement.Name).To(Equal("test-post-placement"))
+		Expect(response.Placement.Namespace).To(Equal(namespace))
+		Expect(response.FilteredPipelineResults).ToNot(BeNil())
+		Expect(response.Error).To(BeEmpty())
 	})
 })
 
@@ -353,7 +353,7 @@ func callDebugServiceWithPod(hub *framework.Hub, namespace, method, path, token 
 
 	if method == "POST" && payload != nil {
 		jsonData, err := json.Marshal(payload)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		curlCmd = append(curlCmd,
 			"-X", "POST",
 			"-H", "Content-Type: application/json",
@@ -381,44 +381,44 @@ func callDebugServiceWithPod(hub *framework.Hub, namespace, method, path, token 
 		},
 	}
 
-	ginkgo.By(fmt.Sprintf("Creating curl pod %s in namespace %s", podName, namespace))
+	By(fmt.Sprintf("Creating curl pod %s in namespace %s", podName, namespace))
 	_, err := hub.KubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	// Wait for pod to complete
-	ginkgo.By("Waiting for curl pod to complete")
-	gomega.Eventually(func() corev1.PodPhase {
+	By("Waiting for curl pod to complete")
+	Eventually(func() corev1.PodPhase {
 		p, err := hub.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
 		if err != nil {
 			return corev1.PodUnknown
 		}
 		return p.Status.Phase
-	}, placementDebuggerTimeout, placementDebuggerPollingInterval).Should(gomega.Or(
-		gomega.Equal(corev1.PodSucceeded),
-		gomega.Equal(corev1.PodFailed),
+	}, placementDebuggerTimeout, placementDebuggerPollingInterval).Should(Or(
+		Equal(corev1.PodSucceeded),
+		Equal(corev1.PodFailed),
 	))
 
 	// Get pod logs
-	ginkgo.By("Retrieving curl pod logs")
+	By("Retrieving curl pod logs")
 	req := hub.KubeClient.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{})
 	logs, err := req.Stream(context.Background())
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 	defer logs.Close()
 
 	respBody, err := io.ReadAll(logs)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
-	ginkgo.GinkgoLogr.Info("Received response from debugger", "response", string(respBody))
+	GinkgoLogr.Info("Received response from debugger", "response", string(respBody))
 
 	// Clean up the pod
 	err = hub.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), podName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		ginkgo.GinkgoLogr.Error(err, "Failed to delete curl pod", "pod", podName)
+		GinkgoLogr.Error(err, "Failed to delete curl pod", "pod", podName)
 	}
 
 	var debugResp DebugResponse
 	err = json.Unmarshal(respBody, &debugResp)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	return &debugResp
 }

@@ -117,10 +117,10 @@ func (d *managedClusterAddonInstallReconciler) getAllDecisions(
 	var errs []error
 	required := sets.Set[string]{}
 	for _, strategy := range placements {
-		_, err := d.placementLister.Placements(strategy.PlacementRef.Namespace).Get(strategy.PlacementRef.Name)
+		_, err := d.placementLister.Placements(strategy.Namespace).Get(strategy.Name)
 		if errors.IsNotFound(err) {
 			logger.V(2).Info("Placement not found for addon", "placementNamespace",
-				strategy.PlacementRef.Namespace, "placementName", strategy.PlacementRef.Name, "addonName", addonName)
+				strategy.Namespace, "placementName", strategy.Name, "addonName", addonName)
 			continue
 		}
 		if err != nil {
@@ -129,9 +129,9 @@ func (d *managedClusterAddonInstallReconciler) getAllDecisions(
 		}
 
 		decisionSelector := labels.SelectorFromSet(labels.Set{
-			clusterv1beta1.PlacementLabel: strategy.PlacementRef.Name,
+			clusterv1beta1.PlacementLabel: strategy.Name,
 		})
-		decisions, err := d.placementDecisionLister.PlacementDecisions(strategy.PlacementRef.Namespace).List(decisionSelector)
+		decisions, err := d.placementDecisionLister.PlacementDecisions(strategy.Namespace).List(decisionSelector)
 		if err != nil {
 			errs = append(errs, err)
 			continue

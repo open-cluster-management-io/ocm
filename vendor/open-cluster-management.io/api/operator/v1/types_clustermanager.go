@@ -146,6 +146,18 @@ const (
 	GRPCAuthType = "grpc"
 )
 
+// AwsCredentialSource selects how the awsirsa registration driver obtains AWS credentials.
+// +kubebuilder:validation:Enum=IRSA;PodIdentity
+type AwsCredentialSource string
+
+const (
+	// AwsCredentialSourceIRSA annotates the service accounts with eks.amazonaws.com/role-arn.
+	AwsCredentialSourceIRSA AwsCredentialSource = "IRSA"
+	// AwsCredentialSourcePodIdentity leaves the service accounts unannotated so an EKS Pod
+	// Identity association is used instead.
+	AwsCredentialSourcePodIdentity AwsCredentialSource = "PodIdentity"
+)
+
 // GRPCAuthSigner is the signer name used when creating CSRs for gRPC authentication.
 const GRPCAuthSigner = "open-cluster-management.io/grpc"
 
@@ -299,7 +311,34 @@ type AwsIrsaConfig struct {
 	// Example - "product:v1:tenant:app-name=My-App"
 	// +optional
 	Tags []string `json:"tags,omitempty"`
+
+	// resourceManagement controls whether the hub creates and deletes the per-cluster
+	// ocm-hub-<suffix> IAM roles and their EKS access entries. With UseExisting both must be
+	// provisioned ahead of time, the hub only verifies that the access entry exists, and Tags is ignored.
+	// +optional
+	// +kubebuilder:default=Managed
+	ResourceManagement AwsResourceManagement `json:"resourceManagement,omitempty"`
+
+	// credentialSource selects how AWS credentials are obtained. IRSA annotates the service
+	// accounts with eks.amazonaws.com/role-arn; PodIdentity leaves them unannotated so an
+	// EKS Pod Identity association is used instead.
+	// +optional
+	// +kubebuilder:default:=IRSA
+	CredentialSource AwsCredentialSource `json:"credentialSource,omitempty"`
 }
+
+// AwsResourceManagement controls whether the hub manages the per-cluster AWS resources for
+// the awsirsa driver.
+// +kubebuilder:validation:Enum=Managed;UseExisting
+type AwsResourceManagement string
+
+const (
+	// AwsResourceManagementManaged has the hub create and delete the IAM roles and EKS access entries.
+	AwsResourceManagementManaged AwsResourceManagement = "Managed"
+	// AwsResourceManagementUseExisting expects both to be pre-provisioned; the hub only verifies
+	// that the access entry exists.
+	AwsResourceManagementUseExisting AwsResourceManagement = "UseExisting"
+)
 
 // GRPC represents the configuration for gRPC registration driver.
 type GRPCRegistrationConfig struct {

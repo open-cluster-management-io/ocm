@@ -155,7 +155,7 @@ var DefaultHubPlacementFeatureGates = map[featuregate.Feature]featuregate.Featur
 // To add a new feature, define a key for it above and add it here.
 var DefaultHubWorkFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	NilExecutorValidating:        {Default: false, PreRelease: featuregate.Alpha},
-	ManifestWorkReplicaSet:       {Default: false, PreRelease: featuregate.Alpha},
+	ManifestWorkReplicaSet:       {Default: true, PreRelease: featuregate.Alpha},
 	CloudEventsDrivers:           {Default: false, PreRelease: featuregate.Alpha},
 	CleanUpCompletedManifestWork: {Default: false, PreRelease: featuregate.Alpha},
 }

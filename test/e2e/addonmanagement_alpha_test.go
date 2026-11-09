@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -50,7 +50,7 @@ var (
 	}
 )
 
-var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.Label("addon-manager"), func() {
+var _ = Describe("Addon management (v1alpha1)", Ordered, Label("addon-manager"), func() {
 	addOnName := "hello-template"
 	addonInstallNamespace := "test-addon-template"
 
@@ -69,30 +69,30 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 
 	var signerSecretNamespace string
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		signerSecretNamespace = "signer-secret-test-ns-" + rand.String(6)
 
-		ginkgo.By("create addon custom sign secret namespace")
+		By("create addon custom sign secret namespace")
 		_, err := hub.KubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: signerSecretNamespace,
 			},
 		}, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		}
 
-		ginkgo.By("create addon custom sign secret")
+		By("create addon custom sign secret")
 		err = copySignerSecret(context.TODO(), hub.KubeClient, "open-cluster-management-hub",
 			"signer-secret", signerSecretNamespace, customSignerSecretName)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		// the addon manager deployment should be running
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			return hub.CheckHubReady()
-		}).Should(gomega.Succeed())
+		}).Should(Succeed())
 
-		ginkgo.By(fmt.Sprintf("create addon template resources for cluster %v", universalClusterName))
+		By(fmt.Sprintf("create addon template resources for cluster %v", universalClusterName))
 		err = createResourcesFromYamlFiles(context.Background(), hub.DynamicClient, hub.RestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
 				"Namespace":                   universalClusterName,
@@ -104,30 +104,30 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			}),
 			templateResources,
 		)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
+		By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
 		err = hub.CreateManagedClusterAddOnV1Alpha1(universalClusterName, addOnName, addonInstallNamespace)
 		if err != nil {
 			klog.Errorf("failed to create managed cluster addon %v on the managed cluster namespace %v: %v", addOnName, universalClusterName, err)
-			gomega.Expect(errors.IsAlreadyExists(err)).To(gomega.BeTrue())
+			Expect(errors.IsAlreadyExists(err)).To(BeTrue())
 		}
 
-		ginkgo.By(fmt.Sprintf("wait the addon %v/%v available condition to be true", universalClusterName, addOnName))
-		gomega.Eventually(func() error {
+		By(fmt.Sprintf("wait the addon %v/%v available condition to be true", universalClusterName, addOnName))
+		Eventually(func() error {
 			return hub.CheckManagedClusterAddOnStatusV1Alpha1(universalClusterName, addOnName)
-		}).Should(gomega.Succeed())
+		}).Should(Succeed())
 	})
 
-	ginkgo.AfterEach(func() {
-		ginkgo.By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
+	AfterEach(func() {
+		By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
 		err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			ginkgo.Fail(fmt.Sprintf("failed to delete managed cluster addon %v on cluster %v: %v", addOnName, universalClusterName, err))
+			Fail(fmt.Sprintf("failed to delete managed cluster addon %v on cluster %v: %v", addOnName, universalClusterName, err))
 		}
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err == nil {
@@ -147,9 +147,9 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return err
 			}
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By(fmt.Sprintf("delete addon template resources for cluster %v", universalClusterName))
+		By(fmt.Sprintf("delete addon template resources for cluster %v", universalClusterName))
 		err = deleteResourcesFromYamlFiles(context.Background(), hub.DynamicClient, hub.RestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
 				"Namespace":                   universalClusterName,
@@ -161,26 +161,26 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			}),
 			templateResources,
 		)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By("delete addon custom sign secret")
+		By("delete addon custom sign secret")
 		err = hub.KubeClient.CoreV1().Secrets(signerSecretNamespace).Delete(context.TODO(),
 			customSignerSecretName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			ginkgo.Fail(fmt.Sprintf("failed to delete custom signer secret %v/%v: %v",
+			Fail(fmt.Sprintf("failed to delete custom signer secret %v/%v: %v",
 				signerSecretNamespace, customSignerSecretName, err))
 		}
 
-		ginkgo.By("delete addon custom sign secret namespace")
+		By("delete addon custom sign secret namespace")
 		err = hub.KubeClient.CoreV1().Namespaces().Delete(context.TODO(), signerSecretNamespace, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			ginkgo.Fail(fmt.Sprintf("failed to delete custom signer secret namespace %v: %v", signerSecretNamespace, err))
+			Fail(fmt.Sprintf("failed to delete custom signer secret namespace %v: %v", signerSecretNamespace, err))
 		}
 
 		// delete all CSR created for the addon on the hub cluster, otherwise if it reaches the limit number 10, the
 		// other tests will fail
-		ginkgo.By(fmt.Sprintf("delete CSRs for addon %v on cluster %v", addOnName, universalClusterName))
-		gomega.Eventually(func() error {
+		By(fmt.Sprintf("delete CSRs for addon %v on cluster %v", addOnName, universalClusterName))
+		Eventually(func() error {
 			listOpts := metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName,
 					clusterv1.ClusterNameLabelKey, universalClusterName),
@@ -203,25 +203,25 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 
 			klog.Infof("All CSRs deleted successfully")
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 	})
 
-	ginkgo.It("Template type addon should be functioning", func() {
-		ginkgo.By("Check hub kubeconfig secret is created")
-		gomega.Eventually(func() error {
+	It("Template type addon should be functioning", func() {
+		By("Check hub kubeconfig secret is created")
+		Eventually(func() error {
 			_, err := hub.KubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
 				templateagent.HubKubeconfigSecretName(addOnName), metav1.GetOptions{})
 			return err
-		}).Should(gomega.Succeed())
+		}).Should(Succeed())
 
-		ginkgo.By("Check custom client cert secret is created")
-		gomega.Eventually(func() error {
+		By("Check custom client cert secret is created")
+		Eventually(func() error {
 			_, err := hub.KubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
 				templateagent.CustomSignedSecretName(addOnName, customSignerName), metav1.GetOptions{})
 			return err
-		}).Should(gomega.Succeed())
+		}).Should(Succeed())
 
-		ginkgo.By("Make sure addon is functioning")
+		By("Make sure addon is functioning")
 		configmap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("config-%s", rand.String(6)),
@@ -235,9 +235,9 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 
 		_, err := hub.KubeClient.CoreV1().ConfigMaps(universalClusterName).Create(
 			context.Background(), configmap, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			copiedConfig, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
 				context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
@@ -248,12 +248,12 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return fmt.Errorf("expected configmap is not correct, %v", copiedConfig.Data)
 			}
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Make sure manifestwork config is configured")
+		By("Make sure manifestwork config is configured")
 		manifestWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(),
 			fmt.Sprintf("addon-%s-deploy-0", addOnName), metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		foundDeploymentConfig := false
 		expectedDeploymentResourceIdentifier := workapiv1.ResourceIdentifier{
 			Group:     "apps",
@@ -271,24 +271,24 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 		for _, mc := range manifestWork.Spec.ManifestConfigs {
 			if mc.ResourceIdentifier == expectedDeploymentResourceIdentifier {
 				foundDeploymentConfig = true
-				gomega.Expect(mc.UpdateStrategy.Type).To(gomega.Equal(workapiv1.UpdateStrategyTypeServerSideApply))
+				Expect(mc.UpdateStrategy.Type).To(Equal(workapiv1.UpdateStrategyTypeServerSideApply))
 			}
 			if mc.ResourceIdentifier == expectedDaemonSetResourceIdentifier {
 				foundDaemonSetConfig = true
 			}
 		}
 		if !foundDeploymentConfig || !foundDaemonSetConfig {
-			gomega.Expect(fmt.Errorf("expected manifestwork is not correct, %v",
-				manifestWork.Spec.ManifestConfigs)).ToNot(gomega.HaveOccurred())
+			Expect(fmt.Errorf("expected manifestwork is not correct, %v",
+				manifestWork.Spec.ManifestConfigs)).ToNot(HaveOccurred())
 		}
 
-		ginkgo.By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
+		By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
 		err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By("The pre-delete job should clean up the configmap after the addon is deleted")
-		gomega.Eventually(func() error {
+		By("The pre-delete job should clean up the configmap after the addon is deleted")
+		Eventually(func() error {
 			_, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
 				context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
@@ -299,9 +299,9 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			}
 
 			return fmt.Errorf("the configmap should be deleted")
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -312,10 +312,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			}
 
 			return fmt.Errorf("the managedClusterAddon should be deleted")
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("The pre-delete job should be deleted ")
-		gomega.Eventually(func() error {
+		By("The pre-delete job should be deleted ")
+		Eventually(func() error {
 			_, err := spoke.KubeClient.BatchV1().Jobs(addonInstallNamespace).Get(
 				context.Background(), "hello-template-cleanup-configmap", metav1.GetOptions{})
 			if err != nil {
@@ -326,12 +326,12 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			}
 
 			return fmt.Errorf("the job should be deleted")
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 	})
 
-	ginkgo.It("Template type addon should be configured by addon deployment config for image override"+
+	It("Template type addon should be configured by addon deployment config for image override"+
 		"even there are cluster annotation config", func() {
-		ginkgo.By("Prepare cluster annotation for addon image override config")
+		By("Prepare cluster annotation for addon image override config")
 		overrideRegistries := addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			// should be different from the registries in the addonDeploymentConfig
 			Registries: []addonapiv1alpha1.ImageMirror{
@@ -342,8 +342,8 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			},
 		}
 		registriesJson, err := json.Marshal(overrideRegistries)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		gomega.Eventually(func() error {
+		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
 			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
 				context.Background(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
@@ -362,15 +362,15 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
-		gomega.Eventually(func() error {
+		By("Prepare a AddOnDeploymentConfig for addon image override config")
+		Eventually(func() error {
 			return prepareImageOverrideAddOnDeploymentConfigAlpha(universalClusterName, addonInstallNamespace)
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Add the configs to ManagedClusterAddOn")
-		gomega.Eventually(func() error {
+		By("Add the configs to ManagedClusterAddOn")
+		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -395,10 +395,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return err
 			}
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Make sure addon is configured")
-		gomega.Eventually(func() error {
+		By("Make sure addon is configured")
+		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
@@ -415,10 +415,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			}
 
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Restore the managed cluster annotation")
-		gomega.Eventually(func() error {
+		By("Restore the managed cluster annotation")
+		Eventually(func() error {
 			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
 				context.Background(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
@@ -430,12 +430,12 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
 		// restore the image override config, because the override image is not available
 		// but it is needed by the pre-delete job
-		ginkgo.By("Restore the configs to ManagedClusterAddOn")
-		gomega.Eventually(func() error {
+		By("Restore the configs to ManagedClusterAddOn")
+		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -449,10 +449,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return err
 			}
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Make sure addon config is restored")
-		gomega.Eventually(func() error {
+		By("Make sure addon config is restored")
+		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
@@ -469,17 +469,17 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			}
 
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 	})
 
-	ginkgo.It("Template type addon should be configured by addon deployment config for node placement", func() {
-		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
-		gomega.Eventually(func() error {
+	It("Template type addon should be configured by addon deployment config for node placement", func() {
+		By("Prepare a AddOnDeploymentConfig for addon image override config")
+		Eventually(func() error {
 			return prepareNodePlacementAddOnDeploymentConfigAlpha(universalClusterName, addonInstallNamespace)
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Add the configs to ManagedClusterAddOn")
-		gomega.Eventually(func() error {
+		By("Add the configs to ManagedClusterAddOn")
+		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -504,10 +504,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return err
 			}
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Make sure addon is configured")
-		gomega.Eventually(func() error {
+		By("Make sure addon is configured")
+		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
@@ -522,26 +522,30 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return fmt.Errorf("unexpected tolerations %v", agentDeploy.Spec.Template.Spec.Tolerations)
 			}
 
+			if !equality.Semantic.DeepEqual(agentDeploy.Spec.Template.Spec.Affinity, affinity) {
+				return fmt.Errorf("unexpected affinity %v", agentDeploy.Spec.Template.Spec.Affinity)
+			}
+
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
 	})
 
-	ginkgo.It("Template type addon should be configured by addon deployment config for namespace", func() {
-		ginkgo.By("Prepare a AddOnDeploymentConfig for namespace config")
+	It("Template type addon should be configured by addon deployment config for namespace", func() {
+		By("Prepare a AddOnDeploymentConfig for namespace config")
 		overrideNamespace := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "another-addon-namespace",
 			},
 		}
 		_, err := spoke.KubeClient.CoreV1().Namespaces().Create(context.TODO(), overrideNamespace, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		gomega.Eventually(func() error {
+		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
 			return prepareInstallNamespaceAlpha(universalClusterName, overrideNamespace.Name)
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Add the configs to ManagedClusterAddOn")
-		gomega.Eventually(func() error {
+		By("Add the configs to ManagedClusterAddOn")
+		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -566,24 +570,24 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return err
 			}
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Make sure addon is configured")
-		gomega.Eventually(func() error {
+		By("Make sure addon is configured")
+		Eventually(func() error {
 			_, err := spoke.KubeClient.AppsV1().Deployments(overrideNamespace.Name).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			return err
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 	})
 
-	ginkgo.It("Template type addon's image should be overrode by cluster annotation", func() {
-		ginkgo.By("Prepare cluster annotation for addon image override config")
+	It("Template type addon's image should be overrode by cluster annotation", func() {
+		By("Prepare cluster annotation for addon image override config")
 		overrideRegistries := addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			Registries: registriesAlpha,
 		}
 		registriesJson, err := json.Marshal(overrideRegistries)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		gomega.Eventually(func() error {
+		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
 			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
 				context.Background(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
@@ -602,10 +606,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Make sure addon is configured")
-		gomega.Eventually(func() error {
+		By("Make sure addon is configured")
+		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
@@ -622,12 +626,12 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			}
 
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
 		// restore the image override config, because the override image is not available
 		// but it is needed by the pre-delete job
-		ginkgo.By("Restore the managed cluster annotation")
-		gomega.Eventually(func() error {
+		By("Restore the managed cluster annotation")
+		Eventually(func() error {
 			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
 				context.Background(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
@@ -639,10 +643,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Make sure addon config is restored")
-		gomega.Eventually(func() error {
+		By("Make sure addon config is restored")
+		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
@@ -659,17 +663,17 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			}
 
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 	})
 
-	ginkgo.It("Template type addon should be configured by addon deployment config for proxy", func() {
-		ginkgo.By("Prepare a AddOnDeploymentConfig for addon proxy config")
-		gomega.Eventually(func() error {
+	It("Template type addon should be configured by addon deployment config for proxy", func() {
+		By("Prepare a AddOnDeploymentConfig for addon proxy config")
+		Eventually(func() error {
 			return prepareProxyAddOnDeploymentConfigAlpha(universalClusterName, addonInstallNamespace)
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Add the configs to ManagedClusterAddOn")
-		gomega.Eventually(func() error {
+		By("Add the configs to ManagedClusterAddOn")
+		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -694,10 +698,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return err
 			}
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Make sure addon is configured")
-		gomega.Eventually(func() error {
+		By("Make sure addon is configured")
+		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
@@ -738,23 +742,23 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 			}
 
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
 		cm, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(context.TODO(),
 			fmt.Sprintf("%s-proxy-ca", addOnName), metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		gomega.Expect(cm.Data).To(gomega.HaveKey("ca-bundle.crt"))
-		gomega.Expect(cm.Data["ca-bundle.crt"]).To(gomega.Equal(string(proxyConfigAlpha.CABundle)))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cm.Data).To(HaveKey("ca-bundle.crt"))
+		Expect(cm.Data["ca-bundle.crt"]).To(Equal(string(proxyConfigAlpha.CABundle)))
 	})
 
-	ginkgo.It("Template type addon should be configured by addon deployment config for resource requirement", func() {
-		ginkgo.By("Prepare a AddOnDeploymentConfig for addon resource requirement config")
-		gomega.Eventually(func() error {
+	It("Template type addon should be configured by addon deployment config for resource requirement", func() {
+		By("Prepare a AddOnDeploymentConfig for addon resource requirement config")
+		Eventually(func() error {
 			return prepareResourceRequirementsAddOnDeploymentConfigAlpha(universalClusterName, addonInstallNamespace)
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Add the configs to ManagedClusterAddOn")
-		gomega.Eventually(func() error {
+		By("Add the configs to ManagedClusterAddOn")
+		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -779,10 +783,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return err
 			}
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Make sure addon is configured")
-		gomega.Eventually(func() error {
+		By("Make sure addon is configured")
+		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
@@ -810,11 +814,11 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				}
 			}
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 	})
 
-	ginkgo.It("ClusterManagementAddon deletion should wait for ManagedClusterAddons cleanup", func() {
-		ginkgo.By("Make sure addon is functioning before deletion")
+	It("ClusterManagementAddon deletion should wait for ManagedClusterAddons cleanup", func() {
+		By("Make sure addon is functioning before deletion")
 		configmap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("config-%s", rand.String(6)),
@@ -828,9 +832,9 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 
 		_, err := hub.KubeClient.CoreV1().ConfigMaps(universalClusterName).Create(
 			context.Background(), configmap, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			copiedConfig, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
 				context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
@@ -841,15 +845,15 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return fmt.Errorf("expected configmap is not correct, %v", copiedConfig.Data)
 			}
 			return nil
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Delete the ClusterManagementAddon to trigger cascading deletion")
+		By("Delete the ClusterManagementAddon to trigger cascading deletion")
 		err = hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By("The pre-delete job should clean up the configmap")
-		gomega.Eventually(func() error {
+		By("The pre-delete job should clean up the configmap")
+		Eventually(func() error {
 			_, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
 				context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
@@ -859,10 +863,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return err
 			}
 			return fmt.Errorf("the configmap should be deleted")
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("ManagedClusterAddon should eventually be deleted after pre-delete job completes")
-		gomega.Eventually(func() error {
+		By("ManagedClusterAddon should eventually be deleted after pre-delete job completes")
+		Eventually(func() error {
 			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -872,10 +876,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return err
 			}
 			return fmt.Errorf("the ManagedClusterAddon should be deleted")
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("The pre-delete job should be cleaned up")
-		gomega.Eventually(func() error {
+		By("The pre-delete job should be cleaned up")
+		Eventually(func() error {
 			_, err := spoke.KubeClient.BatchV1().Jobs(addonInstallNamespace).Get(
 				context.Background(), "hello-template-cleanup-configmap", metav1.GetOptions{})
 			if err != nil {
@@ -885,10 +889,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return err
 			}
 			return fmt.Errorf("the job should be deleted")
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 
-		ginkgo.By("Verify ClusterManagementAddon is deleted")
-		gomega.Eventually(func() error {
+		By("Verify ClusterManagementAddon is deleted")
+		Eventually(func() error {
 			_, err := hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -898,7 +902,7 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return err
 			}
 			return fmt.Errorf("the ClusterManagementAddon should be deleted")
-		}).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(HaveOccurred())
 	})
 })
 
@@ -970,6 +974,7 @@ func prepareNodePlacementAddOnDeploymentConfigAlpha(namespace, installNamespace 
 					NodePlacement: &addonapiv1alpha1.NodePlacement{
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
+						Affinity:     affinity,
 					},
 					AgentInstallNamespace: installNamespace,
 				},

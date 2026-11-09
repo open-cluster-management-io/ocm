@@ -127,8 +127,7 @@ func (c *CELSelector) Validate(ctx context.Context, cluster *clusterapiv1.Manage
 // evaluateAllExpressions evaluates each CEL expression in sequence.
 // Returns (true, remainingBudget) if all expressions succeed, otherwise (false, budget at failure).
 func (c *CELSelector) evaluateAllExpressions(ctx context.Context, cluster *unstructured.Unstructured, budget int64) (bool, int64) {
-	ctx = context.WithValue(ctx, "cluster", cluster.GetName())
-	logger := klog.FromContext(ctx)
+	logger := klog.FromContext(ctx).WithValues("cluster", cluster.GetName())
 	remainingBudget := budget
 	input := map[string]any{"managedCluster": cluster.Object}
 

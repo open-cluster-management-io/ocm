@@ -370,6 +370,10 @@ func (d *nodePlacementDecorator) decorate(_ string, pod *corev1.PodTemplateSpec)
 		pod.Spec.Tolerations = np.Tolerations
 	}
 
+	if np.Affinity != nil {
+		pod.Spec.Affinity = np.Affinity
+	}
+
 	return nil
 }
 

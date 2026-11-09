@@ -6,8 +6,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	certificates "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,8 +22,8 @@ import (
 
 const expectedAnnotation = "open-cluster-management.io/automatically-accepted-on"
 
-var _ = ginkgo.Describe("Cluster Auto Approval", func() {
-	ginkgo.It("Cluster should be automatically approved", func() {
+var _ = Describe("Cluster Auto Approval", func() {
+	It("Cluster should be automatically approved", func() {
 		var err error
 
 		managedClusterName := "autoapprovaltest-spokecluster"
@@ -33,7 +33,7 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 
 		bootstrapFile := path.Join(util.TestDir, "bootstrap-autoapprovaltest", "kubeconfig")
 		err = authn.CreateBootstrapKubeConfigWithUser(bootstrapFile, serverCertFile, securePort, util.AutoApprovalBootstrapUser)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapFile,
@@ -50,7 +50,7 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 		defer cancel()
 
 		// after bootstrap the spokecluster should be accepted and its csr should be auto approved
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -65,29 +65,29 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 			}
 
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		var approvedCSR *certificates.CertificateSigningRequest
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			approvedCSR, err = util.FindAutoApprovedSpokeCSR(kubeClient, managedClusterName)
 			return err
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		// simulate hub cluster to fill a certificate
 		now := time.Now()
 		err = authn.FillCertificateToApprovedCSR(kubeClient, approvedCSR, now.UTC(), now.Add(30*time.Second).UTC())
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
 				return err
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		// the spoke cluster should have joined condition finally
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -96,19 +96,19 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 				return fmt.Errorf("cluster should be joined")
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
-	ginkgo.It("Cluster can be denied by manually after automatically approved", func() {
+	It("Cluster can be denied by manually after automatically approved", func() {
 		clusterName := "autoapprovaltest-spoke-cluster1"
 		_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), &clusterv1.ManagedCluster{
 			ObjectMeta: v1.ObjectMeta{
 				Name: clusterName,
 			},
 		}, v1.CreateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			cluster, err := util.GetManagedCluster(clusterClient, clusterName)
 			if err != nil {
 				return err
@@ -123,20 +123,20 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 			}
 
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		// we can deny the cluster after it is accepted
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			cluster, err := util.GetManagedCluster(clusterClient, clusterName)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			updatedCluster := cluster.DeepCopy()
 			updatedCluster.Spec.HubAcceptsClient = false
 			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), updatedCluster, v1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-		gomega.Consistently(func() error {
+		Consistently(func() error {
 			cluster, err := util.GetManagedCluster(clusterClient, clusterName)
 			if err != nil {
 				return err
@@ -151,6 +151,6 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 			}
 
 			return nil
-		}, 10*time.Second, eventuallyInterval).Should(gomega.Succeed())
+		}, 10*time.Second, eventuallyInterval).Should(Succeed())
 	})
 })

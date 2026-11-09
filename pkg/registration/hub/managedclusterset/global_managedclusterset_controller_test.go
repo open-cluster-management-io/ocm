@@ -58,7 +58,7 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "create")
 				clusterset := actions[0].(clienttesting.CreateAction).GetObject().(*clusterv1beta2.ManagedClusterSet)
-				if clusterset.ObjectMeta.Name != GlobalManagedClusterSetName {
+				if clusterset.Name != GlobalManagedClusterSetName {
 					t.Errorf("Failed to create global managed cluster set")
 				}
 			},

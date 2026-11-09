@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"google.golang.org/grpc"
 	"k8s.io/client-go/kubernetes"
@@ -77,19 +77,19 @@ var CRDPaths = []string{
 
 func init() {
 	klog.InitFlags(nil)
-	klog.SetOutput(ginkgo.GinkgoWriter)
+	klog.SetOutput(GinkgoWriter)
 
 	flag.StringVar(&sourceDriver, "test.driver", util.KubeDriver, "Driver of test, default is kube")
 }
 
 func TestIntegration(t *testing.T) {
-	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "Integration Suite")
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Integration Suite")
 }
 
-var _ = ginkgo.BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
-	ginkgo.By("bootstrapping test environment")
+var _ = BeforeSuite(func() {
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	By("bootstrapping test environment")
 
 	// start a kube-apiserver
 	testEnv = &envtest.Environment{
@@ -98,43 +98,43 @@ var _ = ginkgo.BeforeSuite(func() {
 	}
 	envCtx, envCancel = context.WithCancel(context.TODO())
 	cfg, err := testEnv.Start()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(cfg).ToNot(gomega.BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(cfg).ToNot(BeNil())
 
 	// create kubeconfig file for hub in a tmp dir
 	tempDir, err = os.MkdirTemp("", "test")
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(tempDir).ToNot(gomega.BeEmpty())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(tempDir).ToNot(BeEmpty())
 
 	err = workapiv1.Install(scheme.Scheme)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	err = features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 	err = features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubWorkFeatureGates)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	// enable ManifestWorkReplicaSet feature gate
 	err = features.HubMutableFeatureGate.Set("ManifestWorkReplicaSet=true")
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 	// enable CleanUpCompletedManifestWork feature gate
 	err = features.HubMutableFeatureGate.Set("CleanUpCompletedManifestWork=true")
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	switch sourceDriver {
 	case util.KubeDriver:
 		sourceConfigFileName = path.Join(tempDir, "kubeconfig")
 		err = util.CreateKubeconfigFile(cfg, sourceConfigFileName)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		hubHash = helper.HubHash(cfg.Host)
 
 		hubWorkClient, err = workclientset.NewForConfig(cfg)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// start hub controller
 		go func() {
-			defer ginkgo.GinkgoRecover()
+			defer GinkgoRecover()
 			opts := hub.NewWorkHubManagerOptions()
 			opts.WorkDriver = "kube"
 			opts.WorkDriverConfig = sourceConfigFileName
@@ -143,21 +143,21 @@ var _ = ginkgo.BeforeSuite(func() {
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		}()
 	case util.GRPCDriver:
 		hubWorkClient, err = workclientset.NewForConfig(cfg)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		sourceConfigFileName, hubHash = startGRPCServer(envCtx, tempDir, cfg)
 
 		// start hub controller
 		go func() {
-			defer ginkgo.GinkgoRecover()
+			defer GinkgoRecover()
 			// in grpc driver, hub controller still calls hub kube-apiserver.
 			sourceKubeConfigFileName := path.Join(tempDir, "kubeconfig")
 			err = util.CreateKubeconfigFile(cfg, sourceKubeConfigFileName)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			opts := hub.NewWorkHubManagerOptions()
 			opts.WorkDriver = "kube"
@@ -167,31 +167,31 @@ var _ = ginkgo.BeforeSuite(func() {
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		}()
 	default:
-		ginkgo.Fail(fmt.Sprintf("unsupported test driver %s", sourceDriver))
+		Fail(fmt.Sprintf("unsupported test driver %s", sourceDriver))
 	}
 
 	spokeRestConfig = cfg
 
 	spokeKubeClient, err = kubernetes.NewForConfig(cfg)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	spokeWorkClient, err = workclientset.NewForConfig(cfg)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	hubClusterClient, err = clusterclientset.NewForConfig(cfg)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 })
 
-var _ = ginkgo.AfterSuite(func() {
-	ginkgo.By("tearing down the test environment")
+var _ = AfterSuite(func() {
+	By("tearing down the test environment")
 
 	envCancel()
 
 	err := testEnv.Stop()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	if tempDir != "" {
 		os.RemoveAll(tempDir)
@@ -202,7 +202,7 @@ type agentOptionsDecorator func(opt *spoke.WorkloadAgentOptions, commonOpt *comm
 	*spoke.WorkloadAgentOptions, *commonoptions.AgentOptions)
 
 func startWorkAgent(ctx context.Context, clusterName string, decorators ...agentOptionsDecorator) {
-	defer ginkgo.GinkgoRecover()
+	defer GinkgoRecover()
 	o := spoke.NewWorkloadAgentOptions()
 	o.StatusSyncInterval = 3 * time.Second
 	o.WorkloadSourceDriver = sourceDriver
@@ -224,30 +224,30 @@ func startWorkAgent(ctx context.Context, clusterName string, decorators ...agent
 		KubeConfig:    spokeRestConfig,
 		EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 }
 
 func startGRPCServer(ctx context.Context, temp string, cfg *rest.Config) (string, string) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 	bindPort := fmt.Sprintf("%d", ln.Addr().(*net.TCPAddr).Port)
 	_ = ln.Close()
 
 	configFileName := path.Join(temp, "grpcconfig")
 	gRPCURL, gRPCServerOptions, _, err := util.CreateGRPCConfigs(configFileName, bindPort)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	hubHash := helper.HubHash(gRPCURL)
 
 	hook, err := util.NewGRPCServerWorkHook(cfg)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	grpcEventServer := cloudeventsgrpc.NewGRPCBroker(cloudeventsgrpc.NewBrokerOptions())
 	grpcEventServer.RegisterService(ctx, payload.ManifestBundleEventDataType,
 		serviceswork.NewWorkService(hook.WorkClient, hook.WorkInformers.Work().V1().ManifestWorks()))
 
 	go func() {
-		defer ginkgo.GinkgoRecover()
+		defer GinkgoRecover()
 		hook.Run(ctx)
 	}()
 
@@ -261,9 +261,9 @@ func startGRPCServer(ctx context.Context, temp string, cfg *rest.Config) (string
 		WithExtraMetrics(cemetrics.CloudEventsGRPCMetrics()...)
 
 	go func() {
-		defer ginkgo.GinkgoRecover()
+		defer GinkgoRecover()
 		err := server.Run(ctx)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 	}()
 
 	return configFileName, hubHash

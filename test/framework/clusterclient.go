@@ -10,7 +10,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/pointer"
 
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 )
@@ -116,7 +115,7 @@ func (hub *Hub) BuildClusterClient(saNamespace, saName string, clusterPolicyRule
 		saName,
 		&authv1.TokenRequest{
 			Spec: authv1.TokenRequestSpec{
-				ExpirationSeconds: pointer.Int64(8640 * 3600),
+				ExpirationSeconds: new(int64(8640 * 3600)),
 			},
 		},
 		metav1.CreateOptions{},

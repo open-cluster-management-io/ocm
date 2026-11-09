@@ -167,7 +167,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 						Namespace: "test-namespace",
 					},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, tokenRequest)
+				if err := evt.SetData(cloudevents.ApplicationJSON, tokenRequest); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError:     true,
@@ -199,7 +201,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 					},
 				}
 				tokenRequest.UID = "test-request-uid"
-				evt.SetData(cloudevents.ApplicationJSON, tokenRequest)
+				if err := evt.SetData(cloudevents.ApplicationJSON, tokenRequest); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -235,7 +239,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 						Audiences: []string{"test-audience"},
 					},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, tokenRequest)
+				if err := evt.SetData(cloudevents.ApplicationJSON, tokenRequest); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			reactorError:      fmt.Errorf("simulated error"),

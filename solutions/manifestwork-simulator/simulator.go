@@ -380,8 +380,8 @@ func (a *App) newBootstrapClient(ctx context.Context) (*rest.Config, error) {
 	config.BearerToken = token.Status.Token
 	config.BearerTokenFile = ""
 	config.Username, config.Password = "", ""
-	config.TLSClientConfig.CertFile, config.TLSClientConfig.KeyFile = "", ""
-	config.TLSClientConfig.CertData, config.TLSClientConfig.KeyData = nil, nil
+	config.CertFile, config.KeyFile = "", ""
+	config.CertData, config.KeyData = nil, nil
 	config.ExecProvider, config.AuthProvider = nil, nil
 	config.Impersonate = rest.ImpersonationConfig{}
 	return config, nil
@@ -1542,7 +1542,7 @@ func isDNSLabel(value string) bool {
 		return false
 	}
 	for _, char := range value {
-		if !(char >= 'a' && char <= 'z') && !(char >= '0' && char <= '9') && char != '-' {
+		if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
 			return false
 		}
 	}

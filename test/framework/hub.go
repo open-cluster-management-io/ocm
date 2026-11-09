@@ -9,6 +9,7 @@ import (
 	clientcmd "k8s.io/client-go/tools/clientcmd"
 
 	ocmfeature "open-cluster-management.io/api/feature"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
@@ -74,9 +75,13 @@ func (hub *Hub) CheckHubReady() error {
 		}
 	}
 
-	// if manifestworkreplicaset feature is enabled, check the work controller
-	if cm.Spec.WorkConfiguration != nil &&
-		helpers.FeatureGateEnabled(cm.Spec.WorkConfiguration.FeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet) {
+	// MWRS is enabled by default, so the work controller is expected even when workConfiguration is unset.
+	var workFeatureGates []operatorapiv1.FeatureGate
+	if cm.Spec.WorkConfiguration != nil {
+		workFeatureGates = cm.Spec.WorkConfiguration.FeatureGates
+	}
+	if helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet) ||
+		helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.CleanUpCompletedManifestWork) {
 		if err = CheckDeploymentReady(ctx, hub.KubeClient, hub.ClusterManagerNamespace, fmt.Sprintf("%s-work-controller", hub.ClusterManagerName)); err != nil {
 			return fmt.Errorf("failed to check work controller: %w", err)
 		}

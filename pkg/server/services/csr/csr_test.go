@@ -164,7 +164,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				csr := &certificatesv1.CertificateSigningRequest{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-csr"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, csr)
+				if err := evt.SetData(cloudevents.ApplicationJSON, csr); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -184,7 +186,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 						Labels: map[string]string{clusterv1.ClusterNameLabelKey: "test-cluster"},
 					},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, csr)
+				if err := evt.SetData(cloudevents.ApplicationJSON, csr); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {

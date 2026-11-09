@@ -87,9 +87,9 @@ func (a *App) registerCluster(ctx context.Context, name string, index int) error
 	agentConfig := rest.CopyConfig(a.ocmRESTConfig)
 	agentConfig.BearerToken, agentConfig.BearerTokenFile = "", ""
 	agentConfig.Username, agentConfig.Password = "", ""
-	agentConfig.TLSClientConfig.CertFile, agentConfig.TLSClientConfig.KeyFile = "", ""
-	agentConfig.TLSClientConfig.CertData = certPEM
-	agentConfig.TLSClientConfig.KeyData = pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyPEM})
+	agentConfig.CertFile, agentConfig.KeyFile = "", ""
+	agentConfig.CertData = certPEM
+	agentConfig.KeyData = pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyPEM})
 	agentConfig.ExecProvider, agentConfig.AuthProvider = nil, nil
 	agentConfig.Impersonate = rest.ImpersonationConfig{}
 	agentCore, err := kubernetes.NewForConfig(agentConfig)

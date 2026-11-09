@@ -356,7 +356,7 @@ func newPromClient(baseURL string) (*promClient, error) {
 	}
 	parsed, err := url.Parse(baseURL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
-		return nil, fmt.Errorf("Prometheus URL must be an absolute http(s) URL")
+		return nil, fmt.Errorf("prometheus URL must be an absolute http(s) URL")
 	}
 	return &promClient{baseURL: strings.TrimRight(baseURL, "/"), client: &http.Client{Timeout: 5 * time.Second}}, nil
 }
@@ -379,7 +379,7 @@ func (p *promClient) query(ctx context.Context, bearerToken, promQL string) (*fl
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Prometheus query returned %s", response.Status)
+		return nil, fmt.Errorf("prometheus query returned %s", response.Status)
 	}
 	var payload struct {
 		Status string `json:"status"`
@@ -394,7 +394,7 @@ func (p *promClient) query(ctx context.Context, bearerToken, promQL string) (*fl
 		return nil, err
 	}
 	if payload.Status != "success" {
-		return nil, fmt.Errorf("Prometheus query failed: %s", payload.Error)
+		return nil, fmt.Errorf("prometheus query failed: %s", payload.Error)
 	}
 	if len(payload.Data.Result) == 0 || len(payload.Data.Result[0].Value) < 2 {
 		return nil, nil

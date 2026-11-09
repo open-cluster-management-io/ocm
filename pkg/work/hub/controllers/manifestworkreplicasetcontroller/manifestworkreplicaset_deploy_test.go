@@ -817,11 +817,12 @@ func TestDeployWithMultiPlacementsReconcileAsExpected(t *testing.T) {
 		},
 	}
 	for _, plcSummary := range mwrSet.Status.PlacementsSummary {
-		if plcSummary.Name == placement1.Name { //nolint:gocritic
+		switch plcSummary.Name {
+		case placement1.Name:
 			assert.Equal(t, plcSummary, expectPlcSummary1)
-		} else if plcSummary.Name == placement2.Name {
+		case placement2.Name:
 			assert.Equal(t, plcSummary, expectPlcSummary2)
-		} else {
+		default:
 			t.Fatal("PlacementSummary Name not Exist")
 		}
 	}
@@ -2237,7 +2238,7 @@ func TestOldLabelOnlyManifestWorkMigratesOnSpecChange(t *testing.T) {
 	newTemplate := helpertest.CreateTestManifestWorkSpecWithSecret("v2", "test", "ns-test", "name-test")
 	newTemplate.DeepCopyInto(&mwrSet.Spec.ManifestWorkTemplate)
 
-	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	_, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
 	assert.Nil(t, err)
 
 	// Step 4: Verify the MW in the fake client now has the new hash label and annotation,

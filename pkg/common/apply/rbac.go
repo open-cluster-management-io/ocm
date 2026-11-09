@@ -81,7 +81,7 @@ func (m *PermissionApplier) Apply(
 }
 
 func compareRole(required, existing *rbacv1.Role) (*rbacv1.Role, bool) {
-	modified := resourcemerge.BoolPtr(false)
+	modified := new(false)
 	existingCopy := existing.DeepCopy()
 
 	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
@@ -96,7 +96,7 @@ func compareRole(required, existing *rbacv1.Role) (*rbacv1.Role, bool) {
 }
 
 func compareClusterRole(required, existing *rbacv1.ClusterRole) (*rbacv1.ClusterRole, bool) {
-	modified := resourcemerge.BoolPtr(false)
+	modified := new(false)
 	existingCopy := existing.DeepCopy()
 
 	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
@@ -111,7 +111,7 @@ func compareClusterRole(required, existing *rbacv1.ClusterRole) (*rbacv1.Cluster
 }
 
 func compareRoleBinding(required, existing *rbacv1.RoleBinding) (*rbacv1.RoleBinding, bool) {
-	modified := resourcemerge.BoolPtr(false)
+	modified := new(false)
 	existingCopy := existing.DeepCopy()
 
 	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
@@ -130,7 +130,7 @@ func compareRoleBinding(required, existing *rbacv1.RoleBinding) (*rbacv1.RoleBin
 }
 
 func compareClusterRoleBinding(required, existing *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, bool) {
-	modified := resourcemerge.BoolPtr(false)
+	modified := new(false)
 	existingCopy := existing.DeepCopy()
 
 	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)

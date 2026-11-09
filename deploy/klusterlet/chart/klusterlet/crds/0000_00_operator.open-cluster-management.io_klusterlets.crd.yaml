@@ -43,6 +43,38 @@ spec:
             description: Spec represents the desired deployment configuration of Klusterlet
               agent.
             properties:
+              agentConfiguration:
+                description: |-
+                  AgentConfiguration contains the configuration of the klusterlet agents,
+                  such as the bind ports of their health probe and metrics endpoints.
+                properties:
+                  bindConfiguration:
+                    description: BindConfiguration represents the server bind configuration
+                      of the klusterlet agents.
+                    properties:
+                      healthProbePort:
+                        default: 8443
+                        description: |-
+                          HealthProbePort represents the bind port of the agents' health check endpoint. The default value is 8443.
+                          Agents run as non-root, so privileged ports below 1024 are not allowed.
+                        format: int32
+                        maximum: 65535
+                        minimum: 1024
+                        type: integer
+                      hostNetwork:
+                        description: HostNetwork enables running the agent pods in
+                          host networking mode.
+                        type: boolean
+                      metricsPort:
+                        default: 8080
+                        description: |-
+                          MetricsPort represents the bind port of the agents' metrics endpoint. The default value is 8080.
+                          Metrics may be disabled by setting a value less than or equal to 0.
+                        format: int32
+                        maximum: 65535
+                        type: integer
+                    type: object
+                type: object
               clusterName:
                 description: |-
                   clusterName is the name of the managed cluster to be created on hub.
@@ -395,6 +427,16 @@ spec:
                           Contain the details required for registering with hub cluster (ie: an EKS cluster) using AWS IAM roles for service account.
                           This is required only when the authType is awsirsa.
                         properties:
+                          credentialSource:
+                            default: IRSA
+                            description: |-
+                              credentialSource selects how AWS credentials are obtained. IRSA annotates the service
+                              accounts with eks.amazonaws.com/role-arn; PodIdentity leaves them unannotated so an
+                              EKS Pod Identity association is used instead.
+                            enum:
+                            - IRSA
+                            - PodIdentity
+                            type: string
                           hubClusterArn:
                             description: |-
                               The arn of the hub cluster (ie: an EKS cluster). This will be required to pass information to hub, which hub will use to create IAM identities for this klusterlet.

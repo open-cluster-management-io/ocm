@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,14 +18,14 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Predicates", func() {
+var _ = Describe("Predicates", func() {
 	var cancel context.CancelFunc
 	var namespace string
 	var placementName string
 	var clusterSet1Name string
 	var suffix string
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		suffix = rand.String(5)
 		namespace = fmt.Sprintf("ns-%s", suffix)
 		placementName = fmt.Sprintf("placement-%s", suffix)
@@ -38,34 +38,38 @@ var _ = ginkgo.Describe("Predicates", func() {
 			},
 		}
 		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		// start controller manager
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
-		go controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
-			KubeConfig:    restConfig,
-			EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
-		})
+		go func() {
+			defer GinkgoRecover()
+			err := controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
+				KubeConfig:    restConfig,
+				EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
+			})
+			Expect(err).NotTo(HaveOccurred())
+		}()
 	})
 
-	ginkgo.AfterEach(func() {
+	AfterEach(func() {
 		if cancel != nil {
 			cancel()
 		}
 		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
-	ginkgo.Context("Cluster Selector", func() {
-		ginkgo.It("Should schedule placement successfully once spec.Predicates LabelSelector changes", func() {
+	Context("Cluster Selector", func() {
+		It("Should schedule placement successfully once spec.Predicates LabelSelector changes", func() {
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			assertCreatingClusters(clusterSet1Name, 2, "cloud", "Azure")
 			assertCreatingClusters(clusterSet1Name, 3, "cloud", "Amazon")
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(10).Build()
 			assertCreatingPlacementWithDecision(placement, 5, 1)
 
-			ginkgo.By("add the predicates")
+			By("add the predicates")
 			// add a predicates
 			predicates := []clusterapiv1beta1.ClusterPredicate{
 				{
@@ -85,7 +89,7 @@ var _ = ginkgo.Describe("Predicates", func() {
 				placementName, namespace,
 				[]clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{testinghelpers.PlacementDecisionName(placementName, 1)}, ClustersCount: 3}})
 
-			ginkgo.By("change the predicates")
+			By("change the predicates")
 			// change the predicates
 			predicates = []clusterapiv1beta1.ClusterPredicate{
 				{
@@ -103,14 +107,14 @@ var _ = ginkgo.Describe("Predicates", func() {
 			assertPlacementDecisionNumbers(placementName, namespace, 2, 1)
 		})
 
-		ginkgo.It("Should schedule placement successfully once spec.Predicates ClaimSelector changes", func() {
+		It("Should schedule placement successfully once spec.Predicates ClaimSelector changes", func() {
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			assertCreatingClusters(clusterSet1Name, 2, "cloud", "Azure")
 			assertCreatingClusters(clusterSet1Name, 3, "cloud", "Amazon")
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(10).Build()
 			assertCreatingPlacementWithDecision(placement, 5, 1)
 
-			ginkgo.By("add the predicates")
+			By("add the predicates")
 			// add a predicates
 			predicates := []clusterapiv1beta1.ClusterPredicate{
 				{
@@ -131,7 +135,7 @@ var _ = ginkgo.Describe("Predicates", func() {
 			assertPatchingPlacementSpec(placement)
 			assertPlacementDecisionNumbers(placementName, namespace, 3, 1)
 
-			ginkgo.By("change the predicates")
+			By("change the predicates")
 			// change the predicates
 			predicates = []clusterapiv1beta1.ClusterPredicate{
 				{
@@ -153,7 +157,7 @@ var _ = ginkgo.Describe("Predicates", func() {
 			assertPlacementDecisionNumbers(placementName, namespace, 2, 1)
 		})
 
-		ginkgo.It("Should schedule placement successfully once spec.Predicates CelSelector changes", func() {
+		It("Should schedule placement successfully once spec.Predicates CelSelector changes", func() {
 			// cluster settings
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 2)

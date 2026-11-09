@@ -32,7 +32,7 @@ func IndexClusterManagementAddonByPlacement(obj interface{}) ([]string, error) {
 	}
 
 	for _, placement := range cma.Spec.InstallStrategy.Placements {
-		key := fmt.Sprintf("%s/%s", placement.PlacementRef.Namespace, placement.PlacementRef.Name)
+		key := fmt.Sprintf("%s/%s", placement.Namespace, placement.Name)
 		keys = append(keys, key)
 	}
 

@@ -5,8 +5,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -18,15 +18,15 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Collecting Node Resource", func() {
-	ginkgo.It("managed cluster node resource should be collected successfully", func() {
+var _ = Describe("Collecting Node Resource", func() {
+	It("managed cluster node resource should be collected successfully", func() {
 		var err error
 
 		// create one node
 		capacity := util.NewResourceList(32, 64)
 		allocatable := util.NewResourceList(16, 32)
 		err = util.CreateNode(kubeClient, "node1", capacity, allocatable)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		managedClusterName := "resorucetest-managedcluster"
 		// #nosec G101
@@ -48,22 +48,22 @@ var _ = ginkgo.Describe("Collecting Node Resource", func() {
 		defer cancel()
 
 		// the spoke cluster and csr should be created after bootstrap
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			if _, err := util.GetManagedCluster(clusterClient, managedClusterName); err != nil {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// the spoke cluster should has finalizer that is added by hub controller
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return false
@@ -73,35 +73,35 @@ var _ = ginkgo.Describe("Collecting Node Resource", func() {
 			}
 
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// simulate hub cluster admin to accept the managedcluster and approve the csr
 		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// the managed cluster should have accepted condition after it is accepted
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return false
 			}
 			accepted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
 			return accepted != nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// the resource of spoke cluster should be updated finally
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return false
@@ -120,14 +120,14 @@ var _ = ginkgo.Describe("Collecting Node Resource", func() {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// cordon the node
 		err = util.CordonNode(kubeClient, "node1")
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// the resource of spoke cluster should be updated finally
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return false
@@ -146,6 +146,6 @@ var _ = ginkgo.Describe("Collecting Node Resource", func() {
 			}
 
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	})
 })

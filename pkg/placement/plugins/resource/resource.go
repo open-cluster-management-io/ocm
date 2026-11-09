@@ -132,13 +132,13 @@ func getClusterResource(cluster *clusterapiv1.ManagedCluster, resourceName clust
 	if v, exist := cluster.Status.Allocatable[resourceName]; exist {
 		allocatable = v.AsApproximateFloat64()
 	} else {
-		return allocatable, capacity, fmt.Errorf("no allocatable %s found in cluster %s", resourceName, cluster.ObjectMeta.Name)
+		return allocatable, capacity, fmt.Errorf("no allocatable %s found in cluster %s", resourceName, cluster.Name)
 	}
 
 	if v, exist := cluster.Status.Capacity[resourceName]; exist {
 		capacity = v.AsApproximateFloat64()
 	} else {
-		return allocatable, capacity, fmt.Errorf("no capacity %s found in cluster %s", resourceName, cluster.ObjectMeta.Name)
+		return allocatable, capacity, fmt.Errorf("no capacity %s found in cluster %s", resourceName, cluster.Name)
 	}
 
 	return allocatable, capacity, nil

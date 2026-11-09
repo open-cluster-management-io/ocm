@@ -1,3 +1,12 @@
+# v1.104.3 (2026-10-22)
+
+* **Bug Fix**: Update smithy-go to v1.28.6
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.104.2 (2026-10-19)
+
+* **Bug Fix**: Allow lists with null values to deserialize into its zero value instead of failing
+
 # v1.104.1 (2026-10-09.2)
 
 * **Dependency Update**: Update to smithy-go v1.28.5.

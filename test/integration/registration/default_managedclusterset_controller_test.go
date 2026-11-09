@@ -4,20 +4,20 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	setcontroller "open-cluster-management.io/ocm/pkg/registration/hub/managedclusterset"
 )
 
-var _ = ginkgo.Describe("DefaultManagedClusterSet", func() {
+var _ = Describe("DefaultManagedClusterSet", func() {
 
-	ginkgo.It("should create DefaultManagedClusterSet successfully", func() {
+	It("should create DefaultManagedClusterSet successfully", func() {
 
-		ginkgo.By("check whether DefaultManagedClusterSet is created")
-		gomega.Eventually(func() error {
+		By("check whether DefaultManagedClusterSet is created")
+		Eventually(func() error {
 			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.DefaultManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -28,17 +28,17 @@ var _ = ginkgo.Describe("DefaultManagedClusterSet", func() {
 			}
 			return fmt.Errorf("check not pass!")
 
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
-	ginkgo.It("should recreate DefaultManagedClusterSet successfully after deleted", func() {
+	It("should recreate DefaultManagedClusterSet successfully after deleted", func() {
 
-		ginkgo.By("delete DefaultManagedClusterSet")
+		By("delete DefaultManagedClusterSet")
 		err := clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.TODO(), setcontroller.DefaultManagedClusterSetName, metav1.DeleteOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "try to delete DefaultManagedClusterSet error")
+		Expect(err).NotTo(HaveOccurred(), "try to delete DefaultManagedClusterSet error")
 
-		ginkgo.By("check whether DefaultManagedClusterSet is recreated")
-		gomega.Eventually(func() error {
+		By("check whether DefaultManagedClusterSet is recreated")
+		Eventually(func() error {
 			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.DefaultManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -49,6 +49,6 @@ var _ = ginkgo.Describe("DefaultManagedClusterSet", func() {
 			}
 			return fmt.Errorf("check not pass!")
 
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 })

@@ -18,8 +18,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	workfake "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -42,7 +44,10 @@ func installDeleteCollectionReactor(t *testing.T, client *workfake.Clientset) {
 	t.Helper()
 	client.PrependReactor("delete-collection", "manifestworks", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		deleteAction := action.(k8stesting.DeleteCollectionAction)
-		object, err := client.Tracker().List(workv1.SchemeGroupVersion.WithResource("manifestworks"), workv1.SchemeGroupVersion.WithKind("ManifestWork"), action.GetNamespace())
+		// The tracker takes a runtime/schema GroupVersion; the API package's
+		// replacement GroupVersion is the meta variant without WithResource/WithKind.
+		workGV := schema.GroupVersion{Group: workv1.GroupVersion.Group, Version: workv1.GroupVersion.Version}
+		object, err := client.Tracker().List(workGV.WithResource("manifestworks"), workGV.WithKind("ManifestWork"), action.GetNamespace())
 		if err != nil {
 			return true, nil, err
 		}
@@ -50,7 +55,7 @@ func installDeleteCollectionReactor(t *testing.T, client *workfake.Clientset) {
 		selector := deleteAction.GetListRestrictions().Labels
 		for _, item := range list.Items {
 			if selector.Matches(labels.Set(item.Labels)) {
-				if err := client.Tracker().Delete(workv1.SchemeGroupVersion.WithResource("manifestworks"), item.Namespace, item.Name); err != nil {
+				if err := client.Tracker().Delete(workGV.WithResource("manifestworks"), item.Namespace, item.Name); err != nil {
 					return true, nil, err
 				}
 			}

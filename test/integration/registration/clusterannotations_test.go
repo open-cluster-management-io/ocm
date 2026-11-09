@@ -5,8 +5,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 
@@ -17,8 +17,8 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Cluster Annotations", func() {
-	ginkgo.It("Cluster Annotations should be created on the managed cluster", func() {
+var _ = Describe("Cluster Annotations", func() {
+	It("Cluster Annotations should be created on the managed cluster", func() {
 		managedClusterName := "clusterannotations-spokecluster"
 		//#nosec G101
 		hubKubeconfigSecret := "clusterannotations-hub-kubeconfig-secret"
@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("Cluster Annotations", func() {
 		defer cancel()
 
 		// after bootstrap the spokecluster and csr should be created
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			mc, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -66,7 +66,7 @@ var _ = ginkgo.Describe("Cluster Annotations", func() {
 				return fmt.Errorf("expected annotation agent.open-cluster-management.io/foo to be bar, got %s", mc.Annotations["agent.open-cluster-management.io/foo"])
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 	})
 })

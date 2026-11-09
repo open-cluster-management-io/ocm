@@ -65,10 +65,7 @@ func KlusterletSecretQueueKeyFunc(klusterletLister operatorlister.KlusterletList
 		accessor, _ := meta.Accessor(obj)
 		namespace := accessor.GetNamespace()
 		name := accessor.GetName()
-		interestedObjectFound := false
-		if name == HubKubeConfig || name == BootstrapHubKubeConfig || name == ExternalManagedKubeConfig {
-			interestedObjectFound = true
-		}
+		interestedObjectFound := name == HubKubeConfig || name == BootstrapHubKubeConfig || name == ExternalManagedKubeConfig
 		if !interestedObjectFound {
 			return []string{}
 		}
@@ -91,10 +88,7 @@ func KlusterletDeploymentQueueKeyFunc(klusterletLister operatorlister.Klusterlet
 		accessor, _ := meta.Accessor(obj)
 		namespace := accessor.GetNamespace()
 		name := accessor.GetName()
-		interestedObjectFound := false
-		if strings.HasSuffix(name, "-agent") {
-			interestedObjectFound = true
-		}
+		interestedObjectFound := strings.HasSuffix(name, "-agent")
 		if !interestedObjectFound {
 			return []string{}
 		}
@@ -117,17 +111,13 @@ func ClusterManagerDeploymentQueueKeyFunc(clusterManagerLister operatorlister.Cl
 		accessor, _ := meta.Accessor(obj)
 		name := accessor.GetName()
 		namespace := accessor.GetNamespace()
-		interestedObjectFound := false
-
-		if strings.HasSuffix(name, "registration-controller") ||
+		interestedObjectFound := strings.HasSuffix(name, "registration-controller") ||
 			strings.HasSuffix(name, "registration-webhook") ||
 			strings.HasSuffix(name, "work-webhook") ||
 			strings.HasSuffix(name, "addon-manager-controller") ||
 			strings.HasSuffix(name, "addon-webhook") ||
 			strings.HasSuffix(name, "work-controller") ||
-			strings.HasSuffix(name, "placement-controller") {
-			interestedObjectFound = true
-		}
+			strings.HasSuffix(name, "placement-controller")
 		if !interestedObjectFound {
 			return []string{}
 		}

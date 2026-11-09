@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	v1 "open-cluster-management.io/api/cluster/v1"
 
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
@@ -157,7 +156,7 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 			if err != nil {
 				return err
 			}
-			if !meta.IsStatusConditionTrue(mc.Status.Conditions, v1.ManagedClusterConditionHubAccepted) {
+			if !meta.IsStatusConditionTrue(mc.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted) {
 				return fmt.Errorf("managed cluster %s should have hub accepted condition", managedCluster.Name)
 			}
 			return nil

@@ -100,7 +100,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				addon := &addonv1alpha1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, addon)
+				if err := evt.SetData(cloudevents.ApplicationJSON, addon); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -117,7 +119,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				addon := &addonv1alpha1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, addon)
+				if err := evt.SetData(cloudevents.ApplicationJSON, addon); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -134,7 +138,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				addon := &addonv1alpha1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, addon)
+				if err := evt.SetData(cloudevents.ApplicationJSON, addon); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			expectedError: true,
@@ -155,7 +161,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 				addon := &addonv1alpha1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
 				}
-				evt.SetData(cloudevents.ApplicationJSON, addon)
+				if err := evt.SetData(cloudevents.ApplicationJSON, addon); err != nil {
+					t.Fatal(err)
+				}
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {

@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +28,7 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Cluster Claim", func() {
+var _ = Describe("Cluster Claim", func() {
 	var managedClusterName, hubKubeconfigSecret, hubKubeconfigDir string
 	var claims []*clusterv1alpha1.ClusterClaim
 	var maxCustomClusterClaims int
@@ -38,13 +38,13 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 	var err error
 	var cancel context.CancelFunc
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		// reset so one spec's opt-in can't leak into the next
 		reportHostingCluster = false
 		hostingClusterName = ""
 	})
 
-	ginkgo.JustBeforeEach(func() {
+	JustBeforeEach(func() {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
 		hubKubeconfigSecret = fmt.Sprintf("hub-kubeconfig-secret-%s", suffix)
@@ -53,7 +53,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 		// create claims
 		for _, claim := range claims {
 			_, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), claim, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		}
 
 		// run registration agent
@@ -72,33 +72,33 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 		commOptions.SpokeClusterName = managedClusterName
 		cancel = runAgent("claimtest", agentOptions, commOptions, spokeCfg)
 
-		ginkgo.DeferCleanup(func() {
+		DeferCleanup(func() {
 			err = clusterClient.ClusterV1alpha1().ClusterClaims().DeleteCollection(
 				context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			cancel()
 		})
 	})
 
 	assertSuccessBootstrap := func() {
 		// the spoke cluster and csr should be created after bootstrap
-		ginkgo.By("Check existence of ManagedCluster & CSR")
-		gomega.Eventually(func() bool {
+		By("Check existence of ManagedCluster & CSR")
+		Eventually(func() bool {
 			if _, err := util.GetManagedCluster(clusterClient, managedClusterName); err != nil {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// the spoke cluster should has finalizer that is added by hub controller
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return false
@@ -109,48 +109,48 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 			}
 
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-		ginkgo.By("Accept and approve the ManagedCluster")
+		By("Accept and approve the ManagedCluster")
 		// simulate hub cluster admin to accept the managedcluster and approve the csr
 		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// the managed cluster should have accepted condition after it is accepted
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return false
 			}
 			accepted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
 			return accepted != nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-		ginkgo.By("ManagedCluster joins the hub")
+		By("ManagedCluster joins the hub")
 		// the spoke cluster should have joined condition finally
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return false
 			}
 			joined := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
 			return joined != nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	}
 
-	ginkgo.Context("Sync all claims", func() {
-		ginkgo.BeforeEach(func() {
+	Context("Sync all claims", func() {
+		BeforeEach(func() {
 			maxCustomClusterClaims = 20
 			claims = []*clusterv1alpha1.ClusterClaim{
 				{
@@ -172,10 +172,10 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 			}
 		})
 
-		ginkgo.It("should sync all cluster claims on spoke to status of ManagedCluster", func() {
+		It("should sync all cluster claims on spoke to status of ManagedCluster", func() {
 			assertSuccessBootstrap()
 
-			ginkgo.By("Sync existing claims")
+			By("Sync existing claims")
 			var clusterClaims []clusterv1.ManagedClusterClaim
 			for _, claim := range claims {
 				clusterClaims = append(clusterClaims, clusterv1.ManagedClusterClaim{
@@ -184,15 +184,15 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				})
 			}
 
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return false
 				}
 				return reflect.DeepEqual(clusterClaims, spokeCluster.Status.ClusterClaims)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-			ginkgo.By("Create a new claim")
+			By("Create a new claim")
 			newClaim := &clusterv1alpha1.ClusterClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "c",
@@ -202,7 +202,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				},
 			}
 			newClaim, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), newClaim, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			var newClusterClaims []clusterv1.ManagedClusterClaim
 			newClusterClaims = append(newClusterClaims, clusterClaims...)
@@ -211,18 +211,18 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				Value: newClaim.Spec.Value,
 			})
 
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return false
 				}
 				return reflect.DeepEqual(newClusterClaims, spokeCluster.Status.ClusterClaims)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-			ginkgo.By("Update the claim")
+			By("Update the claim")
 			newClaim.Spec.Value = "Z"
 			_, err := clusterClient.ClusterV1alpha1().ClusterClaims().Update(context.TODO(), newClaim, metav1.UpdateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			var updatedClusterClaims []clusterv1.ManagedClusterClaim
 			updatedClusterClaims = append(updatedClusterClaims, clusterClaims...)
@@ -231,81 +231,81 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				Value: newClaim.Spec.Value,
 			})
 
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return false
 				}
 				return reflect.DeepEqual(updatedClusterClaims, spokeCluster.Status.ClusterClaims)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-			ginkgo.By("Delete the claim")
+			By("Delete the claim")
 			err = clusterClient.ClusterV1alpha1().ClusterClaims().Delete(context.TODO(), newClaim.Name, metav1.DeleteOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Eventually(func() bool {
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() bool {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return false
 				}
 				return reflect.DeepEqual(clusterClaims, spokeCluster.Status.ClusterClaims)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 	})
 
-	ginkgo.Context("Self-reported hosting cluster (KEP-188)", func() {
-		ginkgo.BeforeEach(func() {
+	Context("Self-reported hosting cluster (KEP-188)", func() {
+		BeforeEach(func() {
 			reportHostingCluster = true
 			hostingClusterName = "hub-cluster-b"
 		})
 
-		ginkgo.It("should create, update and delete the reserved hosting-cluster claim", func() {
+		It("should create, update and delete the reserved hosting-cluster claim", func() {
 			assertSuccessBootstrap()
 
-			ginkgo.By("Claim is created with the reported value")
-			gomega.Eventually(func() (string, error) {
+			By("Claim is created with the reported value")
+			Eventually(func() (string, error) {
 				claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(
 					context.TODO(), managedcluster.HostingClusterClaimName, metav1.GetOptions{})
 				if err != nil {
 					return "", err
 				}
 				return claim.Spec.Value, nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Equal("hub-cluster-b"))
+			}, eventuallyTimeout, eventuallyInterval).Should(Equal("hub-cluster-b"))
 
-			ginkgo.By("Claim is corrected if something else changes its value")
+			By("Claim is corrected if something else changes its value")
 			claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(
 				context.TODO(), managedcluster.HostingClusterClaimName, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			claim.Spec.Value = "someone-else-changed-this"
 			_, err = clusterClient.ClusterV1alpha1().ClusterClaims().Update(context.TODO(), claim, metav1.UpdateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Eventually(func() (string, error) {
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() (string, error) {
 				claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(
 					context.TODO(), managedcluster.HostingClusterClaimName, metav1.GetOptions{})
 				if err != nil {
 					return "", err
 				}
 				return claim.Spec.Value, nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Equal("hub-cluster-b"))
+			}, eventuallyTimeout, eventuallyInterval).Should(Equal("hub-cluster-b"))
 		})
 	})
 
-	ginkgo.Context("Self-report disabled (default)", func() {
-		ginkgo.It("should never create the reserved hosting-cluster claim", func() {
+	Context("Self-report disabled (default)", func() {
+		It("should never create the reserved hosting-cluster claim", func() {
 			assertSuccessBootstrap()
 
-			gomega.Consistently(func() bool {
+			Consistently(func() bool {
 				_, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(
 					context.TODO(), managedcluster.HostingClusterClaimName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
-			}, 5*time.Second, eventuallyInterval).Should(gomega.BeTrue())
+			}, 5*time.Second, eventuallyInterval).Should(BeTrue())
 		})
 	})
 
-	ginkgo.Context("Sync all clusterproperties", func() {
+	Context("Sync all clusterproperties", func() {
 		var aboutClient aboutclient.Interface
 		var err error
 		var properties []*aboutv1alpha1.ClusterProperty
-		ginkgo.BeforeEach(func() {
+		BeforeEach(func() {
 			maxCustomClusterClaims = 20
 			claims = []*clusterv1alpha1.ClusterClaim{}
 			properties = []*aboutv1alpha1.ClusterProperty{
@@ -327,28 +327,28 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				},
 			}
 			aboutClient, err = aboutclient.NewForConfig(spokeCfg)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			for _, prop := range properties {
 				_, err = aboutClient.AboutV1alpha1().ClusterProperties().Create(
 					context.Background(), prop, metav1.CreateOptions{})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			}
 			err = features.SpokeMutableFeatureGate.Set("ClusterProperty=true")
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
-			ginkgo.DeferCleanup(func() {
+			DeferCleanup(func() {
 				err := aboutClient.AboutV1alpha1().ClusterProperties().DeleteCollection(
 					context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 				err = features.SpokeMutableFeatureGate.Set("ClusterProperty=false")
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 
-		ginkgo.It("should sync all cluster properties on spoke to status of ManagedCluster", func() {
+		It("should sync all cluster properties on spoke to status of ManagedCluster", func() {
 			assertSuccessBootstrap()
 
-			ginkgo.By("Sync existing clusterproperty")
+			By("Sync existing clusterproperty")
 			var clusterClaims []clusterv1.ManagedClusterClaim
 			for _, claim := range properties {
 				clusterClaims = append(clusterClaims, clusterv1.ManagedClusterClaim{
@@ -357,7 +357,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				})
 			}
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return err
@@ -367,9 +367,9 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				}
 
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-			ginkgo.By("Create a new clusterproperty")
+			By("Create a new clusterproperty")
 			newProperty := &aboutv1alpha1.ClusterProperty{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "property3",
@@ -379,7 +379,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				},
 			}
 			newProperty, err = aboutClient.AboutV1alpha1().ClusterProperties().Create(context.TODO(), newProperty, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			var newClusterClaims []clusterv1.ManagedClusterClaim
 			newClusterClaims = append(newClusterClaims, clusterClaims...)
@@ -388,7 +388,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				Value: newProperty.Spec.Value,
 			})
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return err
@@ -397,12 +397,12 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 					return fmt.Errorf("cluster claims are not equal, got %v", spokeCluster.Status.ClusterClaims)
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-			ginkgo.By("Update the property")
+			By("Update the property")
 			newProperty.Spec.Value = "Z"
 			_, err := aboutClient.AboutV1alpha1().ClusterProperties().Update(context.TODO(), newProperty, metav1.UpdateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			var updatedClusterClaims []clusterv1.ManagedClusterClaim
 			updatedClusterClaims = append(updatedClusterClaims, clusterClaims...)
@@ -411,7 +411,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				Value: newProperty.Spec.Value,
 			})
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return err
@@ -420,12 +420,12 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 					return fmt.Errorf("cluster claims are not equal, got %v", spokeCluster.Status.ClusterClaims)
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-			ginkgo.By("Delete the property")
+			By("Delete the property")
 			err = aboutClient.AboutV1alpha1().ClusterProperties().Delete(context.TODO(), newProperty.Name, metav1.DeleteOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Eventually(func() error {
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() error {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return err
@@ -434,10 +434,10 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 					return fmt.Errorf("cluster claims are not equal, got %v", spokeCluster.Status.ClusterClaims)
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 		})
 
-		ginkgo.It("should sync all both properties and claims", func() {
+		It("should sync all both properties and claims", func() {
 			assertSuccessBootstrap()
 
 			var clusterClaims []clusterv1.ManagedClusterClaim
@@ -448,7 +448,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				})
 			}
 
-			ginkgo.By("Create a new claim")
+			By("Create a new claim")
 			newClaim := &clusterv1alpha1.ClusterClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "c",
@@ -458,7 +458,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				},
 			}
 			newClaim, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), newClaim, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			var updatedClusterClaims []clusterv1.ManagedClusterClaim
 			updatedClusterClaims = append(updatedClusterClaims, clusterv1.ManagedClusterClaim{
@@ -467,7 +467,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 			})
 			updatedClusterClaims = append(updatedClusterClaims, clusterClaims...)
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return err
@@ -476,15 +476,15 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 					return fmt.Errorf("cluster claims are not equal, got %v", spokeCluster.Status.ClusterClaims)
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-			ginkgo.By("create a claim with the same key")
+			By("create a claim with the same key")
 			updateProperty, err := aboutClient.AboutV1alpha1().ClusterProperties().Get(
 				context.TODO(), "property1", metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			updateProperty.Spec.Value = "newValue"
 			_, err = aboutClient.AboutV1alpha1().ClusterProperties().Update(context.TODO(), updateProperty, metav1.UpdateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			newClaim = &clusterv1alpha1.ClusterClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "property1",
@@ -493,11 +493,11 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 					Value: "value1",
 				},
 			}
-			newClaim, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), newClaim, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			_, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), newClaim, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
 			updatedClusterClaims[1].Value = "newValue"
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return err
@@ -506,12 +506,12 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 					return fmt.Errorf("cluster claims are not equal, got %v", spokeCluster.Status.ClusterClaims)
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 		})
 	})
 
-	ginkgo.Context("Truncate exposed claims", func() {
-		ginkgo.BeforeEach(func() {
+	Context("Truncate exposed claims", func() {
+		BeforeEach(func() {
 			maxCustomClusterClaims = 5
 			claims = []*clusterv1alpha1.ClusterClaim{}
 			for i := 0; i < 10; i++ {
@@ -526,23 +526,23 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 			}
 		})
 
-		ginkgo.It("should sync truncated cluster claims on spoke to status of ManagedCluster", func() {
+		It("should sync truncated cluster claims on spoke to status of ManagedCluster", func() {
 			assertSuccessBootstrap()
 
-			ginkgo.By("Sync truncated claims")
-			gomega.Eventually(func() bool {
+			By("Sync truncated claims")
+			Eventually(func() bool {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return false
 				}
 
 				return len(spokeCluster.Status.ClusterClaims) == maxCustomClusterClaims
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 	})
 
-	ginkgo.Context("Keep custom reserved claims", func() {
-		ginkgo.BeforeEach(func() {
+	Context("Keep custom reserved claims", func() {
+		BeforeEach(func() {
 			maxCustomClusterClaims = 5
 			reservedClusterClaimSuffixes = []string{"reserved.io"}
 			claims = []*clusterv1alpha1.ClusterClaim{
@@ -567,18 +567,18 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 			}
 		})
 
-		ginkgo.It("should sync custom suffix claims to status of ManagedCluster", func() {
+		It("should sync custom suffix claims to status of ManagedCluster", func() {
 			assertSuccessBootstrap()
 
-			ginkgo.By("Sync claims")
-			gomega.Eventually(func() bool {
+			By("Sync claims")
+			Eventually(func() bool {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return false
 				}
 
 				return len(spokeCluster.Status.ClusterClaims) == maxCustomClusterClaims+1
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 	})
 })
