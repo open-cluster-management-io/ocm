@@ -130,8 +130,8 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 				return d
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "create", "create", "patch")
-				p := actions[2].(clienttesting.PatchActionImpl).Patch
+				testingcommon.AssertActions(t, actions, "list", "create", "list", "create", "patch")
+				p := actions[4].(clienttesting.PatchActionImpl).Patch
 				workSet := &workapiv1alpha1.ManifestWorkReplicaSet{}
 				if err := json.Unmarshal(p, workSet); err != nil {
 					t.Fatal(err)
@@ -192,8 +192,8 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 				return d
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "create", "create", "delete", "patch")
-				p := actions[3].(clienttesting.PatchActionImpl).Patch
+				testingcommon.AssertActions(t, actions, "list", "create", "list", "create", "delete", "patch")
+				p := actions[5].(clienttesting.PatchActionImpl).Patch
 				workSet := &workapiv1alpha1.ManifestWorkReplicaSet{}
 				if err := json.Unmarshal(p, workSet); err != nil {
 					t.Fatal(err)
