@@ -6,7 +6,10 @@
             "Principal": {
                 "AWS": "arn:{{.managedClusterPartition}}:iam::{{.managedClusterAccountId}}:role/ocm-managed-cluster-{{.managedClusterIamRoleSuffix}}"
             },
-            "Action": "sts:AssumeRole",
+            "Action": [
+                "sts:AssumeRole",
+                "sts:TagSession"
+            ],
             "Condition": {
                 "StringEquals": {
                     "aws:PrincipalTag/hub_cluster_account_id": "{{.hubAccountId}}",
