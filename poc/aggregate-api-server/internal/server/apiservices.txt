@@ -1,0 +1,10 @@
+# APIService owns a complete group/version. Keep in sync with resource descriptors.
+work.open-cluster-management.io/v1
+work.open-cluster-management.io/v1alpha1
+cluster.open-cluster-management.io/v1
+cluster.open-cluster-management.io/v1beta2
+cluster.open-cluster-management.io/v1beta1
+cluster.open-cluster-management.io/v1alpha1
+addon.open-cluster-management.io/v1alpha1
+addon.open-cluster-management.io/v1beta1
+internal.open-cluster-management.io/v1beta1

@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ocm-aggregate-api
+  namespace: ocm-api-poc
+  labels:
+    app.kubernetes.io/managed-by: ocm-aggregate-api-poc
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ocm-aggregate-api-auth-delegator
+  labels:
+    app.kubernetes.io/managed-by: ocm-aggregate-api-poc
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: ocm-aggregate-api
+  namespace: ocm-api-poc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocm-aggregate-api
+  namespace: ocm-api-poc
+  labels:
+    app.kubernetes.io/managed-by: ocm-aggregate-api-poc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ocm-aggregate-api
+  template:
+    metadata:
+      labels:
+        app: ocm-aggregate-api
+    spec:
+      serviceAccountName: ocm-aggregate-api
+      containers:
+      - name: apiserver
+        image: ocm-aggregate-api-poc:dev
+        imagePullPolicy: Never
+        args:
+        - --listen-address=:8443
+        - --tls-cert-file=/tls/tls.crt
+        - --tls-key-file=/tls/tls.key
+        - --requestheader-client-ca-file=/tls/requestheader-client-ca.crt
+        ports:
+        - name: https
+          containerPort: 8443
+        env:
+        - name: POSTGRES_DSN
+          valueFrom:
+            secretKeyRef:
+              name: ocm-api-poc-postgres
+              key: dsn
+        - name: REQUESTHEADER_ALLOWED_NAMES
+          valueFrom:
+            secretKeyRef:
+              name: ocm-api-poc-proxy
+              key: allowed-names
+        readinessProbe:
+          tcpSocket:
+            port: https
+          periodSeconds: 3
+        livenessProbe:
+          tcpSocket:
+            port: https
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65532
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+        - name: serving-cert
+          mountPath: /tls
+          readOnly: true
+      volumes:
+      - name: serving-cert
+        secret:
+          secretName: ocm-aggregate-api-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ocm-aggregate-api
+  namespace: ocm-api-poc
+  labels:
+    app.kubernetes.io/managed-by: ocm-aggregate-api-poc
+spec:
+  selector:
+    app: ocm-aggregate-api
+  ports:
+  - name: https
+    port: 443
+    targetPort: https

@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocm-api-poc-postgres
+  namespace: ocm-api-poc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ocm-api-poc-postgres
+  template:
+    metadata:
+      labels:
+        app: ocm-api-poc-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:17
+        ports:
+        - name: postgres
+          containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: postgres
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ocm-api-poc-postgres
+              key: admin-password
+        - name: OCM_API_POC_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ocm-api-poc-postgres
+              key: password
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres", "-d", "postgres"]
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: initdb
+          mountPath: /docker-entrypoint-initdb.d/10-init.sh
+          subPath: 10-init.sh
+          readOnly: true
+      volumes:
+      - name: data
+        emptyDir: {}
+      - name: initdb
+        configMap:
+          name: ocm-api-poc-postgres-init
+          defaultMode: 0755
+          items:
+          - key: initdb.sh
+            path: 10-init.sh
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ocm-api-poc-postgres
+  namespace: ocm-api-poc
+spec:
+  selector:
+    app: ocm-api-poc-postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: postgres
