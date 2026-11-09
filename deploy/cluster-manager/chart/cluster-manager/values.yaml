@@ -115,6 +115,26 @@ clusterManager:
   # if false, will not create clusterManager instance, default is true.
   create: true
   mode: Default
+  # Hosted mode runs OCM controllers in this release cluster while OCM hub API
+  # resources are managed through externalHubKubeconfig. Addresses must be
+  # reachable by the external hub API server.
+  hosted:
+    registrationWebhookConfiguration:
+      address: ""
+      port: 30443
+      bindConfiguration:
+        port: 30443
+        healthProbePort: 0
+        metricsPort: 0
+        hostNetwork: true
+    workWebhookConfiguration:
+      address: ""
+      port: 31443
+      bindConfiguration:
+        port: 31443
+        healthProbePort: 0
+        metricsPort: 0
+        hostNetwork: true
   resourceRequirement:
     type: Default
   registrationConfiguration:

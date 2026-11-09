@@ -1,0 +1,337 @@
+<!-- Copyright Contributors to the Open Cluster Management project -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OCM ManifestWork Load Simulator</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b1020; --panel:#121a2d; --line:#25324c; --muted:#9aa9c2; --text:#edf3ff; --blue:#67b7ff; --green:#50d6a0; --orange:#ffbd69; --red:#ff7185; }
+    * { box-sizing:border-box } body { margin:0; background:radial-gradient(ellipse at top,#142344,var(--bg) 60%); color:var(--text); font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif }
+    main { max-width:1440px; margin:0 auto; padding:28px 24px 60px } h1,h2,h3,p { margin-top:0 } h1 { margin-bottom:8px; font-size:clamp(24px,3vw,36px) } h2 { font-size:18px; margin-bottom:4px } h3 { font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px }
+    .sub,.muted { color:var(--muted) } .sub { margin-bottom:24px; max-width:950px } .topline { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; flex-wrap:wrap }
+    .badge,.chip { display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line); border-radius:999px; padding:6px 11px; color:var(--muted); background:#111a2b }
+    .dot { width:8px;height:8px;border-radius:50%;background:var(--orange) } .dot.ok { background:var(--green) } .dot.bad { background:var(--red) }
+    .grid { display:grid; gap:16px } .controls { grid-template-columns:repeat(4,minmax(170px,1fr)); margin-bottom:16px } .cards { grid-template-columns:repeat(4,minmax(130px,1fr)); margin-bottom:16px } .graphs { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .panel { background:linear-gradient(160deg,#151f35,#101729); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:0 12px 32px #0003; min-width:0 }
+    .control label { display:flex; justify-content:space-between; gap:8px; font-weight:650; margin-bottom:10px } input[type=range] { width:100%; accent-color:var(--blue) } .range-note { display:flex; justify-content:space-between; color:var(--muted);font-size:11px }
+    .button-row { display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-top:12px } button { border:1px solid #41618c; border-radius:8px; background:#1a3760; color:white; padding:9px 14px; font:inherit; font-weight:650; cursor:pointer } button.secondary { background:#192235;border-color:var(--line) } button.danger { background:#512334;border-color:#804255 } button:disabled { opacity:.45;cursor:not-allowed }
+    input[type=text] { background:#0a1120;border:1px solid var(--line);border-radius:7px;padding:8px 10px;color:var(--text);width:90px }
+    .banner { border:1px solid #755c35;background:#322919;color:#ffe3b4;padding:11px 14px;border-radius:10px;margin:0 0 16px }
+    .stat { display:flex; flex-direction:column; gap:3px } .stat strong { font-size:22px;font-variant-numeric:tabular-nums } .stat span { color:var(--muted);font-size:12px }
+    .card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px;margin-bottom:10px } .card-head p { margin:3px 0 0;color:var(--muted);font-size:12px }
+    .chart { height:155px;width:100%;display:block;cursor:crosshair } .chart-labels { display:flex;justify-content:space-between;font-size:11px;color:var(--muted) }
+    .legend { display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:11px;margin:4px 0 8px } .legend i { display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px }
+    .estimate-note { padding:9px 11px;background:#171f30;border-radius:8px;color:var(--muted);font-size:12px;margin:8px 0 12px }
+    .assumptions { margin:12px 0 16px;padding:12px;background:#0e1728;border:1px solid var(--line);border-radius:9px }
+    .assumptions table { width:100%;border-collapse:collapse;font-size:12px }
+    .assumptions th,.assumptions td { padding:5px 4px;text-align:left;border-bottom:1px solid #202c42 }
+    .assumptions input { width:90px;max-width:100%;background:#0a1120;border:1px solid var(--line);border-radius:5px;color:var(--text);padding:5px }
+    .small { font-size:12px }.error { color:var(--red) }.good { color:var(--green) }
+    details { margin-top:16px;color:var(--muted) } summary { cursor:pointer }
+    @media(max-width:900px) { .controls{grid-template-columns:repeat(2,1fr)} .graphs{grid-template-columns:1fr} }
+    @media(max-width:560px) { main{padding:18px 12px 40px}.controls,.cards{grid-template-columns:1fr 1fr}.panel{padding:14px} }
+  </style>
+</head>
+<body>
+<main>
+  <div class="topline">
+    <div><h1>ManifestWork load simulator</h1><p class="sub">Live resource comparison for a disposable OCM test hub. Each simulated cluster registers through a real CSR and ManagedCluster; simulated agents renew a registration lease and acknowledge synthetic ManifestWorks. No full Klusterlet or spoke application runtime is deployed.</p><p class="small muted">Simulator run ID: <code id="runId">loading</code></p></div>
+    <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><div class="badge"><i id="statusDot" class="dot"></i><span id="statusText">Loading simulator status</span></div><button id="resetGraphs" class="secondary" title="Drop collected graph samples; the idle baseline is kept">Reset graphs</button></div>
+  </div>
+  <div id="safetyBanner" class="banner">Load generation is opt-in. The server must be started with <code>--enable-load</code>, and you must type <code>RUN</code> before starting agents.</div>
+
+  <section class="grid controls">
+    <div class="panel control"><label for="clusters">Simulated clusters <strong id="clustersValue">1</strong></label><input id="clusters" type="range" min="1" max="1000" value="1"><div class="range-note"><span>1</span><span>1,000</span></div></div>
+    <div class="panel control"><label for="works">ManifestWorks per cluster <strong id="worksValue">1</strong></label><input id="works" type="range" min="1" max="100" value="1"><div class="range-note"><span>1</span><span id="worksMax">100</span></div></div>
+    <div class="panel control"><label for="tps">Fleet ManifestWork updates/sec <strong id="tpsValue">0</strong></label><input id="tps" type="range" min="0" max="100" value="0"><div class="range-note"><span>0</span><span>100</span></div></div>
+    <div class="panel">
+      <h3>Workload shape</h3><p class="small">Each work gets a reproducible random mix of Deployment, Service, Ingress, ConfigMap, fake Secret, and up to three extra ConfigMaps. Payloads are bounded.</p>
+      <div><strong id="totalWorks">1</strong> total works <span class="muted">· 10,000 maximum</span></div>
+      <div class="button-row"><span class="small muted">Type RUN to start:</span><input id="confirmation" type="text" autocomplete="off" aria-label="Type RUN to confirm"><button id="start">Start</button><button id="pause" class="secondary">Pause</button><button id="stop" class="danger">Stop &amp; clean up</button></div>
+      <div id="startHint" class="small muted" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <section class="grid cards">
+    <div class="panel stat"><strong id="clusterCounts">0 / 0</strong><span>active / desired clusters</span></div>
+    <div class="panel stat"><strong id="workCounts">0 / 0</strong><span>active / desired ManifestWorks</span></div>
+    <div class="panel stat"><strong id="rate">0 / 0</strong><span>achieved / requested updates/sec</span></div>
+    <div class="panel stat"><strong id="transactions">0</strong><span>agent status writes · active watches</span></div>
+    <div class="panel stat"><strong id="pendingNamespaces">0</strong><span id="pendingNamespaceNote">namespaces Kubernetes is finalizing</span></div>
+  </section>
+
+  <section id="crosshairPanel" class="panel" style="display:none">
+    <div class="card-head"><div><h2>Selected sample</h2><p id="crosshead" class="small muted">—</p></div><button id="clearSelection" class="secondary">Clear</button></div>
+    <div id="crossValues" class="small" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 24px"></div>
+  </section>
+
+  <section class="grid graphs">
+    <article class="panel">
+      <div class="card-head"><div><h2>Hosting control plane — measured</h2><p>Native hosting kube-apiserver and etcd</p></div><span id="hostStatus" class="chip">Waiting for metrics</span></div>
+      <div class="legend"><span><i style="background:#67b7ff"></i>API server</span><span><i style="background:#50d6a0"></i>etcd</span><span><i style="background:#ffbd69"></i>OCM component pods</span></div>
+      <h3>CPU cores</h3><canvas id="hostCPU" class="chart"></canvas><div class="chart-labels"><span id="hostCpuNow">No samples</span><span>Time →</span></div>
+      <h3 style="margin-top:14px">Memory MiB</h3><canvas id="hostMemory" class="chart"></canvas><div class="chart-labels"><span id="hostMemNow">No samples</span><span>Time →</span></div>
+      <div id="hostRequests" class="estimate-note">API request rate and latency require API-server /metrics access.</div>
+    </article>
+    <article class="panel">
+      <div class="card-head"><div><h2>Direct hub API — estimated</h2><p>Modeled native API server and etcd if OCM state were stored directly on the hub</p></div><span id="estimateBadge" class="chip">Uncalibrated</span></div>
+      <div id="estimateNote" class="estimate-note">No direct-hub baseline loaded. No savings estimate will be shown until the model is calibrated.</div>
+      <div class="assumptions">
+        <h3>Editable incremental-cost assumptions</h3>
+        <p class="small muted">The provisional graph adds these per-object costs to the measured hosting API/etcd baseline. A calibrated direct-hub CSV replaces this model.</p>
+        <table><thead><tr><th>Added load</th><th>CPU cores</th><th>Memory MiB</th></tr></thead>
+          <tbody>
+            <tr><td>Per simulated cluster — API</td><td><input id="apiCPUCluster" type="number" min="0" max="10000" step="0.00001"></td><td><input id="apiMemCluster" type="number" min="0" max="10000" step="0.01"></td></tr>
+            <tr><td>Per ManifestWork — API</td><td><input id="apiCPUWork" type="number" min="0" max="10000" step="0.00001"></td><td><input id="apiMemWork" type="number" min="0" max="10000" step="0.01"></td></tr>
+            <tr><td>Per fleet update/sec — API</td><td><input id="apiCPUUpdate" type="number" min="0" max="10000" step="0.00001"></td><td><input id="apiMemUpdate" type="number" min="0" max="10000" step="0.01"></td></tr>
+            <tr><td>Per simulated cluster — etcd</td><td><input id="etcdCPUCluster" type="number" min="0" max="10000" step="0.00001"></td><td><input id="etcdMemCluster" type="number" min="0" max="10000" step="0.01"></td></tr>
+            <tr><td>Per ManifestWork — etcd</td><td><input id="etcdCPUWork" type="number" min="0" max="10000" step="0.00001"></td><td><input id="etcdMemWork" type="number" min="0" max="10000" step="0.01"></td></tr>
+            <tr><td>Per fleet update/sec — etcd</td><td><input id="etcdCPUUpdate" type="number" min="0" max="10000" step="0.00001"></td><td><input id="etcdMemUpdate" type="number" min="0" max="10000" step="0.01"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="legend"><span><i style="background:#67b7ff"></i>API server</span><span><i style="background:#50d6a0"></i>etcd</span></div>
+      <h3>Estimated CPU cores</h3><canvas id="directCPU" class="chart"></canvas><div class="chart-labels"><span id="directCpuNow">No estimate</span><span>Time →</span></div>
+      <h3 style="margin-top:14px">Estimated memory MiB</h3><canvas id="directMemory" class="chart"></canvas><div class="chart-labels"><span id="directMemNow">No estimate</span><span>Time →</span></div>
+      <div id="fitStatus" class="small muted">Direct-hub estimates are predictions, not live measurements.</div>
+    </article>
+    <article class="panel">
+      <div class="card-head"><div><h2>Separate OCM control plane — measured</h2><p>Standalone kube-apiserver, Kine and PostgreSQL</p></div><span id="ocmStatus" class="chip">Waiting for metrics</span></div>
+      <div class="legend"><span><i style="background:#67b7ff"></i>API server</span><span><i style="background:#bf93ff"></i>Kine</span><span><i style="background:#ff7185"></i>PostgreSQL</span></div>
+      <h3>CPU cores</h3><canvas id="ocmCPU" class="chart"></canvas><div class="chart-labels"><span id="ocmCpuNow">No samples</span><span>Time →</span></div>
+      <h3 style="margin-top:14px">Memory MiB</h3><canvas id="ocmMemory" class="chart"></canvas><div class="chart-labels"><span id="ocmMemNow">No samples</span><span>Time →</span></div>
+      <div id="ocmRequests" class="estimate-note">OCM API request rate and latency require API-server /metrics access; Kine and database transaction rates depend on available metrics.</div>
+    </article>
+    <article class="panel">
+      <div class="card-head"><div><h2>Load and simulator health</h2><p>Logical updates are distinct from API requests and DB transactions.</p></div><span id="loadStatus" class="chip">Idle</span></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">
+        <div class="stat"><strong id="registrationCounts">0 / 0</strong><span>ManagedCluster registrations / pending registrations</span></div>
+        <div class="stat"><strong id="registrationStages">none</strong><span id="registrationStageNote">pending registrations by stage</span></div>
+        <div class="stat"><strong id="stalledRegistrations">0</strong><span>registrations without stage progress for 2m+</span></div>
+        <div class="stat"><strong id="csrCounts">0 / 0</strong><span>CSRs created / auto-approved by hub</span></div>
+        <div class="stat"><strong id="leaseWrites">0</strong><span>registration lease writes</span></div>
+        <div class="stat"><strong id="logicalUpdates">0</strong><span>successful logical work updates</span></div>
+        <div class="stat"><strong id="statusWrites">0</strong><span>simulated-agent status writes</span></div>
+        <div class="stat"><strong id="apiErrors">0</strong><span>simulator/watch errors</span></div>
+        <div class="stat"><strong id="watchCount">0</strong><span>active work watches</span></div>
+        <div class="stat"><strong id="statusLag">n/a</strong><span>average synthetic status-write latency</span></div>
+      </div>
+      <div id="lastError" class="estimate-note" style="display:none"></div>
+        <details><summary>Metric source notes</summary><ul class="small"><li>API-server CPU, memory, request rate and mean request latency are scraped from each kubeconfig API server’s <code>/metrics</code>.</li><li>etcd, Kine and PostgreSQL container CPU/memory require Prometheus URLs and matching container metrics.</li><li>Unavailable metrics stay blank; the dashboard never substitutes guessed live values.</li><li>ManagedClusters use the issued simulator-agent client certificate. If hub CSR approval/signing is unavailable, the registration remains pending; the simulator does not approve its own CSR.</li><li>This models registration resources, leases and work-agent API calls—not the full Klusterlet deployment or an application runtime on a spoke.</li></ul></details>
+    </article>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const maxTotal = 10000;
+let configTimer;
+let assumptionsTimer;
+let latest;
+function setControlsFromInputs(){
+  const clusters = Number($('clusters').value);
+  const maxWorks = Math.max(1, Math.min(100, Math.floor(maxTotal / clusters)));
+  $('works').max = maxWorks;
+  $('worksMax').textContent = maxWorks;
+  if (Number($('works').value) > maxWorks) $('works').value = maxWorks;
+  $('clustersValue').textContent = clusters.toLocaleString();
+  $('worksValue').textContent = $('works').value;
+  $('tpsValue').textContent = $('tps').value;
+  $('totalWorks').textContent = (clusters * Number($('works').value)).toLocaleString();
+}
+function configure(){
+  setControlsFromInputs();
+  clearTimeout(configTimer);
+  configTimer = setTimeout(async()=>{
+    const response = await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({clusters:Number($('clusters').value),worksPerCluster:Number($('works').value),updatesPerSecond:Number($('tps').value)})});
+    if(!response.ok) showError(await response.text());
+    await refresh();
+  },120);
+}
+const assumptionFields={apiCpuPerCluster:'apiCPUCluster',apiMemoryMiBPerCluster:'apiMemCluster',apiCpuPerWork:'apiCPUWork',apiMemoryMiBPerWork:'apiMemWork',apiCpuPerUpdatePerSecond:'apiCPUUpdate',apiMemoryMiBPerUpdatePerSecond:'apiMemUpdate',etcdCpuPerCluster:'etcdCPUCluster',etcdMemoryMiBPerCluster:'etcdMemCluster',etcdCpuPerWork:'etcdCPUWork',etcdMemoryMiBPerWork:'etcdMemWork',etcdCpuPerUpdatePerSecond:'etcdCPUUpdate',etcdMemoryMiBPerUpdatePerSecond:'etcdMemUpdate'};
+function updateAssumptions(){
+  clearTimeout(assumptionsTimer);
+  assumptionsTimer=setTimeout(async()=>{
+    const assumptions={};for(const [key,id] of Object.entries(assumptionFields))assumptions[key]=Number($(id).value);
+    const response=await fetch('/api/assumptions',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(assumptions)});
+    if(!response.ok)showError(await response.text());else showError('');
+    await refresh();
+  },180);
+}
+async function action(path, body={}){
+  const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!response.ok) showError(await response.text());
+  else showError('');
+  await refresh();
+}
+function showError(message){const el=$('lastError');el.textContent=message;el.style.display=message?'block':'none';}
+function value(metric,key){const n=metric&&metric[key];return typeof n==='number'&&Number.isFinite(n)?n:null;}
+const stageOrder=[['managed-cluster','managed-cluster'],['csr','csr'],['certificate','certificate'],['hub-acceptance','hub-acceptance'],['namespace','namespace'],['unknown','unknown']];
+function stageSummary(stages){const m=stages||{};const parts=stageOrder.filter(([k])=>(m[k]||0)>0).map(([k,label])=>`${label} ${m[k]}`);return parts.length?parts.join(' · '):'none';}
+function ageSummary(seconds){if(!seconds||seconds<=0)return '0s';return seconds>=90?`${Math.floor(seconds/60)}m ${Math.round(seconds%60)}s`:`${Math.round(seconds)}s`;}
+function draw(id, series, scale=1, suffix='', selectedIdx=null){
+  const canvas=$(id), rect=canvas.getBoundingClientRect(), ratio=window.devicePixelRatio||1;
+  canvas.width=Math.max(1,rect.width*ratio);canvas.height=Math.max(1,rect.height*ratio);
+  const ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);const w=rect.width,h=rect.height;
+  ctx.clearRect(0,0,w,h);ctx.strokeStyle='#25324c';ctx.lineWidth=1;
+  for(let i=0;i<4;i++){const y=10+i*(h-24)/3;ctx.beginPath();ctx.moveTo(36,y);ctx.lineTo(w-6,y);ctx.stroke();}
+  const all=series.flatMap(s=>s.values.filter(v=>v!==null));if(!all.length){ctx.fillStyle='#9aa9c2';ctx.font='12px system-ui';ctx.fillText('Waiting for samples',42,h/2);return;}
+  const max=Math.max(...all,0.00001),min=Math.min(...all,0),plotW=w-48,plotH=h-28;
+  ctx.fillStyle='#9aa9c2';ctx.font='10px system-ui';ctx.fillText((max*scale).toFixed(1)+suffix,1,16);ctx.fillText((min*scale).toFixed(1)+suffix,1,h-5);
+  for(const line of series){ctx.strokeStyle=line.color;ctx.lineWidth=2;ctx.beginPath();let started=false;
+    line.values.forEach((v,i)=>{if(v===null)return;const x=40+(line.values.length<=1?0:i*plotW/(line.values.length-1));const y=8+(max-v)*plotH/(max-min||1);if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);});ctx.stroke();}
+  const count=series.length?series[0].values.length:0;
+  if(selectedIdx!==null&&count>1&&selectedIdx<count){
+    const x=40+selectedIdx*plotW/(count-1);
+    ctx.strokeStyle='#edf3ff';ctx.setLineDash([4,3]);ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x,8);ctx.lineTo(x,h-20);ctx.stroke();ctx.setLineDash([]);
+    // Mark and label every line that has a value where the crosshair intersects it.
+    ctx.font='10px system-ui';
+    for(const line of series){
+      const v=line.values[selectedIdx];
+      if(v===null||v===undefined)continue;
+      const y=8+(max-v)*plotH/(max-min||1);
+      ctx.beginPath();ctx.arc(x,y,3.5,0,Math.PI*2);ctx.fillStyle=line.color;ctx.fill();
+      ctx.strokeStyle='#0b1020';ctx.lineWidth=1.5;ctx.stroke();
+      const atRight=x>w-72;
+      ctx.fillStyle=line.color;ctx.textAlign=atRight?'right':'left';
+      ctx.fillText(v.toFixed(2),atRight?x-7:x+7,y-5);
+      ctx.textAlign='left';
+    }
+  }
+}
+function metricSeries(history, key, metricKey, color, scale=1){return {color,values:history.map(s=>value(s[key],metricKey)===null?null:value(s[key],metricKey)/scale)};}
+// The selection is anchored to a sample timestamp, not an array position, so
+// it stays on the same moment as history grows and scrolls, and is cleared
+// once that sample rolls out of the window.
+let selectedTimestamp=null;
+function selectedIndexOf(history){
+  if(selectedTimestamp===null)return null;
+  for(let i=0;i<history.length;i++){if(history[i].timestamp===selectedTimestamp)return i;}
+  return null;
+}
+function updateCharts(state){
+  const history=state.history||[];
+  const selectedIdx=selectedIndexOf(history);
+  if(selectedTimestamp!==null&&selectedIdx===null)selectedTimestamp=null;
+  const hostCPU=[metricSeries(history,'hostingApi','cpuCores','#67b7ff'),metricSeries(history,'hostingEtcd','cpuCores','#50d6a0'),metricSeries(history,'ocmComponents','cpuCores','#ffbd69')];
+  const hostMem=[metricSeries(history,'hostingApi','memoryBytes','#67b7ff',1048576),metricSeries(history,'hostingEtcd','memoryBytes','#50d6a0',1048576),metricSeries(history,'ocmComponents','memoryBytes','#ffbd69',1048576)];
+  const estimate=state.directEstimate||{};
+  const estimateSeries=(metric,field,scale=1)=>{const values=history.map(s=>value(s.directEstimate?.[metric],field)===null?null:value(s.directEstimate?.[metric],field)/scale);const latestValue=value(estimate[metric],field);if(values.length)values[values.length-1]=latestValue===null?null:latestValue/scale;else values.push(latestValue===null?null:latestValue/scale);return values;};
+  const directCPU=[{color:'#67b7ff',values:estimateSeries('api','cpuCores')},{color:'#50d6a0',values:estimateSeries('etcd','cpuCores')}];
+  const directMem=[{color:'#67b7ff',values:estimateSeries('api','memoryBytes',1048576)},{color:'#50d6a0',values:estimateSeries('etcd','memoryBytes',1048576)}];
+  const ocmCPU=[metricSeries(history,'ocmApi','cpuCores','#67b7ff'),metricSeries(history,'kine','cpuCores','#bf93ff'),metricSeries(history,'postgres','cpuCores','#ff7185')];
+  const ocmMem=[metricSeries(history,'ocmApi','memoryBytes','#67b7ff',1048576),metricSeries(history,'kine','memoryBytes','#bf93ff',1048576),metricSeries(history,'postgres','memoryBytes','#ff7185',1048576)];
+  draw('hostCPU',hostCPU,1,'',selectedIdx);draw('hostMemory',hostMem,1,'',selectedIdx);draw('directCPU',directCPU,1,'',selectedIdx);draw('directMemory',directMem,1,'',selectedIdx);draw('ocmCPU',ocmCPU,1,'',selectedIdx);draw('ocmMemory',ocmMem,1,'',selectedIdx);
+  const last=history[history.length-1];
+  const fmt=(n,unit='')=>n===null||n===undefined?'n/a':Number(n).toFixed(2)+unit;
+   $('hostCpuNow').textContent='API '+fmt(value(last?.hostingApi,'cpuCores'))+' cores · etcd '+fmt(value(last?.hostingEtcd,'cpuCores'))+' · OCM pods '+fmt(value(last?.ocmComponents,'cpuCores'))+' cores';
+   $('hostMemNow').textContent='API '+fmt(value(last?.hostingApi,'memoryBytes')===null?null:last.hostingApi.memoryBytes/1048576,' MiB')+' · etcd '+fmt(value(last?.hostingEtcd,'memoryBytes')===null?null:last.hostingEtcd.memoryBytes/1048576,' MiB')+' · OCM pods '+fmt(value(last?.ocmComponents,'memoryBytes')===null?null:last.ocmComponents.memoryBytes/1048576,' MiB');
+  $('directCpuNow').textContent='API '+fmt(value(estimate.api,'cpuCores'))+' · etcd '+fmt(value(estimate.etcd,'cpuCores'))+' cores';
+  $('directMemNow').textContent='API '+fmt(value(estimate.api,'memoryBytes')===null?null:estimate.api.memoryBytes/1048576,' MiB')+' · etcd '+fmt(value(estimate.etcd,'memoryBytes')===null?null:estimate.etcd.memoryBytes/1048576,' MiB');
+  $('ocmCpuNow').textContent='API '+fmt(value(last?.ocmApi,'cpuCores'))+' · Kine '+fmt(value(last?.kine,'cpuCores'))+' · PostgreSQL '+fmt(value(last?.postgres,'cpuCores'))+' cores';
+  $('ocmMemNow').textContent='API '+fmt(value(last?.ocmApi,'memoryBytes')===null?null:last.ocmApi.memoryBytes/1048576,' MiB')+' · Kine '+fmt(value(last?.kine,'memoryBytes')===null?null:last.kine.memoryBytes/1048576,' MiB')+' · PostgreSQL '+fmt(value(last?.postgres,'memoryBytes')===null?null:last.postgres.memoryBytes/1048576,' MiB');
+  const hostReq=value(last?.hostingApi,'requestsPerSecond'),hostLat=value(last?.hostingApi,'avgLatencySeconds');
+  const hostStorageRate=value(last?.hostingApi,'storageRequestsPerSecond'),hostStorageLatency=value(last?.hostingApi,'storageLatencySeconds');
+  $('hostRequests').textContent='Hosting API: '+(hostReq===null?'request rate n/a':hostReq.toFixed(1)+' requests/sec')+' · '+(hostLat===null?'latency n/a':'mean '+(hostLat*1000).toFixed(1)+' ms')+' · etcd ops: '+(hostStorageRate===null?'n/a':hostStorageRate.toFixed(1)+'/sec')+(hostStorageLatency===null?'':' · mean '+(hostStorageLatency*1000).toFixed(1)+' ms');
+  const ocmReq=value(last?.ocmApi,'requestsPerSecond'),ocmLat=value(last?.ocmApi,'avgLatencySeconds');
+  const ocmStorageRate=value(last?.ocmApi,'storageRequestsPerSecond'),ocmStorageLatency=value(last?.ocmApi,'storageLatencySeconds');
+  const dbTPS=value(last?.postgres,'requestsPerSecond');
+  $('ocmRequests').textContent='OCM API: '+(ocmReq===null?'request rate n/a':ocmReq.toFixed(1)+' requests/sec')+' · '+(ocmLat===null?'latency n/a':'mean '+(ocmLat*1000).toFixed(1)+' ms')+' · Kine storage ops: '+(ocmStorageRate===null?'n/a':ocmStorageRate.toFixed(1)+'/sec')+(ocmStorageLatency===null?'':' · mean '+(ocmStorageLatency*1000).toFixed(1)+' ms')+' · PostgreSQL transactions/sec: '+(dbTPS===null?'n/a (exporter metric required)':dbTPS.toFixed(1));
+   const hErrors=[last?.hostingApi?.error,last?.hostingEtcd?.error,last?.ocmComponents?.error].filter(Boolean);
+  const oErrors=[last?.ocmApi?.error,last?.kine?.error,last?.postgres?.error].filter(Boolean);
+  $('hostStatus').textContent=hErrors.length?hErrors[0]:'API / etcd sampled';
+  $('ocmStatus').textContent=oErrors.length?oErrors[0]:'API / Kine / DB sampled';
+  renderCrosshair();
+}
+async function refresh(){
+  try{
+    const response=await fetch('/api/state',{cache:'no-store'});if(!response.ok)throw new Error(await response.text());
+    const s=await response.json();latest=s;
+    $('runId').textContent=s.runId;
+    $('clusters').value=s.config.clusters;$('works').value=s.config.worksPerCluster;$('tps').value=s.config.updatesPerSecond;setControlsFromInputs();
+    $('statusText').textContent=s.running?'Running':s.started?'Paused':s.terminatingClusters?'Cleaning up':s.pendingNamespaceDeletes?'Cleanup accepted':'Idle';
+    $('statusDot').className='dot '+(s.running?'ok':s.lastError?'bad':'');
+    $('clusterCounts').textContent=`${s.activeClusters} / ${s.desiredClusters}`;
+    $('workCounts').textContent=`${s.activeWorks} / ${s.desiredWorks}`;
+    $('rate').textContent=`${Number(s.achievedUpdatesPerSecond||0).toFixed(1)} / ${s.config.updatesPerSecond}`;
+    $('transactions').textContent=`${Number(s.agentStatusUpdates||0).toLocaleString()} · ${s.activeWatches}`;
+    $('registrationCounts').textContent=`${Number(s.managedClusterRegistrations||0).toLocaleString()} / ${Number(s.pendingRegistrations||0).toLocaleString()}`;
+    $('registrationStages').textContent=stageSummary(s.registrationStages);
+    $('registrationStageNote').textContent='pending registrations by stage · oldest '+ageSummary(s.pendingRegistrationOldestSeconds)+' · avg '+ageSummary(s.pendingRegistrationAgeSeconds);
+    $('stalledRegistrations').textContent=Number(s.stalledRegistrations||0).toLocaleString();
+    $('csrCounts').textContent=`${Number(s.registrationCSRs||0).toLocaleString()} / ${Number(s.registrationCSRsApproved||0).toLocaleString()}`;
+    $('leaseWrites').textContent=Number(s.leaseWrites||0).toLocaleString();
+    const finalizing=Number(s.pendingNamespaceDeletes||0);
+    const cleanupTotal=Number(s.cleanupTotal||0);
+    if(cleanupTotal>0){
+      $('pendingNamespaces').textContent=`${Number(s.cleanupFinalized||0).toLocaleString()} / ${cleanupTotal.toLocaleString()}`;
+      $('pendingNamespaceNote').textContent=`namespace cleanup finalized / total · ${finalizing.toLocaleString()} finalizing`;
+    }else{
+      $('pendingNamespaces').textContent=finalizing.toLocaleString();
+      $('pendingNamespaceNote').textContent='namespaces Kubernetes is finalizing';
+    }
+    $('logicalUpdates').textContent=Number(s.manifestWorkUpdates||0).toLocaleString();
+    $('statusWrites').textContent=Number(s.agentStatusUpdates||0).toLocaleString();
+    $('apiErrors').textContent=Number(s.errors||0).toLocaleString();$('watchCount').textContent=s.activeWatches;
+    $('statusLag').textContent=s.agentStatusUpdates?`${Number(s.averageAgentStatusLagSeconds||0).toFixed(3)} s`:'n/a';
+    $('start').disabled=!s.canStart;
+    $('startHint').textContent=!s.allowWrites?'Restart the server with --enable-load to permit test writes.':s.terminatingClusters?`Cleaning ${s.terminatingClusters} simulator cluster(s); starting is disabled until cleanup is accepted.`:s.pendingNamespaceDeletes?`Kubernetes is finalizing ${s.pendingNamespaceDeletes} prior namespace(s); a new run uses unique names.`:s.started?'Pause or stop the current run before starting again.':'';
+    $('pause').disabled=!s.running;$('stop').disabled=!s.started&&!s.activeClusters&&!s.terminatingClusters;
+    $('safetyBanner').style.display=s.allowWrites?'none':'block';
+    $('loadStatus').textContent=s.running?'Generating load':s.started?'Paused':'Idle';
+    $('hostStatus').textContent=s.history?.length?'Sampling':'Waiting for metrics';$('ocmStatus').textContent=s.history?.length?'Sampling':'Waiting for metrics';
+    const estimate=s.directEstimate||{};$('estimateBadge').textContent=estimate.calibrated?(estimate.extrapolated?'Extrapolated':estimate.weakFit?'Weak fit':'Calibrated'):'Provisional assumptions';
+    for(const [key,id] of Object.entries(assumptionFields)){if(document.activeElement!==$(id))$(id).value=s.assumptions[key];}
+    const lastSample=(s.history||[]).slice(-1)[0];
+    const interval=(range,lowKey,highKey,scale=1,unit='')=>range?.[lowKey]===undefined?'n/a':`${(range[lowKey]/scale).toFixed(2)}–${(range[highKey]/scale).toFixed(2)}${unit}`;
+    $('estimateNote').textContent=(estimate.message||'No direct-hub baseline loaded.')+(estimate.calibrated&&lastSample?` Current 95% residual ranges: API CPU ${interval(estimate.apiRange,'cpuLow','cpuHigh',1,' cores')}, memory ${interval(estimate.apiRange,'memoryLow','memoryHigh',1048576,' MiB')}; etcd CPU ${interval(estimate.etcdRange,'cpuLow','cpuHigh',1,' cores')}, memory ${interval(estimate.etcdRange,'memoryLow','memoryHigh',1048576,' MiB')}.`:'' );
+    const baselineStatus=lastSample?.baselineStatus;
+    $('fitStatus').textContent=(estimate.calibrated?`${estimate.samples} direct baseline samples · conservative fit R² ${Number(estimate.r2).toFixed(3)}. The interval is residual-based, not a guarantee.`:'Assumption-based estimate, not a measurement. Edit the incremental costs above or collect a direct-hub baseline.')+(baselineStatus?' · '+baselineStatus:'');
+    showError(s.lastError||'');updateCharts(s);
+  }catch(error){$('statusText').textContent='Dashboard API unavailable';$('statusDot').className='dot bad';showError(String(error));}
+}
+for(const id of ['clusters','works','tps'])$(id).addEventListener('input',configure);
+for(const id of Object.values(assumptionFields))$(id).addEventListener('input',updateAssumptions);
+$('start').addEventListener('click',()=>action('/api/start',{confirmation:$('confirmation').value}));
+$('pause').addEventListener('click',()=>action('/api/pause'));
+$('stop').addEventListener('click',()=>{if(confirm('Stop the simulator and delete only resources owned by this simulator run?'))action('/api/stop');});
+window.addEventListener('resize',()=>latest&&updateCharts(latest));
+for(const id of ['hostCPU','hostMemory','directCPU','directMemory','ocmCPU','ocmMemory']){
+  $(id).addEventListener('click',evt=>{
+    const history=latest?.history||[];
+    if(history.length<2)return;
+    const rect=evt.target.getBoundingClientRect();
+    const frac=Math.min(1,Math.max(0,(evt.clientX-rect.left-40)/(rect.width-48)));
+    const idx=Math.round(frac*(history.length-1));
+    selectedTimestamp=history[idx].timestamp;
+    if(latest)updateCharts(latest);
+  });
+}
+$('clearSelection').addEventListener('click',()=>{selectedTimestamp=null;if(latest)updateCharts(latest);});
+$('resetGraphs').addEventListener('click',()=>{selectedTimestamp=null;action('/api/reset-history');});
+function renderCrosshair(){
+  const panel=$('crosshairPanel');
+  const history=latest?.history||[];
+  if(selectedTimestamp===null){panel.style.display='none';return;}
+  const idx=selectedIndexOf(history);
+  if(idx===null){selectedTimestamp=null;panel.style.display='none';return;}
+  const s=history[idx];
+  panel.style.display='block';
+  $('crosshead').textContent=s.timestamp+' · '+s.config.clusters+' clusters / '+s.config.worksPerCluster+' works / '+s.config.updatesPerSecond+' updates/sec requested · '+Number(s.achievedUpdatesPerSecond||0).toFixed(1)+'/s achieved';
+  const m=ms=>{if(!ms)return 'n/a';const c=ms.cpuCores,mem=ms.memoryBytes;return (c===null||c===undefined?'n/a':c.toFixed(3)+' cores')+' · '+(mem===null||mem===undefined?'n/a':(mem/1048576).toFixed(0)+' MiB');};
+  const rowsOut=[
+    ['Hosting API',m(s.hostingApi)],['Hosting etcd',m(s.hostingEtcd)],
+    ['Hosting OCM pods',m(s.ocmComponents)],['OCM API',m(s.ocmApi)],
+    ['Kine',m(s.kine)],['PostgreSQL',m(s.postgres)],
+    ['Estimated API',m(s.directEstimate&&s.directEstimate.api)],['Estimated etcd',m(s.directEstimate&&s.directEstimate.etcd)],
+    ['Registration stages',stageSummary(s.registrationStages)+' · oldest '+ageSummary(s.pendingRegistrationOldestSeconds)],
+    ['Stalled registrations',Number(s.stalledRegistrations||0).toLocaleString()+' pending of '+Number(s.pendingRegistrations||0).toLocaleString()],
+    ['Agent status writes',Number(s.agentStatusUpdates||0).toLocaleString()],['Errors',Number(s.errors||0).toLocaleString()],
+  ];
+  $('crossValues').innerHTML=rowsOut.map(r=>'<div><strong>'+r[0]+':</strong> '+r[1]+'</div>').join('');
+}
+refresh();setInterval(refresh,2000);
+</script>
+</body>
+</html>

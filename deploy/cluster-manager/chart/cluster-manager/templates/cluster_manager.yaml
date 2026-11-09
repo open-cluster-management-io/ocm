@@ -10,6 +10,23 @@ spec:
   addOnManagerImagePullSpec: "{{ template "addOnManagerImage" . }}"
   deployOption:
     mode: {{ .Values.clusterManager.mode }}
+    {{- if eq .Values.clusterManager.mode "Hosted" }}
+    hosted:
+      registrationWebhookConfiguration:
+        address: {{ required "clusterManager.hosted.registrationWebhookConfiguration.address is required in Hosted mode" .Values.clusterManager.hosted.registrationWebhookConfiguration.address | quote }}
+        port: {{ .Values.clusterManager.hosted.registrationWebhookConfiguration.port }}
+        {{- with .Values.clusterManager.hosted.registrationWebhookConfiguration.bindConfiguration }}
+        bindConfiguration:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      workWebhookConfiguration:
+        address: {{ required "clusterManager.hosted.workWebhookConfiguration.address is required in Hosted mode" .Values.clusterManager.hosted.workWebhookConfiguration.address | quote }}
+        port: {{ .Values.clusterManager.hosted.workWebhookConfiguration.port }}
+        {{- with .Values.clusterManager.hosted.workWebhookConfiguration.bindConfiguration }}
+        bindConfiguration:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+    {{- end }}
   {{- with .Values.clusterManager.resourceRequirement }}
   resourceRequirement:
     {{- toYaml . | nindent 4 }}

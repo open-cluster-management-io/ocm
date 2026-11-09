@@ -19,6 +19,36 @@ For example, install the chart into `open-cluster-management` namespace.
 helm install cluster-manager  --version <version> ocm/cluster-manager --namespace=open-cluster-management --create-namespace
 ```
 
+### Hosted mode
+
+Hosted mode keeps the operator and OCM controllers in the release cluster while
+the `ClusterManager` controller reads and writes hub resources through an
+external kubeconfig. Before installing the chart, create a namespace named
+`cluster-manager` in the release cluster and add an `external-hub-kubeconfig`
+Secret with a `kubeconfig` data key. Set `clusterManager.mode` to `Hosted` and
+provide reachable webhook addresses, for example:
+
+```yaml
+clusterManager:
+  mode: Hosted
+  hosted:
+    registrationWebhookConfiguration:
+      address: 192.0.2.10
+      port: 30443
+      bindConfiguration:
+        port: 30443
+        hostNetwork: true
+    workWebhookConfiguration:
+      address: 192.0.2.10
+      port: 31443
+      bindConfiguration:
+        port: 31443
+        hostNetwork: true
+```
+
+The API server serving the hub must be able to resolve and reach the webhook
+addresses. Hosted add-on conversion routing is not configured by this chart.
+
 ## Uninstall
 
 ### Delete all managedClusters before uninstall the Chart
