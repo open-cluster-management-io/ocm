@@ -124,7 +124,11 @@ The `awsirsa` registration driver can also get its AWS credentials from [EKS Pod
 
 Set `credentialSource: PodIdentity` on both CRs. The operators then stop annotating the OCM service accounts with `eks.amazonaws.com/role-arn`, so the service accounts no longer depend on IRSA. If the annotation is already there, for example on an existing IRSA setup, the operators remove it and restart the affected pods.
 
-The default is `IRSA`, so existing setups keep working unchanged. While a Pod Identity association exists for a service account, EKS gives its pods Pod Identity credentials even if the IRSA annotation is present. To switch back to IRSA, set `credentialSource: IRSA`, delete the associations, and restart the OCM pods.
+The default is `IRSA`, so existing setups keep working unchanged. While a Pod Identity association exists for a service account, EKS gives its pods Pod Identity credentials even if the IRSA annotation is present.
+
+To switch back to IRSA, first make `$SPOKE_ROLE_NAME` and `$IDENTITY_CREATOR_ROLE_NAME` trust the clusters' IAM OIDC providers again. Roles created by the steps below trust only `pods.eks.amazonaws.com`. Create the OIDC providers if the clusters don't have them, then apply the IRSA trust policies from steps 2 and 3 with `aws iam update-assume-role-policy`. Then set `credentialSource: IRSA`, delete the associations, and restart the OCM pods.
+
+If you are migrating an existing IRSA setup, `$SPOKE_ROLE_NAME` and `$IDENTITY_CREATOR_ROLE_NAME` already exist, so `aws iam create-role` in steps 2 and 3 fails. Run `aws iam update-assume-role-policy --role-name <role> --policy-document file://<trust policy>` instead. To keep the running pods working until both CRs are switched, put the IRSA statement and the Pod Identity statement in the same trust policy. Remove the IRSA statement once the switch is complete.
 
 1. Install the [EKS Pod Identity Agent](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-agent-setup.html) add-on on the hub and spoke clusters.
 
@@ -137,7 +141,7 @@ The default is `IRSA`, so existing setups keep working unchanged. While a Pod Id
    ```
    Associate the role with the agent service accounts. In `Default` mode these are `klusterlet-registration-sa` and `klusterlet-work-sa`. In `Singleton` mode only `klusterlet-work-sa` is used.
 
-   Keep session tags enabled, which is the default. Don't pass `--disable-session-tags`: the trust policy relies on the tags to restrict which pods can use the role, so associations without them are denied. The tags are transitive, so the hub role's trust policy also grants `sts:TagSession` to the spoke role.
+   Keep session tags enabled, which is the default. Don't pass `--disable-session-tags`: the trust policy relies on the tags to restrict which pods can use the role, so associations without them are denied. The tags are transitive, so the hub role's trust policy also grants `sts:TagSession` to the spoke role. When the hub and spoke are in different AWS accounts, the spoke role's permission policy must allow `sts:TagSession` on the hub role too. The step 2 permission policy template includes it. If you created the role from an older version of the template, re-run its `put-role-policy` command.
    ```bash
    for sa in klusterlet-registration-sa klusterlet-work-sa; do
      aws eks create-pod-identity-association --cluster-name $SPOKE_CLUSTER_NAME --region $SPOKE_REGION \
@@ -231,7 +235,7 @@ sed -e "s/HUB_ACCOUNT_ID/$HUB_ACCOUNT_ID/g" -e "s/HUB_REGION/$HUB_REGION/g" -e "
   templates/Template-Identity-Creator-Permission-Policy-UseExisting.json > templates/Identity-Creator-Permission-Policy.json
 ```
 
-Then set `resourceManagement` on the ClusterManager:
+Set `resourceManagement` on the ClusterManager right after `clusteradm init` in step 4, before any spoke joins in step 5. Step 4 turns on auto-approval, so a spoke that joins while the hub is still in `Managed` mode is accepted at once, and the hub tries to create or update its IAM role and access entry. With the policy above those calls are denied and `HubAccepted` reports errors. With broader permissions, the hub would overwrite the resources you provisioned.
 ```yaml
 spec:
   registrationConfiguration:
@@ -240,6 +244,12 @@ spec:
       awsirsa:
         hubClusterArn: arn:aws:eks:us-west-2:123456789012:cluster/hub
         resourceManagement: UseExisting
+```
+Wait for the registration controller to roll out with the new setting before joining spokes:
+```bash
+kubectl -n open-cluster-management-hub rollout status deploy/cluster-manager-registration-controller
+kubectl -n open-cluster-management-hub get deploy cluster-manager-registration-controller \
+  -o jsonpath='{.spec.template.spec.containers[0].args}' | grep -- --aws-resource-management=UseExisting
 ```
 
 Things to keep in mind:
