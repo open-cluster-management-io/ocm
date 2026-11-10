@@ -22,6 +22,11 @@ func (in AgentBindConfiguration) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AgentComponentConfiguration) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.AgentComponentConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in AgentConfiguration) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.operator.v1.AgentConfiguration"
 }
