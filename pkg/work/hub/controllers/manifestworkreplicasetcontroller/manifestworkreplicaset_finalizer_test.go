@@ -1,7 +1,6 @@
 package manifestworkreplicasetcontroller
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -101,10 +100,10 @@ func TestFinalizeReconcile(t *testing.T) {
 				workApplier:        workapplier.NewWorkApplierWithTypedClient(fakeClient, mwLister),
 			}
 
-			_, state, rstErr := finalizerController.reconcile(context.TODO(), manifestWorkReplicaSet)
+			_, state, rstErr := finalizerController.reconcile(t.Context(), manifestWorkReplicaSet)
 
 			updatetSet, err := fakeClient.WorkV1alpha1().ManifestWorkReplicaSets(manifestWorkReplicaSet.Namespace).
-				Get(context.TODO(), manifestWorkReplicaSet.Name, metav1.GetOptions{})
+				Get(t.Context(), manifestWorkReplicaSet.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Failed to get manifestWorkReplicaSet: %v", err)
 			}

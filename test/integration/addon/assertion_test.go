@@ -106,11 +106,12 @@ var addOnTest3ConfigSpecBeta = addonapiv1beta1.AddOnDeploymentConfigSpec{
 	},
 }
 
-func createClusterManagementAddOnAlpha(name, defaultConfigNamespace, defaultConfigName string) (*addonapiv1alpha1.ClusterManagementAddOn, error) {
-	clusterManagementAddon, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+func createClusterManagementAddOnAlpha(ctx context.Context, name, defaultConfigNamespace,
+	defaultConfigName string) (*addonapiv1alpha1.ClusterManagementAddOn, error) {
+	clusterManagementAddon, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		clusterManagementAddon, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(
-			context.Background(),
+			ctx,
 			&addonapiv1alpha1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
@@ -148,11 +149,12 @@ func createClusterManagementAddOnAlpha(name, defaultConfigNamespace, defaultConf
 	return clusterManagementAddon, nil
 }
 
-func createClusterManagementAddOnBeta(name, defaultConfigNamespace, defaultConfigName string) (*addonapiv1beta1.ClusterManagementAddOn, error) {
-	clusterManagementAddon, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+func createClusterManagementAddOnBeta(ctx context.Context, name, defaultConfigNamespace,
+	defaultConfigName string) (*addonapiv1beta1.ClusterManagementAddOn, error) {
+	clusterManagementAddon, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(ctx, name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		clusterManagementAddon, err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Create(
-			context.Background(),
+			ctx,
 			&addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
@@ -190,9 +192,9 @@ func createClusterManagementAddOnBeta(name, defaultConfigNamespace, defaultConfi
 	return clusterManagementAddon, nil
 }
 
-func patchClusterManagementAddOnAlpha(_ context.Context, newaddon *addonapiv1alpha1.ClusterManagementAddOn) {
+func patchClusterManagementAddOnAlpha(ctx context.Context, newaddon *addonapiv1alpha1.ClusterManagementAddOn) {
 	Eventually(func() error {
-		old, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), newaddon.Name, metav1.GetOptions{})
+		old, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, newaddon.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -203,19 +205,19 @@ func patchClusterManagementAddOnAlpha(_ context.Context, newaddon *addonapiv1alp
 		cmaPatcher := patcher.NewPatcher[
 			*addonapiv1alpha1.ClusterManagementAddOn, addonapiv1alpha1.ClusterManagementAddOnSpec, addonapiv1alpha1.ClusterManagementAddOnStatus](
 			hubAddonClient.AddonV1alpha1().ClusterManagementAddOns())
-		_, err = cmaPatcher.PatchSpec(context.Background(), new, new.Spec, old.Spec)
+		_, err = cmaPatcher.PatchSpec(ctx, new, new.Spec, old.Spec)
 		if err != nil {
 			return err
 		}
 
-		_, err = cmaPatcher.PatchLabelAnnotations(context.Background(), new, new.ObjectMeta, old.ObjectMeta)
+		_, err = cmaPatcher.PatchLabelAnnotations(ctx, new, new.ObjectMeta, old.ObjectMeta)
 		return err
 	}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 }
 
-func patchClusterManagementAddOnBeta(_ context.Context, newaddon *addonapiv1beta1.ClusterManagementAddOn) {
+func patchClusterManagementAddOnBeta(ctx context.Context, newaddon *addonapiv1beta1.ClusterManagementAddOn) {
 	Eventually(func() error {
-		old, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), newaddon.Name, metav1.GetOptions{})
+		old, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(ctx, newaddon.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -223,40 +225,40 @@ func patchClusterManagementAddOnBeta(_ context.Context, newaddon *addonapiv1beta
 		new.Spec = *newaddon.Spec.DeepCopy()
 		new.Annotations = newaddon.Annotations
 
-		_, err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Update(context.Background(), new, metav1.UpdateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Update(ctx, new, metav1.UpdateOptions{})
 		return err
 	}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 }
 
-func updateManagedClusterAddOnStatusAlpha(_ context.Context, new *addonapiv1alpha1.ManagedClusterAddOn) {
+func updateManagedClusterAddOnStatusAlpha(ctx context.Context, new *addonapiv1alpha1.ManagedClusterAddOn) {
 	Eventually(func() error {
-		old, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Get(context.Background(), new.Name, metav1.GetOptions{})
+		old, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Get(ctx, new.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		old.Status = new.Status
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(old.Namespace).UpdateStatus(context.Background(), old, metav1.UpdateOptions{})
+		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(old.Namespace).UpdateStatus(ctx, old, metav1.UpdateOptions{})
 		return err
 	}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 }
 
-func updateManagedClusterAddOnStatusBeta(_ context.Context, new *addonapiv1beta1.ManagedClusterAddOn) {
+func updateManagedClusterAddOnStatusBeta(ctx context.Context, new *addonapiv1beta1.ManagedClusterAddOn) {
 	Eventually(func() error {
-		old, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(new.Namespace).Get(context.Background(), new.Name, metav1.GetOptions{})
+		old, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(new.Namespace).Get(ctx, new.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		old.Status = new.Status
-		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(old.Namespace).UpdateStatus(context.Background(), old, metav1.UpdateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(old.Namespace).UpdateStatus(ctx, old, metav1.UpdateOptions{})
 		return err
 	}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 }
 
-func assertClusterManagementAddOnDefaultConfigReferencesAlpha(name string, expect ...addonapiv1alpha1.DefaultConfigReference) {
+func assertClusterManagementAddOnDefaultConfigReferencesAlpha(ctx context.Context, name string, expect ...addonapiv1alpha1.DefaultConfigReference) {
 	By(fmt.Sprintf("Check ClusterManagementAddOn %s DefaultConfigReferences (Alpha)", name))
 
 	Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -277,11 +279,11 @@ func assertClusterManagementAddOnDefaultConfigReferencesAlpha(name string, expec
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
-func assertClusterManagementAddOnDefaultConfigReferencesBeta(name string, expect ...addonapiv1beta1.DefaultConfigReference) {
+func assertClusterManagementAddOnDefaultConfigReferencesBeta(ctx context.Context, name string, expect ...addonapiv1beta1.DefaultConfigReference) {
 	By(fmt.Sprintf("Check ClusterManagementAddOn %s DefaultConfigReferences (Beta)", name))
 
 	Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -302,7 +304,7 @@ func assertClusterManagementAddOnDefaultConfigReferencesBeta(name string, expect
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
-func createAddOnDeploymentConfigAlpha(
+func createAddOnDeploymentConfigAlpha(ctx context.Context,
 	hubAddonClient addonclient.Interface,
 	configNamespace string,
 	configName string,
@@ -316,11 +318,11 @@ func createAddOnDeploymentConfigAlpha(
 		Spec: configSpec,
 	}
 	_, err := hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configNamespace).Create(
-		context.Background(), config, metav1.CreateOptions{})
+		ctx, config, metav1.CreateOptions{})
 	return err
 }
 
-func createAddOnDeploymentConfigBeta(
+func createAddOnDeploymentConfigBeta(ctx context.Context,
 	hubAddonClient addonclient.Interface,
 	configNamespace string,
 	configName string,
@@ -334,11 +336,11 @@ func createAddOnDeploymentConfigBeta(
 		Spec: configSpec,
 	}
 	_, err := hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(configNamespace).Create(
-		context.Background(), config, metav1.CreateOptions{})
+		ctx, config, metav1.CreateOptions{})
 	return err
 }
 
-func updateAddOnDeploymentConfigSpecAlpha(
+func updateAddOnDeploymentConfigSpecAlpha(ctx context.Context,
 	hubAddonClient addonclient.Interface,
 	configNamespace string,
 	configName string,
@@ -346,14 +348,14 @@ func updateAddOnDeploymentConfigSpecAlpha(
 ) {
 	Eventually(func() error {
 		addOnConfig, err := hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configNamespace).Get(
-			context.Background(), configName, metav1.GetOptions{})
+			ctx, configName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
 		addOnConfig.Spec = newConfigSpec
 		_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configNamespace).Update(
-			context.Background(), addOnConfig, metav1.UpdateOptions{})
+			ctx, addOnConfig, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -361,7 +363,7 @@ func updateAddOnDeploymentConfigSpecAlpha(
 	}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 }
 
-func updateAddOnDeploymentConfigSpecBeta(
+func updateAddOnDeploymentConfigSpecBeta(ctx context.Context,
 	hubAddonClient addonclient.Interface,
 	configNamespace string,
 	configName string,
@@ -369,14 +371,14 @@ func updateAddOnDeploymentConfigSpecBeta(
 ) {
 	Eventually(func() error {
 		addOnConfig, err := hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(configNamespace).Get(
-			context.Background(), configName, metav1.GetOptions{})
+			ctx, configName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
 		addOnConfig.Spec = newConfigSpec
 		_, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(configNamespace).Update(
-			context.Background(), addOnConfig, metav1.UpdateOptions{})
+			ctx, addOnConfig, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -384,11 +386,11 @@ func updateAddOnDeploymentConfigSpecBeta(
 	}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 }
 
-func assertClusterManagementAddOnInstallProgressionAlpha(name string, expect ...addonapiv1alpha1.InstallProgression) {
+func assertClusterManagementAddOnInstallProgressionAlpha(ctx context.Context, name string, expect ...addonapiv1alpha1.InstallProgression) {
 	By(fmt.Sprintf("Check ClusterManagementAddOn %s InstallProgression", name))
 
 	Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -409,11 +411,11 @@ func assertClusterManagementAddOnInstallProgressionAlpha(name string, expect ...
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
-func assertClusterManagementAddOnInstallProgressionBeta(name string, expect ...addonapiv1beta1.InstallProgression) {
+func assertClusterManagementAddOnInstallProgressionBeta(ctx context.Context, name string, expect ...addonapiv1beta1.InstallProgression) {
 	By(fmt.Sprintf("Check ClusterManagementAddOn %s InstallProgression (v1beta1)", name))
 
 	Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -434,11 +436,11 @@ func assertClusterManagementAddOnInstallProgressionBeta(name string, expect ...a
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
-func assertManagedClusterAddOnConfigReferencesAlpha(name, namespace string, expect ...addonapiv1alpha1.ConfigReference) {
+func assertManagedClusterAddOnConfigReferencesAlpha(ctx context.Context, name, namespace string, expect ...addonapiv1alpha1.ConfigReference) {
 	By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s ConfigReferences", namespace, name))
 
 	Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -464,11 +466,11 @@ func assertManagedClusterAddOnConfigReferencesAlpha(name, namespace string, expe
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
-func assertManagedClusterAddOnConfigReferencesBeta(name, namespace string, expect ...addonapiv1beta1.ConfigReference) {
+func assertManagedClusterAddOnConfigReferencesBeta(ctx context.Context, name, namespace string, expect ...addonapiv1beta1.ConfigReference) {
 	By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s ConfigReferences (v1beta1)", namespace, name))
 
 	Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -494,11 +496,11 @@ func assertManagedClusterAddOnConfigReferencesBeta(name, namespace string, expec
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
-func assertClusterManagementAddOnAnnotationsAlpha(name string) {
+func assertClusterManagementAddOnAnnotationsAlpha(ctx context.Context, name string) {
 	By(fmt.Sprintf("Check ClusterManagementAddOn %v Annotations (Alpha)", name))
 
 	Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -513,21 +515,21 @@ func assertClusterManagementAddOnAnnotationsAlpha(name string) {
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
-func assertClusterManagementAddOnAnnotationsBeta(name string) {
+func assertClusterManagementAddOnAnnotationsBeta(ctx context.Context, name string) {
 	By(fmt.Sprintf("Check ClusterManagementAddOn %v Annotations (Beta)", name))
 
 	// Note: The AddonLifecycleAnnotationKey was removed in v1beta1, so this assertion
 	// is a no-op for backward compatibility with test structure. In v1beta1, addon
 	// lifecycle management is always handled by the addon-manager.
 	Eventually(func() error {
-		_, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		_, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(ctx, name, metav1.GetOptions{})
 		return err
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
-func updateManifestWorkStatus(client workclientset.Interface, clusterName string, manifestWorkName string, status metav1.ConditionStatus) {
+func updateManifestWorkStatus(ctx context.Context, client workclientset.Interface, clusterName string, manifestWorkName string, status metav1.ConditionStatus) {
 	Eventually(func() error {
-		work, err := client.WorkV1().ManifestWorks(clusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+		work, err := client.WorkV1().ManifestWorks(clusterName).Get(ctx, manifestWorkName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -539,12 +541,12 @@ func updateManifestWorkStatus(client workclientset.Interface, clusterName string
 			&work.Status.Conditions,
 			metav1.Condition{Type: workapiv1.WorkAvailable, Status: status, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
 
-		_, err = client.WorkV1().ManifestWorks(clusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
+		_, err = client.WorkV1().ManifestWorks(clusterName).UpdateStatus(ctx, work, metav1.UpdateOptions{})
 		return err
 	}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 }
 
-func createManagedCluster(hubClusterClient clusterv1client.Interface, managedClusterName string) error {
+func createManagedCluster(ctx context.Context, hubClusterClient clusterv1client.Interface, managedClusterName string) error {
 	managedCluster := &clusterv1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: managedClusterName,
@@ -553,20 +555,21 @@ func createManagedCluster(hubClusterClient clusterv1client.Interface, managedClu
 			HubAcceptsClient: true,
 		},
 	}
-	_, err := hubClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
+	_, err := hubClusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: managedClusterName}}
-	_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+	_, err = hubKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func createPlacementDecision(hubClusterClient clusterv1client.Interface, placementNamespace, placementName, groupIndex string, clusterNames ...string) error {
+func createPlacementDecision(ctx context.Context, hubClusterClient clusterv1client.Interface,
+	placementNamespace, placementName, groupIndex string, clusterNames ...string) error {
 	var err error
 	decision := &clusterv1beta1.PlacementDecision{
 		ObjectMeta: metav1.ObjectMeta{
@@ -578,7 +581,7 @@ func createPlacementDecision(hubClusterClient clusterv1client.Interface, placeme
 			},
 		},
 	}
-	decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementNamespace).Create(context.Background(), decision, metav1.CreateOptions{})
+	decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementNamespace).Create(ctx, decision, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -589,18 +592,18 @@ func createPlacementDecision(hubClusterClient clusterv1client.Interface, placeme
 	}
 	decision.Status.Decisions = clusterDecisions
 
-	_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementNamespace).UpdateStatus(context.Background(), decision, metav1.UpdateOptions{})
+	_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementNamespace).UpdateStatus(ctx, decision, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func assertClusterManagementAddOnConditionsAlpha(name string, expect ...metav1.Condition) {
+func assertClusterManagementAddOnConditionsAlpha(ctx context.Context, name string, expect ...metav1.Condition) {
 	By(fmt.Sprintf("Check ClusterManagementAddOn %s Conditions (Alpha)", name))
 
 	Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -622,11 +625,11 @@ func assertClusterManagementAddOnConditionsAlpha(name string, expect ...metav1.C
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
-func assertClusterManagementAddOnConditionsBeta(name string, expect ...metav1.Condition) {
+func assertClusterManagementAddOnConditionsBeta(ctx context.Context, name string, expect ...metav1.Condition) {
 	By(fmt.Sprintf("Check ClusterManagementAddOn %s Conditions (Beta)", name))
 
 	Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -661,13 +664,13 @@ func earliestRolloutDeadline(start metav1.Time, duration time.Duration) time.Tim
 	return start.Time.Truncate(time.Second).Add(duration)
 }
 
-func assertClusterManagementAddOnNoConditionsAlpha(name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
+func assertClusterManagementAddOnNoConditionsAlpha(ctx context.Context, name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
 	By(fmt.Sprintf("Check ClusterManagementAddOn %s no conditions in duration %v (Alpha)", name, duration))
 
 	notBefore := earliestRolloutDeadline(start, duration)
 
 	Consistently(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -698,13 +701,13 @@ func assertClusterManagementAddOnNoConditionsAlpha(name string, start metav1.Tim
 	}, duration+2*time.Second, eventuallyInterval).Should(BeNil())
 }
 
-func assertClusterManagementAddOnNoConditionsBeta(name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
+func assertClusterManagementAddOnNoConditionsBeta(ctx context.Context, name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
 	By(fmt.Sprintf("Check ClusterManagementAddOn %s no conditions in duration %v (Beta)", name, duration))
 
 	notBefore := earliestRolloutDeadline(start, duration)
 
 	Consistently(func() error {
-		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -735,11 +738,11 @@ func assertClusterManagementAddOnNoConditionsBeta(name string, start metav1.Time
 	}, duration+2*time.Second, eventuallyInterval).Should(BeNil())
 }
 
-func assertManagedClusterAddOnConditionsAlpha(name, namespace string, expect ...metav1.Condition) {
+func assertManagedClusterAddOnConditionsAlpha(ctx context.Context, name, namespace string, expect ...metav1.Condition) {
 	By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s Conditions (Alpha)", namespace, name))
 
 	Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -758,11 +761,11 @@ func assertManagedClusterAddOnConditionsAlpha(name, namespace string, expect ...
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 }
 
-func assertManagedClusterAddOnConditionsBeta(name, namespace string, expect ...metav1.Condition) {
+func assertManagedClusterAddOnConditionsBeta(ctx context.Context, name, namespace string, expect ...metav1.Condition) {
 	By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s Conditions (Beta)", namespace, name))
 
 	Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

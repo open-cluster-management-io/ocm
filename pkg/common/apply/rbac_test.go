@@ -1,7 +1,6 @@
 package apply
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -407,7 +406,7 @@ subjects:
 				informerFactory.Rbac().V1().ClusterRoles().Lister(),
 				informerFactory.Rbac().V1().ClusterRoleBindings().Lister(),
 			)
-			results := applier.Apply(context.TODO(), events.NewContextualLoggingEventRecorder(t.Name()),
+			results := applier.Apply(t.Context(), events.NewContextualLoggingEventRecorder(t.Name()),
 				func(name string) ([]byte, error) {
 					return []byte(c.manifest), nil
 				}, "test")

@@ -1,7 +1,6 @@
 package addonconfiguration
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -1519,7 +1518,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 					t.Errorf("expected no error when refresh rollout result: %v", err)
 				}
 
-				_, _, err = reconcile.reconcile(context.TODO(), obj.(*addonv1beta1.ClusterManagementAddOn), graph)
+				_, _, err = reconcile.reconcile(t.Context(), obj.(*addonv1beta1.ClusterManagementAddOn), graph)
 				if err != nil && !c.expectErr {
 					t.Errorf("expected no error when sync: %v", err)
 				}

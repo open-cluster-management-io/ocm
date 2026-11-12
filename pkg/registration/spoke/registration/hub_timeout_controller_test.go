@@ -53,7 +53,7 @@ func TestHubTimeoutController_Sync(t *testing.T) {
 				startTime: time.Now().Add(-time.Second * 15),
 			}
 
-			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, ""), "")
+			err := controller.sync(t.Context(), testingcommon.NewFakeSyncContext(t, ""), "")
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -101,7 +101,7 @@ func BenchmarkSchedulePlacements10000(b *testing.B) {
 
 func benchmarkSchedulePlacements(b *testing.B, pnum, cnum int) {
 	var err error
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(b.Context())
 
 	// start a kube-apiserver
 	testEnv := &envtest.Environment{
@@ -121,9 +121,9 @@ func benchmarkSchedulePlacements(b *testing.B, pnum, cnum int) {
 	}
 
 	// prepare namespace
-	createNamespace(namespace)
-	createClusters(namespace, name, cnum)
-	createAddOnPlacementScores("demo", cnum)
+	createNamespace(b.Context(), namespace)
+	createClusters(b.Context(), namespace, name, cnum)
+	createAddOnPlacementScores(b.Context(), "demo", cnum)
 
 	b.ResetTimer()
 	go func() {
@@ -135,31 +135,31 @@ func benchmarkSchedulePlacements(b *testing.B, pnum, cnum int) {
 		}
 	}()
 
-	go createPlacements(pnum)
-	assertPlacementDecisions(pnum, cancel)
+	go createPlacements(b.Context(), pnum)
+	assertPlacementDecisions(b.Context(), pnum, cancel)
 
 }
 
-func createNamespace(namespace string) {
+func createNamespace(ctx context.Context, namespace string) {
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespace,
 		},
 	}
-	_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+	_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if err != nil {
 		klog.Fatalf("%v", err)
 	}
 }
 
-func createClusters(namespace, name string, num int) {
+func createClusters(ctx context.Context, namespace, name string, num int) {
 	// Create ManagedClusterSet
 	clusterset := &clusterapiv1beta2.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
-	_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+	_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, clusterset, metav1.CreateOptions{})
 	if err != nil {
 		klog.Fatalf("%v", err)
 	}
@@ -174,7 +174,7 @@ func createClusters(namespace, name string, num int) {
 			ClusterSet: name,
 		},
 	}
-	_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+	_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(ctx, csb, metav1.CreateOptions{})
 	if err != nil {
 		klog.Fatalf("%v", err)
 	}
@@ -190,16 +190,16 @@ func createClusters(namespace, name string, num int) {
 				},
 			},
 		}
-		_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
+		_, err := clusterClient.ClusterV1().ManagedClusters().Create(ctx, cluster, metav1.CreateOptions{})
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
 		// create cluster namespace
-		createNamespace(clusterName)
+		createNamespace(ctx, clusterName)
 	}
 
 	// Check ManagedCluster
-	clusters, err := clusterClient.ClusterV1().ManagedClusters().List(context.Background(), metav1.ListOptions{})
+	clusters, err := clusterClient.ClusterV1().ManagedClusters().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		klog.Fatalf("%v", err)
 	} else if len(clusters.Items) != num {
@@ -207,19 +207,19 @@ func createClusters(namespace, name string, num int) {
 	}
 }
 
-func createPlacements(num int) {
+func createPlacements(ctx context.Context, num int) {
 	for i := 0; i < num; i++ {
 		benchmarkPlacement.Name = fmt.Sprintf("%s-%d", name, i)
-		_, err := clusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), &benchmarkPlacement, metav1.CreateOptions{})
+		_, err := clusterClient.ClusterV1beta1().Placements(namespace).Create(ctx, &benchmarkPlacement, metav1.CreateOptions{})
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
 	}
 }
 
-func assertPlacementDecisions(num int, cancel context.CancelFunc) {
+func assertPlacementDecisions(ctx context.Context, num int, cancel context.CancelFunc) {
 	for {
-		decisions, _ := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{})
+		decisions, _ := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(ctx, metav1.ListOptions{})
 		if len(decisions.Items) == num {
 			if cancel != nil {
 				cancel()
@@ -230,7 +230,7 @@ func assertPlacementDecisions(num int, cancel context.CancelFunc) {
 	}
 }
 
-func createAddOnPlacementScores(name string, num int) {
+func createAddOnPlacementScores(ctx context.Context, name string, num int) {
 	// Create AddOnPlacementScore
 	for i := 0; i < num; i++ {
 		clusterName := fmt.Sprintf("cluster%d", i)
@@ -240,7 +240,7 @@ func createAddOnPlacementScores(name string, num int) {
 				Name:      name,
 			},
 		}
-		addOn, err := clusterClient.ClusterV1alpha1().AddOnPlacementScores(clusterName).Create(context.Background(), addOn, metav1.CreateOptions{})
+		addOn, err := clusterClient.ClusterV1alpha1().AddOnPlacementScores(clusterName).Create(ctx, addOn, metav1.CreateOptions{})
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
@@ -256,14 +256,14 @@ func createAddOnPlacementScores(name string, num int) {
 			ValidUntil: &vu,
 		}
 
-		_, err = clusterClient.ClusterV1alpha1().AddOnPlacementScores(clusterName).UpdateStatus(context.Background(), addOn, metav1.UpdateOptions{})
+		_, err = clusterClient.ClusterV1alpha1().AddOnPlacementScores(clusterName).UpdateStatus(ctx, addOn, metav1.UpdateOptions{})
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
 	}
 
 	// Check AddOnPlacementScore
-	addons, err := clusterClient.ClusterV1alpha1().AddOnPlacementScores("").List(context.Background(), metav1.ListOptions{})
+	addons, err := clusterClient.ClusterV1alpha1().AddOnPlacementScores("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		klog.Fatalf("%v", err)
 	} else if len(addons.Items) != num {

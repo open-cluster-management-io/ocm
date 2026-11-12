@@ -1,7 +1,6 @@
 package gc
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -166,7 +165,7 @@ func TestGController(t *testing.T) {
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, c.key)
-			err := ctrl.sync(context.TODO(), controllerContext, c.key)
+			err := ctrl.sync(t.Context(), controllerContext, c.key)
 			if err != nil && !errors.Is(err, requeueError) {
 				t.Error(err)
 			}

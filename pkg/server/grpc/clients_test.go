@@ -98,7 +98,7 @@ func TestClientsRun(t *testing.T) {
 	}
 
 	// Create a context that we can cancel to test that Run respects context cancellation
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	// Start the clients in a goroutine
 	done := make(chan struct{})
@@ -111,7 +111,7 @@ func TestClientsRun(t *testing.T) {
 	cancel()
 
 	// Verify that Run exits when context is canceled
-	timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), 1*time.Second)
+	timeoutCtx, timeoutCancel := context.WithTimeout(t.Context(), 1*time.Second)
 	defer timeoutCancel()
 
 	select {
@@ -127,7 +127,7 @@ func TestClientsRunWithNilClients(t *testing.T) {
 	// This demonstrates the expected behavior when informers are not properly initialized
 	clients := &Clients{}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	// We expect this to panic due to nil informers

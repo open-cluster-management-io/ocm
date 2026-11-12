@@ -1,7 +1,6 @@
 package registration_test
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	cryptorand "crypto/rand"
@@ -26,7 +25,7 @@ import (
 )
 
 var _ = Describe("CSR Security Validation", func() {
-	It("Should reject CSR with prefix-matched organization that doesn't exactly match cluster name", func() {
+	It("Should reject CSR with prefix-matched organization that doesn't exactly match cluster name", func(ctx SpecContext) {
 		var err error
 
 		managedClusterName := "securitytest-cluster1"
@@ -91,7 +90,7 @@ var _ = Describe("CSR Security Validation", func() {
 		)
 
 		_, err = kubeClient.CertificatesV1().CertificateSigningRequests().Create(
-			context.Background(),
+			ctx,
 			maliciousCSR,
 			metav1.CreateOptions{},
 		)
@@ -101,7 +100,7 @@ var _ = Describe("CSR Security Validation", func() {
 		// The CSR should remain unapproved for at least 10 seconds
 		Consistently(func() bool {
 			csr, err := kubeClient.CertificatesV1().CertificateSigningRequests().Get(
-				context.Background(),
+				ctx,
 				maliciousCSR.Name,
 				metav1.GetOptions{},
 			)
@@ -114,14 +113,14 @@ var _ = Describe("CSR Security Validation", func() {
 
 		// Clean up the malicious CSR
 		err = kubeClient.CertificatesV1().CertificateSigningRequests().Delete(
-			context.Background(),
+			ctx,
 			maliciousCSR.Name,
 			metav1.DeleteOptions{},
 		)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("Should reject CSR where org and CN agree on wrong cluster name", func() {
+	It("Should reject CSR where org and CN agree on wrong cluster name", func(ctx SpecContext) {
 		var err error
 
 		managedClusterName := "securitytest-cluster2"
@@ -186,7 +185,7 @@ var _ = Describe("CSR Security Validation", func() {
 		)
 
 		_, err = kubeClient.CertificatesV1().CertificateSigningRequests().Create(
-			context.Background(),
+			ctx,
 			maliciousCSR,
 			metav1.CreateOptions{},
 		)
@@ -195,7 +194,7 @@ var _ = Describe("CSR Security Validation", func() {
 		// Wait and verify the malicious CSR is NOT auto-approved
 		Consistently(func() bool {
 			csr, err := kubeClient.CertificatesV1().CertificateSigningRequests().Get(
-				context.Background(),
+				ctx,
 				maliciousCSR.Name,
 				metav1.GetOptions{},
 			)
@@ -208,7 +207,7 @@ var _ = Describe("CSR Security Validation", func() {
 
 		// Clean up the malicious CSR
 		err = kubeClient.CertificatesV1().CertificateSigningRequests().Delete(
-			context.Background(),
+			ctx,
 			maliciousCSR.Name,
 			metav1.DeleteOptions{},
 		)

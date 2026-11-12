@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -14,7 +13,7 @@ import (
 )
 
 var _ = Describe("Create v1alpha1 ManagedClusterAddOn", Label("addon-conversion"), func() {
-	It("Create a v1alpha1 ManagedClusterAddOn and get/update/delete with v1alpha1 client", func() {
+	It("Create a v1alpha1 ManagedClusterAddOn and get/update/delete with v1alpha1 client", func(ctx SpecContext) {
 		clusterName := universalClusterName
 		suffix := rand.String(6)
 		addonName := fmt.Sprintf("addon-%s", suffix)
@@ -31,7 +30,7 @@ var _ = Describe("Create v1alpha1 ManagedClusterAddOn", Label("addon-conversion"
 		}
 
 		_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Create(
-			context.Background(), addon, metav1.CreateOptions{})
+			ctx, addon, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Get v1alpha1 ManagedClusterAddOn using v1alpha1 client")
@@ -68,19 +67,19 @@ var _ = Describe("Create v1alpha1 ManagedClusterAddOn", Label("addon-conversion"
 				}
 			}
 			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).UpdateStatus(
-				context.Background(), addon, metav1.UpdateOptions{})
+				ctx, addon, metav1.UpdateOptions{})
 			return err
 		}).Should(Succeed())
 
 		By("Delete v1alpha1 ManagedClusterAddOn using v1alpha1 client")
 		Eventually(func() error {
 			err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(
-				context.Background(), addonName, metav1.DeleteOptions{})
+				ctx, addonName, metav1.DeleteOptions{})
 			return err
 		}).Should(Succeed())
 	})
 
-	It("Create a v1alpha1 ManagedClusterAddOn and get/update/delete with v1beta1 client", func() {
+	It("Create a v1alpha1 ManagedClusterAddOn and get/update/delete with v1beta1 client", func(ctx SpecContext) {
 		clusterName := universalClusterName
 		suffix := rand.String(6)
 		addonName := fmt.Sprintf("addon-%s", suffix)
@@ -97,7 +96,7 @@ var _ = Describe("Create v1alpha1 ManagedClusterAddOn", Label("addon-conversion"
 		}
 
 		_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Create(
-			context.Background(), addon, metav1.CreateOptions{})
+			ctx, addon, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Update v1alpha1 ManagedClusterAddOn status using v1alpha1 client")
@@ -128,7 +127,7 @@ var _ = Describe("Create v1alpha1 ManagedClusterAddOn", Label("addon-conversion"
 				}
 			}
 			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).UpdateStatus(
-				context.Background(), addon, metav1.UpdateOptions{})
+				ctx, addon, metav1.UpdateOptions{})
 			return err
 		}).Should(Succeed())
 
@@ -178,7 +177,7 @@ var _ = Describe("Create v1alpha1 ManagedClusterAddOn", Label("addon-conversion"
 					})
 			}
 			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).UpdateStatus(
-				context.Background(), v1beta1Addon, metav1.UpdateOptions{})
+				ctx, v1beta1Addon, metav1.UpdateOptions{})
 			return err
 		}).Should(Succeed())
 
@@ -197,14 +196,14 @@ var _ = Describe("Create v1alpha1 ManagedClusterAddOn", Label("addon-conversion"
 		By("Delete v1alpha1 ManagedClusterAddOn using v1beta1 client")
 		Eventually(func() error {
 			err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Delete(
-				context.Background(), addonName, metav1.DeleteOptions{})
+				ctx, addonName, metav1.DeleteOptions{})
 			return err
 		}).Should(Succeed())
 	})
 })
 
 var _ = Describe("Create v1beta1 ManagedClusterAddOn", Label("addon-conversion"), func() {
-	It("Create a v1beta1 ManagedClusterAddOn and get/update/delete with v1beta1 client", func() {
+	It("Create a v1beta1 ManagedClusterAddOn and get/update/delete with v1beta1 client", func(ctx SpecContext) {
 		clusterName := universalClusterName
 		suffix := rand.String(6)
 		addonName := fmt.Sprintf("addon-%s", suffix)
@@ -219,7 +218,7 @@ var _ = Describe("Create v1beta1 ManagedClusterAddOn", Label("addon-conversion")
 		}
 
 		_, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Create(
-			context.Background(), addon, metav1.CreateOptions{})
+			ctx, addon, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Get v1beta1 ManagedClusterAddOn using v1beta1 client")
@@ -249,19 +248,19 @@ var _ = Describe("Create v1beta1 ManagedClusterAddOn", Label("addon-conversion")
 				},
 			}
 			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).UpdateStatus(
-				context.Background(), addon, metav1.UpdateOptions{})
+				ctx, addon, metav1.UpdateOptions{})
 			return err
 		}).Should(Succeed())
 
 		By("Delete v1beta1 ManagedClusterAddOn using v1beta1 client")
 		Eventually(func() error {
 			err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Delete(
-				context.Background(), addonName, metav1.DeleteOptions{})
+				ctx, addonName, metav1.DeleteOptions{})
 			return err
 		}).Should(Succeed())
 	})
 
-	It("Create a v1beta1 ManagedClusterAddOn and get/update/delete with v1alpha1 client", func() {
+	It("Create a v1beta1 ManagedClusterAddOn and get/update/delete with v1alpha1 client", func(ctx SpecContext) {
 		clusterName := universalClusterName
 		suffix := rand.String(6)
 		addonName := fmt.Sprintf("addon-%s", suffix)
@@ -276,7 +275,7 @@ var _ = Describe("Create v1beta1 ManagedClusterAddOn", Label("addon-conversion")
 		}
 
 		_, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Create(
-			context.Background(), addon, metav1.CreateOptions{})
+			ctx, addon, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Update v1beta1 ManagedClusterAddOn status using v1beta1 client")
@@ -300,7 +299,7 @@ var _ = Describe("Create v1beta1 ManagedClusterAddOn", Label("addon-conversion")
 				},
 			}
 			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).UpdateStatus(
-				context.Background(), addon, metav1.UpdateOptions{})
+				ctx, addon, metav1.UpdateOptions{})
 			return err
 		}).Should(Succeed())
 
@@ -338,7 +337,7 @@ var _ = Describe("Create v1beta1 ManagedClusterAddOn", Label("addon-conversion")
 					},
 				})
 			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).UpdateStatus(
-				context.Background(), v1alpha1Addon, metav1.UpdateOptions{})
+				ctx, v1alpha1Addon, metav1.UpdateOptions{})
 			return err
 		}).Should(Succeed())
 
@@ -357,14 +356,14 @@ var _ = Describe("Create v1beta1 ManagedClusterAddOn", Label("addon-conversion")
 		By("Delete v1beta1 ManagedClusterAddOn using v1alpha1 client")
 		Eventually(func() error {
 			err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(
-				context.Background(), addonName, metav1.DeleteOptions{})
+				ctx, addonName, metav1.DeleteOptions{})
 			return err
 		}).Should(Succeed())
 	})
 })
 
 var _ = Describe("Create v1alpha1 ClusterManagementAddOn", Label("addon-conversion"), func() {
-	It("Create a v1alpha1 ClusterManagementAddOn and get/update/delete with v1alpha1 client", func() {
+	It("Create a v1alpha1 ClusterManagementAddOn and get/update/delete with v1alpha1 client", func(ctx SpecContext) {
 		suffix := rand.String(6)
 		addonName := fmt.Sprintf("cma-%s", suffix)
 
@@ -422,7 +421,7 @@ var _ = Describe("Create v1alpha1 ClusterManagementAddOn", Label("addon-conversi
 				},
 			}
 			_, err = hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().UpdateStatus(
-				context.Background(), addon, metav1.UpdateOptions{})
+				ctx, addon, metav1.UpdateOptions{})
 			return err
 		}).Should(Succeed())
 
@@ -432,7 +431,7 @@ var _ = Describe("Create v1alpha1 ClusterManagementAddOn", Label("addon-conversi
 		}).Should(Succeed())
 	})
 
-	It("Create a v1alpha1 ClusterManagementAddOn and get/update/delete with v1beta1 client", func() {
+	It("Create a v1alpha1 ClusterManagementAddOn and get/update/delete with v1beta1 client", func(ctx SpecContext) {
 		suffix := rand.String(6)
 		addonName := fmt.Sprintf("cma-%s", suffix)
 
@@ -484,7 +483,7 @@ var _ = Describe("Create v1alpha1 ClusterManagementAddOn", Label("addon-conversi
 				},
 			}
 			_, err = hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().UpdateStatus(
-				context.Background(), addon, metav1.UpdateOptions{})
+				ctx, addon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -553,7 +552,7 @@ var _ = Describe("Create v1alpha1 ClusterManagementAddOn", Label("addon-conversi
 })
 
 var _ = Describe("Create v1beta1 ClusterManagementAddOn", Label("addon-conversion"), func() {
-	It("Create a v1beta1 ClusterManagementAddOn and get/update/delete with v1beta1 client", func() {
+	It("Create a v1beta1 ClusterManagementAddOn and get/update/delete with v1beta1 client", func(ctx SpecContext) {
 		suffix := rand.String(6)
 		addonName := fmt.Sprintf("cma-%s", suffix)
 
@@ -619,7 +618,7 @@ var _ = Describe("Create v1beta1 ClusterManagementAddOn", Label("addon-conversio
 				},
 			}
 			_, err = hub.AddonClient.AddonV1beta1().ClusterManagementAddOns().UpdateStatus(
-				context.Background(), addon, metav1.UpdateOptions{})
+				ctx, addon, metav1.UpdateOptions{})
 			return err
 		}).Should(Succeed())
 
@@ -629,7 +628,7 @@ var _ = Describe("Create v1beta1 ClusterManagementAddOn", Label("addon-conversio
 		}).Should(Succeed())
 	})
 
-	It("Create a v1beta1 ClusterManagementAddOn and get/update/delete with v1alpha1 client", func() {
+	It("Create a v1beta1 ClusterManagementAddOn and get/update/delete with v1alpha1 client", func(ctx SpecContext) {
 		suffix := rand.String(6)
 		addonName := fmt.Sprintf("cma-%s", suffix)
 
@@ -689,7 +688,7 @@ var _ = Describe("Create v1beta1 ClusterManagementAddOn", Label("addon-conversio
 				},
 			}
 			_, err = hub.AddonClient.AddonV1beta1().ClusterManagementAddOns().UpdateStatus(
-				context.Background(), addon, metav1.UpdateOptions{})
+				ctx, addon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -763,16 +762,16 @@ var _ = Describe("Create v1beta1 ClusterManagementAddOn", Label("addon-conversio
 })
 
 var _ = Describe("Webhook infrastructure", Label("addon-conversion"), func() {
-	It("should have CRD conversion configured", func() {
+	It("should have CRD conversion configured", func(ctx SpecContext) {
 		By("Verifying ManagedClusterAddOn CRD has webhook conversion")
 		mcaCRD, err := hub.APIExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(
-			context.Background(), "managedclusteraddons.addon.open-cluster-management.io", metav1.GetOptions{})
+			ctx, "managedclusteraddons.addon.open-cluster-management.io", metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(mcaCRD.Spec.Conversion.Strategy)).To(Equal("Webhook"))
 
 		By("Verifying ClusterManagementAddOn CRD has webhook conversion")
 		cmaCRD, err := hub.APIExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(
-			context.Background(), "clustermanagementaddons.addon.open-cluster-management.io", metav1.GetOptions{})
+			ctx, "clustermanagementaddons.addon.open-cluster-management.io", metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(cmaCRD.Spec.Conversion.Strategy)).To(Equal("Webhook"))
 	})

@@ -22,7 +22,7 @@ import (
 
 var _ = Describe("Agent Recovery", func() {
 
-	It("agent recovery from invalid bootstrap kubeconfig", func() {
+	It("agent recovery from invalid bootstrap kubeconfig", func(ctx SpecContext) {
 		var err error
 
 		managedClusterName := "bootstrap-recoverytest-spokecluster"
@@ -117,7 +117,7 @@ var _ = Describe("Agent Recovery", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
-	It("agent recovery from invalid hub kubeconfig", func() {
+	It("agent recovery from invalid hub kubeconfig", func(ctx SpecContext) {
 		var err error
 
 		spokeClusterName := "hubkubeconfig-recoverytest-spokecluster"

@@ -1,7 +1,6 @@
 package lease
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -170,7 +169,7 @@ func TestSync(t *testing.T) {
 				}
 			}
 
-			ctx := context.TODO()
+			ctx := t.Context()
 			syncCtx := testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName)
 			mcEventRecorder, err := events.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsV1(), "test")
 			if err != nil {
@@ -185,7 +184,7 @@ func TestSync(t *testing.T) {
 				leaseLister:     leaseInformerFactory.Coordination().V1().Leases().Lister(),
 				mcEventRecorder: mcEventRecorder,
 			}
-			syncErr := ctrl.sync(context.TODO(), syncCtx, testinghelpers.TestManagedClusterName)
+			syncErr := ctrl.sync(t.Context(), syncCtx, testinghelpers.TestManagedClusterName)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}
@@ -285,7 +284,7 @@ func TestRequeueTime(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			ctx := context.TODO()
+			ctx := t.Context()
 			mcEventRecorder, err := events.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsV1(), "test")
 			if err != nil {
 				t.Fatal(err)
@@ -311,7 +310,7 @@ func TestRequeueTime(t *testing.T) {
 				mcEventRecorder: mcEventRecorder,
 			}
 
-			syncErr := ctrl.sync(context.TODO(), syncCtx, testinghelpers.TestManagedClusterName)
+			syncErr := ctrl.sync(t.Context(), syncCtx, testinghelpers.TestManagedClusterName)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

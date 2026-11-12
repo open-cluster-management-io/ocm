@@ -62,7 +62,7 @@ var (
 var envCancel context.CancelFunc
 var envCtx context.Context
 
-var _ = BeforeSuite(func() {
+var _ = BeforeSuite(func(ctx SpecContext) {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
@@ -126,7 +126,7 @@ var _ = BeforeSuite(func() {
 	Expect(operatorClient).ToNot(BeNil())
 
 	// prepare a ClusterManager
-	_, err = operatorClient.OperatorV1().ClusterManagers().Create(context.Background(), &operatorapiv1.ClusterManager{
+	_, err = operatorClient.OperatorV1().ClusterManagers().Create(ctx, &operatorapiv1.ClusterManager{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterManagerName,
 		},
@@ -163,7 +163,7 @@ var _ = BeforeSuite(func() {
 	}, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
-	_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Create(context.Background(), &operatorapiv1.ClusterManager{
+	_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Create(ctx, &operatorapiv1.ClusterManager{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterManagerName,
 		},
@@ -209,7 +209,7 @@ var _ = BeforeSuite(func() {
 	restConfig = cfg
 	hostedRestConfig = hostedConfig
 
-	envCtx, envCancel = context.WithCancel(context.TODO())
+	envCtx, envCancel = context.WithCancel(context.Background())
 
 	go ServiceAccountCtl(envCtx, kubeClient)
 	go ServiceAccountCtl(envCtx, hostedKubeClient)

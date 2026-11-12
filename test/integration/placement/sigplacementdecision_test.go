@@ -34,7 +34,7 @@ var _ = Describe("SIGPlacementDecision", func() {
 	var suffix string
 	var cpClient cpclientset.Interface
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		suffix = rand.String(5)
 		namespace = fmt.Sprintf("ns-%s", suffix)
 		placementName = fmt.Sprintf("placement-%s", suffix)
@@ -51,14 +51,14 @@ var _ = Describe("SIGPlacementDecision", func() {
 				Name: namespace,
 			},
 		}
-		_, err = kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err = kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
+		var runCtx context.Context
+		runCtx, cancel = context.WithCancel(context.Background())
 		go func() {
 			defer GinkgoRecover()
-			err := controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
+			err := controllers.RunControllerManager(runCtx, &controllercmd.ControllerContext{
 				KubeConfig:    restConfig,
 				EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
 			})
@@ -66,19 +66,19 @@ var _ = Describe("SIGPlacementDecision", func() {
 		}()
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx SpecContext) {
 		if cancel != nil {
 			cancel()
 		}
 		err := features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=false", ocmfeature.SIGPlacementDecision))
 		Expect(err).NotTo(HaveOccurred())
 
-		err = kubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+		err = kubeClient.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	Context("Syncing OCM PlacementDecision to SIG MC PlacementDecision", func() {
-		It("should create SIG MC PlacementDecision from OCM PlacementDecision", func() {
+		It("should create SIG MC PlacementDecision from OCM PlacementDecision", func(ctx SpecContext) {
 			By("Create a ManagedClusterSet")
 			clusterSet := &clusterapiv1beta2.ManagedClusterSet{
 				ObjectMeta: metav1.ObjectMeta{
@@ -90,7 +90,7 @@ var _ = Describe("SIGPlacementDecision", func() {
 					},
 				},
 			}
-			_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterSet, metav1.CreateOptions{})
+			_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, clusterSet, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Create ManagedClusterSetBinding")
@@ -103,7 +103,7 @@ var _ = Describe("SIGPlacementDecision", func() {
 					ClusterSet: clusterSet1Name,
 				},
 			}
-			_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), binding, metav1.CreateOptions{})
+			_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(ctx, binding, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Create ManagedClusters")
@@ -113,7 +113,7 @@ var _ = Describe("SIGPlacementDecision", func() {
 			}
 			for _, name := range clusterNames {
 				cluster := testinghelpers.NewManagedCluster(name).WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSet1Name).Build()
-				cluster, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
+				cluster, err = clusterClient.ClusterV1().ManagedClusters().Create(ctx, cluster, metav1.CreateOptions{})
 				Expect(err).ToNot(HaveOccurred())
 
 				cluster.Status = clusterapiv1.ManagedClusterStatus{
@@ -134,7 +134,7 @@ var _ = Describe("SIGPlacementDecision", func() {
 						},
 					},
 				}
-				_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.Background(), cluster, metav1.UpdateOptions{})
+				_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
 				Expect(err).ToNot(HaveOccurred())
 			}
 
@@ -148,12 +148,12 @@ var _ = Describe("SIGPlacementDecision", func() {
 					ClusterSets: []string{clusterSet1Name},
 				},
 			}
-			_, err = clusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
+			_, err = clusterClient.ClusterV1beta1().Placements(namespace).Create(ctx, placement, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Wait for OCM PlacementDecision to be created by scheduling controller")
 			Eventually(func() bool {
-				pdList, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+				pdList, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(ctx, metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s", clusterapiv1beta1.PlacementLabel, placementName),
 				})
 				if err != nil || len(pdList.Items) == 0 {
@@ -164,7 +164,7 @@ var _ = Describe("SIGPlacementDecision", func() {
 
 			By("Verify SIG MC PlacementDecision is created")
 			Eventually(func() bool {
-				sigPDList, err := cpClient.ApisV1alpha2().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+				sigPDList, err := cpClient.ApisV1alpha2().PlacementDecisions(namespace).List(ctx, metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s", cpv1alpha2.LabelClusterManagerKey, sigplacementdecision.SchedulerName),
 				})
 				if err != nil || len(sigPDList.Items) == 0 {
@@ -181,7 +181,7 @@ var _ = Describe("SIGPlacementDecision", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			By("Verify SIG MC PlacementDecision has correct ClusterProfileRef")
-			sigPDList, err := cpClient.ApisV1alpha2().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+			sigPDList, err := cpClient.ApisV1alpha2().PlacementDecisions(namespace).List(ctx, metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s", cpv1alpha2.LabelClusterManagerKey, sigplacementdecision.SchedulerName),
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -193,7 +193,7 @@ var _ = Describe("SIGPlacementDecision", func() {
 			}
 
 			By("Keep the v1alpha2 decision readable through v1alpha1")
-			legacyPD, err := cpClient.ApisV1alpha1().PlacementDecisions(namespace).Get(context.Background(), sigPD.Name, metav1.GetOptions{})
+			legacyPD, err := cpClient.ApisV1alpha1().PlacementDecisions(namespace).Get(ctx, sigPD.Name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(legacyPD.UID).To(Equal(sigPD.UID))
 			Expect(legacyPD.Decisions).To(HaveLen(len(sigPD.Decisions)))
@@ -203,7 +203,7 @@ var _ = Describe("SIGPlacementDecision", func() {
 			}
 
 			By("Verify SIG MC PlacementDecision has an OwnerReference to the OCM PlacementDecision")
-			ocmPD, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).Get(context.Background(), sigPD.Name, metav1.GetOptions{})
+			ocmPD, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).Get(ctx, sigPD.Name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(sigPD.OwnerReferences).To(HaveLen(1))
 			ownerRef := sigPD.OwnerReferences[0]
@@ -214,27 +214,27 @@ var _ = Describe("SIGPlacementDecision", func() {
 			Expect(*ownerRef.Controller).To(BeTrue())
 
 			By("Delete the Placement so the scheduling controller does not regenerate the OCM PlacementDecision")
-			err = clusterClient.ClusterV1beta1().Placements(namespace).Delete(context.Background(), placementName, metav1.DeleteOptions{})
+			err = clusterClient.ClusterV1beta1().Placements(namespace).Delete(ctx, placementName, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Delete the OCM PlacementDecision and verify the controller does not error out")
-			ocmPDList, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+			ocmPDList, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(ctx, metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s", clusterapiv1beta1.PlacementLabel, placementName),
 			})
 			Expect(err).NotTo(HaveOccurred())
 			for _, pd := range ocmPDList.Items {
-				err = clusterClient.ClusterV1beta1().PlacementDecisions(namespace).Delete(context.Background(), pd.Name, metav1.DeleteOptions{})
+				err = clusterClient.ClusterV1beta1().PlacementDecisions(namespace).Delete(ctx, pd.Name, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 
 			Eventually(func() bool {
-				_, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).Get(context.Background(), ocmPD.Name, metav1.GetOptions{})
+				_, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).Get(ctx, ocmPD.Name, metav1.GetOptions{})
 				return apierrors.IsNotFound(err)
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			By("Clean up clusters")
 			for _, name := range clusterNames {
-				err = clusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), name, metav1.DeleteOptions{})
+				err = clusterClient.ClusterV1().ManagedClusters().Delete(ctx, name, metav1.DeleteOptions{})
 				Expect(err).ToNot(HaveOccurred())
 			}
 		})

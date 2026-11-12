@@ -1,7 +1,6 @@
 package event
 
 import (
-	"context"
 	"testing"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -19,7 +18,7 @@ import (
 
 func TestList(t *testing.T) {
 	service := NewEventService(kubefake.NewSimpleClientset())
-	if _, err := service.List(context.Background(), types.ListOptions{}); err == nil {
+	if _, err := service.List(t.Context(), types.ListOptions{}); err == nil {
 		t.Errorf("expected error, but failed")
 	}
 }
@@ -154,7 +153,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 			kubeClient := kubefake.NewSimpleClientset(c.events...)
 
 			service := NewEventService(kubeClient)
-			err := service.HandleStatusUpdate(context.Background(), c.eventEvt)
+			err := service.HandleStatusUpdate(t.Context(), c.eventEvt)
 			if c.expectedError {
 				if err == nil {
 					t.Errorf("expected error, got nil")

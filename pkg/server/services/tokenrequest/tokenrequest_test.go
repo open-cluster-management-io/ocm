@@ -47,7 +47,7 @@ func TestList(t *testing.T) {
 	kubeClient := kubefake.NewSimpleClientset()
 	service := NewTokenRequestService(kubeClient, nil)
 
-	evts, err := service.List(context.Background(), types.ListOptions{})
+	evts, err := service.List(t.Context(), types.ListOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -265,9 +265,9 @@ func TestHandleStatusUpdate(t *testing.T) {
 
 			// Create and register a mock handler
 			mockHandler := &mockEventHandler{}
-			service.RegisterHandler(context.Background(), mockHandler)
+			service.RegisterHandler(t.Context(), mockHandler)
 
-			err := service.HandleStatusUpdate(context.Background(), c.tokenRequestEvt)
+			err := service.HandleStatusUpdate(t.Context(), c.tokenRequestEvt)
 			if c.expectedError {
 				if err == nil {
 					t.Errorf("expected error, got nil")
@@ -300,7 +300,7 @@ func TestRegisterHandler(t *testing.T) {
 	service := NewTokenRequestService(kubeClient, nil).(*TokenRequestService)
 
 	mockHandler := &mockEventHandler{}
-	service.RegisterHandler(context.Background(), mockHandler)
+	service.RegisterHandler(t.Context(), mockHandler)
 
 	if service.handler == nil {
 		t.Errorf("handler should not be nil after registration")

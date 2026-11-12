@@ -354,7 +354,7 @@ func TestRegistrationSync(t *testing.T) {
 					addonClient.AddonV1beta1().ManagedClusterAddOns(clusterName)),
 				addonDriverFactory: &testDriverFactory{},
 				startRegistrationFunc: func(ctx context.Context, config registrationConfig) (context.CancelFunc, error) {
-					_, cancel := context.WithCancel(context.Background())
+					_, cancel := context.WithCancel(t.Context())
 					return cancel, nil
 				},
 				addOnRegistrationConfigs: c.addOnRegistrationConfigs,
@@ -363,7 +363,7 @@ func TestRegistrationSync(t *testing.T) {
 				},
 			}
 
-			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey), c.queueKey)
+			err := controller.sync(t.Context(), testingcommon.NewFakeSyncContext(t, c.queueKey), c.queueKey)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

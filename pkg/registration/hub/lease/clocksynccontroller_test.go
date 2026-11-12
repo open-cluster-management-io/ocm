@@ -1,7 +1,6 @@
 package lease
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -176,7 +175,7 @@ func TestClockSyncController(t *testing.T) {
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				leaseLister:   leaseInformerFactory.Coordination().V1().Leases().Lister(),
 			}
-			syncErr := controller.sync(context.TODO(), syncCtx, testinghelpers.TestManagedClusterName)
+			syncErr := controller.sync(t.Context(), syncCtx, testinghelpers.TestManagedClusterName)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

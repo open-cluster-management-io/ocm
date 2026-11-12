@@ -1,7 +1,6 @@
 package steady
 
 import (
-	"context"
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -67,7 +66,7 @@ func TestScoreClusterWithSteady(t *testing.T) {
 				handle: testinghelpers.NewFakePluginHandle(t, nil, c.existingDecisions...),
 			}
 
-			scoreResult, status := steady.Score(context.TODO(), c.placement, c.clusters)
+			scoreResult, status := steady.Score(t.Context(), c.placement, c.clusters)
 			scores := scoreResult.Scores
 			err := status.AsError()
 			if err != nil {

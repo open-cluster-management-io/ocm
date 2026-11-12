@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -280,7 +279,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 				addOnLister:   addOnInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Lister(),
 			}
 
-			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey), c.queueKey)
+			err := controller.sync(t.Context(), testingcommon.NewFakeSyncContext(t, c.queueKey), c.queueKey)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}

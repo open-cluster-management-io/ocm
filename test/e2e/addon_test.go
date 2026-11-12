@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -16,8 +15,8 @@ var _ = Describe("Manage the managed cluster addons (v1beta1)", Label("addon"), 
 		addOnName = fmt.Sprintf("e2e-addon-%s", rand.String(6))
 	})
 
-	AfterEach(func() {
-		err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Delete(ctx, addOnName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 

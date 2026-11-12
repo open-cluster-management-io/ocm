@@ -50,8 +50,8 @@ var _ = Describe("Klusterlet", func() {
 	var workSAName string
 	var agentLabelSelector string
 
-	BeforeEach(func() {
-		var ctx context.Context
+	BeforeEach(func(ctx SpecContext) {
+		var runCtx context.Context
 
 		klusterletNamespace = fmt.Sprintf("open-cluster-management-%s", rand.String(6))
 		ns := &corev1.Namespace{
@@ -59,7 +59,7 @@ var _ = Describe("Klusterlet", func() {
 				Name: klusterletNamespace,
 			},
 		}
-		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		klusterlet = &operatorapiv1.Klusterlet{
@@ -101,15 +101,15 @@ var _ = Describe("Klusterlet", func() {
 				"placeholder": []byte("placeholder"),
 			},
 		}
-		_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), hubKubeConfigSecret, metav1.CreateOptions{})
+		_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(ctx, hubKubeConfigSecret, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		ctx, cancel = context.WithCancel(context.Background())
-		go startKlusterletOperator(ctx)
+		runCtx, cancel = context.WithCancel(context.Background())
+		go startKlusterletOperator(runCtx)
 	})
 
-	AfterEach(func() {
-		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), klusterletNamespace, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err := kubeClient.CoreV1().Namespaces().Delete(ctx, klusterletNamespace, metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		if cancel != nil {
@@ -136,17 +136,17 @@ var _ = Describe("Klusterlet", func() {
 			workSAName = fmt.Sprintf("%s-work-sa", klusterlet.Name)
 		})
 
-		AfterEach(func() {
-			Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
+		AfterEach(func(ctx SpecContext) {
+			Expect(operatorClient.OperatorV1().Klusterlets().Delete(ctx, klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
 		})
 
-		It("should have expected resource created successfully", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("should have expected resource created successfully", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Check if relatedResources are correct
 			Eventually(func() error {
-				actual, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				actual, err := operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -162,14 +162,14 @@ var _ = Describe("Klusterlet", func() {
 			// Check CRDs
 			Eventually(func() bool {
 				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
-					context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+					ctx, "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 			Eventually(func() bool {
 				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
-					context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+					ctx, "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -177,7 +177,7 @@ var _ = Describe("Klusterlet", func() {
 
 			// Check clusterrole/clusterrolebinding
 			Eventually(func() error {
-				clusterRoles, err := kubeClient.RbacV1().ClusterRoles().List(context.Background(),
+				clusterRoles, err := kubeClient.RbacV1().ClusterRoles().List(ctx,
 					metav1.ListOptions{LabelSelector: agentLabelSelector})
 				if err != nil {
 					return fmt.Errorf("unable to list cluster roles: %v", err)
@@ -199,7 +199,7 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			Eventually(func() bool {
-				clusterRoleBindings, err := kubeClient.RbacV1().ClusterRoleBindings().List(context.Background(),
+				clusterRoleBindings, err := kubeClient.RbacV1().ClusterRoleBindings().List(ctx,
 					metav1.ListOptions{LabelSelector: agentLabelSelector})
 				if err != nil {
 					return false
@@ -223,7 +223,7 @@ var _ = Describe("Klusterlet", func() {
 
 			// Check role/rolebinding and extension apiserver rolebinding
 			Eventually(func() bool {
-				roles, err := kubeClient.RbacV1().Roles(klusterletNamespace).List(context.Background(),
+				roles, err := kubeClient.RbacV1().Roles(klusterletNamespace).List(ctx,
 					metav1.ListOptions{LabelSelector: agentLabelSelector})
 				if err != nil {
 					return false
@@ -242,7 +242,7 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			Eventually(func() bool {
-				roleBindings, err := kubeClient.RbacV1().RoleBindings(metav1.NamespaceAll).List(context.Background(),
+				roleBindings, err := kubeClient.RbacV1().RoleBindings(metav1.NamespaceAll).List(ctx,
 					metav1.ListOptions{LabelSelector: agentLabelSelector})
 				if err != nil {
 					return false
@@ -266,7 +266,7 @@ var _ = Describe("Klusterlet", func() {
 
 			// Check service account
 			Eventually(func() bool {
-				serviceaccouts, err := kubeClient.CoreV1().ServiceAccounts(klusterletNamespace).List(context.Background(),
+				serviceaccouts, err := kubeClient.CoreV1().ServiceAccounts(klusterletNamespace).List(ctx,
 					metav1.ListOptions{LabelSelector: agentLabelSelector})
 				if err != nil {
 					return false
@@ -288,7 +288,7 @@ var _ = Describe("Klusterlet", func() {
 
 			// Check deployment
 			Eventually(func() bool {
-				deployments, err := kubeClient.AppsV1().Deployments(klusterletNamespace).List(context.Background(),
+				deployments, err := kubeClient.AppsV1().Deployments(klusterletNamespace).List(ctx,
 					metav1.ListOptions{LabelSelector: agentLabelSelector})
 				if err != nil {
 					return false
@@ -317,7 +317,7 @@ var _ = Describe("Klusterlet", func() {
 
 			// Check addon namespace
 			Eventually(func() bool {
-				namespaces, err := kubeClient.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{LabelSelector: agentLabelSelector})
+				namespaces, err := kubeClient.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: agentLabelSelector})
 				if err != nil {
 					return false
 				}
@@ -336,13 +336,13 @@ var _ = Describe("Klusterlet", func() {
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Applied", "KlusterletApplied", metav1.ConditionTrue)
 		})
 
-		It("Deployment should be added nodeSelector and toleration when add nodePlacement into klusterlet", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("Deployment should be added nodeSelector and toleration when add nodePlacement into klusterlet", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Check deployment without nodeSelector and toleration
 			Eventually(func() bool {
-				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, registrationDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -357,7 +357,7 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			Eventually(func() error {
-				KlusterletObj, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				KlusterletObj, err := operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -372,13 +372,13 @@ var _ = Describe("Klusterlet", func() {
 						},
 					},
 				}
-				_, err = operatorClient.OperatorV1().Klusterlets().Update(context.Background(), KlusterletObj, metav1.UpdateOptions{})
+				_, err = operatorClient.OperatorV1().Klusterlets().Update(ctx, KlusterletObj, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check deployment with nodeSelector and toleration
 			Eventually(func() bool {
-				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, registrationDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -400,14 +400,14 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 
-		It("Deployment should have priorityclass configurated when setting priorityclass in klusterlet", func() {
+		It("Deployment should have priorityclass configurated when setting priorityclass in klusterlet", func(ctx SpecContext) {
 			priorityClassName := "test-priority-class"
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Check deployment without priorityclass
 			Eventually(func() bool {
-				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, registrationDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -418,19 +418,19 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			Eventually(func() error {
-				KlusterletObj, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				KlusterletObj, err := operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
 				KlusterletObj.Spec.PriorityClassName = priorityClassName
-				_, err = operatorClient.OperatorV1().Klusterlets().Update(context.Background(), KlusterletObj, metav1.UpdateOptions{})
+				_, err = operatorClient.OperatorV1().Klusterlets().Update(ctx, KlusterletObj, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 			// Check deployment with priorityclass
 			Eventually(func() bool {
-				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, registrationDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -438,19 +438,19 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 
-		It("should have correct registration deployment when server url is empty", func() {
+		It("should have correct registration deployment when server url is empty", func(ctx SpecContext) {
 			klusterlet.Spec.ExternalServerURLs = []operatorapiv1.ServerURL{}
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, registrationDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-			deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+			deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, registrationDeploymentName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(deployment.Spec.Template.Spec.Containers)).Should(Equal(1))
 			// external-server-url should not be set
@@ -459,33 +459,33 @@ var _ = Describe("Klusterlet", func() {
 			}
 		})
 
-		It("should have correct work deployment until HubConnectionDegraded is False when clusterName is empty", func() {
+		It("should have correct work deployment until HubConnectionDegraded is False when clusterName is empty", func(ctx SpecContext) {
 			klusterlet.Spec.ClusterName = "" // The clusterName is empty, the controller get clusterName from hubKubeConfigSecret.
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// do not create work deployment if ClusterName is empty
 			Eventually(func() bool {
-				_, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				_, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			// get correct work deployment when get valid cluster name from hub kubeConfig secret
-			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
+			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(ctx, helpers.HubKubeConfig, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Update hub secret with cluster name
 			hubSecret.Data["cluster-name"] = []byte("testcluster")
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), hubSecret, metav1.UpdateOptions{})
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(ctx, hubSecret, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-			deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+			deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(deployment.Spec.Template.Spec.Containers)).Should(Equal(1))
 
@@ -496,17 +496,17 @@ var _ = Describe("Klusterlet", func() {
 			}
 
 			// Update hub config secret to trigger work deployment update
-			hubSecret, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
+			hubSecret, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Get(ctx, helpers.HubKubeConfig, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Update hub secret
 			hubSecret.Data["kubeconfig"] = []byte("update dummy")
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), hubSecret, metav1.UpdateOptions{})
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(ctx, hubSecret, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Check that work deployment is updated
 			Eventually(func() bool {
-				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -520,17 +520,17 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 
-		It("Should change work deployment replicas to 0 when hubConfigSecret is missing", func() {
+		It("Should change work deployment replicas to 0 when hubConfigSecret is missing", func(ctx SpecContext) {
 			klusterlet.Spec.ClusterName = "testcluster"
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// replicas of work deployment should be 0 if hubConfigSecret is missing
-			err = kubeClient.CoreV1().Secrets(klusterletNamespace).Delete(context.Background(), helpers.HubKubeConfig, metav1.DeleteOptions{})
+			err = kubeClient.CoreV1().Secrets(klusterletNamespace).Delete(ctx, helpers.HubKubeConfig, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() error {
-				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -553,11 +553,11 @@ var _ = Describe("Klusterlet", func() {
 					"kubeconfig": []byte("update dummy"),
 				},
 			}
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), hubKubeConfigSecret, metav1.CreateOptions{})
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(ctx, hubKubeConfigSecret, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
-				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -571,12 +571,12 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 		})
 
-		It("Deployment should be updated when klusterlet is changed", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("Deployment should be updated when klusterlet is changed", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -584,7 +584,7 @@ var _ = Describe("Klusterlet", func() {
 
 			// Check if generations are correct
 			Eventually(func() bool {
-				actual, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				actual, err := operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -597,18 +597,18 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			Eventually(func() error {
-				klusterlet, err = operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				klusterlet, err = operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 				klusterlet.Spec.ClusterName = "cluster2"
-				_, err = operatorClient.OperatorV1().Klusterlets().Update(context.Background(), klusterlet, metav1.UpdateOptions{})
+				_, err = operatorClient.OperatorV1().Klusterlets().Update(ctx, klusterlet, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 			for _, deploymentName := range []string{workDeploymentName, registrationDeploymentName} {
 				Eventually(func(g Gomega) {
-					actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
+					actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, deploymentName, metav1.GetOptions{})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(actual.Spec.Template.Spec.Containers).To(HaveLen(1))
 					var clusterNameArgs []string
@@ -623,7 +623,7 @@ var _ = Describe("Klusterlet", func() {
 
 			// Check if generations are correct
 			Eventually(func() bool {
-				actual, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				actual, err := operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -636,23 +636,23 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 
-		It("Deployment should be reconciled when manually updated", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("Deployment should be reconciled when manually updated", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
-			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			workDeployment.Spec.Template.Spec.Containers[0].Image = "test:latest"
-			_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Update(context.Background(), workDeployment, metav1.UpdateOptions{})
+			_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Update(ctx, workDeployment, metav1.UpdateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() bool {
-				workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -664,12 +664,12 @@ var _ = Describe("Klusterlet", func() {
 
 			// Check if generations are correct
 			Eventually(func() bool {
-				actual, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				actual, err := operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
 
-				workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -680,8 +680,8 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 
-		It("Deployment should have correct replica", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("Deployment should have correct replica", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			bootStrapSecret := &corev1.Secret{
@@ -693,20 +693,20 @@ var _ = Describe("Klusterlet", func() {
 					"kubeconfig": util.NewKubeConfig(restConfig),
 				},
 			}
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), bootStrapSecret, metav1.CreateOptions{})
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(ctx, bootStrapSecret, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Update hub secret with cluster name and kubeconfig
-			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
+			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(ctx, helpers.HubKubeConfig, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			hubSecret.Data["cluster-name"] = []byte("testcluster")
 			hubSecret.Data["kubeconfig"] = util.NewKubeConfig(restConfig)
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), hubSecret, metav1.UpdateOptions{})
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(ctx, hubSecret, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Expect 1 replica since no nodes exists currently
 			Eventually(func() int32 {
-				workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return 0
 				}
@@ -716,30 +716,30 @@ var _ = Describe("Klusterlet", func() {
 
 			// Create master nodes and recreate klusterlet
 			_, err = kubeClient.CoreV1().Nodes().Create(
-				context.Background(),
+				ctx,
 				&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{"node-role.kubernetes.io/master": ""}}},
 				metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = kubeClient.CoreV1().Nodes().Create(
-				context.Background(),
+				ctx,
 				&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"node-role.kubernetes.io/master": ""}}},
 				metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = kubeClient.CoreV1().Nodes().Create(
-				context.Background(),
+				ctx,
 				&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: map[string]string{"node-role.kubernetes.io/master": ""}}},
 				metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// update klusterlet to trigger another reconcile
-			klusterlet, err = operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+			klusterlet, err = operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			klusterlet.Labels = map[string]string{"test": "test"}
-			_, err = operatorClient.OperatorV1().Klusterlets().Update(context.Background(), klusterlet, metav1.UpdateOptions{})
+			_, err = operatorClient.OperatorV1().Klusterlets().Update(ctx, klusterlet, metav1.UpdateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() error {
-				workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -751,7 +751,7 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("Deployment should be added hostAliases when add hostAlias into klusterlet", func() {
+		It("Deployment should be added hostAliases when add hostAlias into klusterlet", func(ctx SpecContext) {
 			var hubApiServerHostAliasIP = "11.22.33.44"
 			var hubApiServerHostAliasHostname = "open-cluster-management.io"
 
@@ -760,12 +760,12 @@ var _ = Describe("Klusterlet", func() {
 				Hostname: hubApiServerHostAliasHostname,
 			}
 
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Check registration agent deployment
 			Eventually(func() bool {
-				actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, registrationDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -779,7 +779,7 @@ var _ = Describe("Klusterlet", func() {
 
 			// Check work agent deployment
 			Eventually(func() bool {
-				actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -792,12 +792,12 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 
-		It("Deployment should be updated when klusterlet claim configure is changed", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("Deployment should be updated when klusterlet claim configure is changed", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -805,7 +805,7 @@ var _ = Describe("Klusterlet", func() {
 
 			// Check if generations are correct
 			Eventually(func() bool {
-				actual, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				actual, err := operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -818,7 +818,7 @@ var _ = Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			Eventually(func() error {
-				klusterlet, err = operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				klusterlet, err = operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -828,12 +828,12 @@ var _ = Describe("Klusterlet", func() {
 						ReservedClusterClaimSuffixes: []string{"reserved1.io", "reserved2.io"},
 					},
 				}
-				_, err = operatorClient.OperatorV1().Klusterlets().Update(context.Background(), klusterlet, metav1.UpdateOptions{})
+				_, err = operatorClient.OperatorV1().Klusterlets().Update(ctx, klusterlet, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 			Eventually(func() bool {
-				actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, registrationDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -847,7 +847,7 @@ var _ = Describe("Klusterlet", func() {
 
 			// Check if generations are correct
 			Eventually(func() bool {
-				actual, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				actual, err := operatorClient.OperatorV1().Klusterlets().Get(ctx, klusterlet.Name, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -866,11 +866,11 @@ var _ = Describe("Klusterlet", func() {
 			registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 			workDeploymentName = fmt.Sprintf("%s-work-agent", klusterlet.Name)
 		})
-		AfterEach(func() {
-			Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
+		AfterEach(func(ctx SpecContext) {
+			Expect(operatorClient.OperatorV1().Klusterlets().Delete(ctx, klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
 		})
-		It("should have correct degraded conditions", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("should have correct degraded conditions", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "BootstrapSecretMissing,HubKubeConfigMissing", metav1.ConditionTrue)
@@ -885,20 +885,20 @@ var _ = Describe("Klusterlet", func() {
 					"kubeconfig": util.NewKubeConfig(restConfig),
 				},
 			}
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), bootStrapSecret, metav1.CreateOptions{})
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(ctx, bootStrapSecret, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertKlusterletCondition(
 				klusterlet.Name, operatorClient, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigMissing", metav1.ConditionTrue)
 
-			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
+			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(ctx, helpers.HubKubeConfig, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Update hub secret and make sure the kubeconfig can work
 			hubSecret = hubSecret.DeepCopy()
 			hubSecret.Data["cluster-name"] = []byte("testcluster")
 			hubSecret.Data["kubeconfig"] = util.NewKubeConfig(restConfig)
-			hubSecret, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), hubSecret, metav1.UpdateOptions{})
+			hubSecret, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(ctx, hubSecret, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
@@ -908,21 +908,21 @@ var _ = Describe("Klusterlet", func() {
 
 			// Update replica of deployment
 			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-				context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				ctx, registrationDeploymentName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			registrationDeployment = registrationDeployment.DeepCopy()
 			registrationDeployment.Status.AvailableReplicas = 3
 			registrationDeployment.Status.Replicas = 3
 			registrationDeployment.Status.ReadyReplicas = 3
-			_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).UpdateStatus(context.Background(), registrationDeployment, metav1.UpdateOptions{})
+			_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).UpdateStatus(ctx, registrationDeployment, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
-			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			workDeployment = workDeployment.DeepCopy()
 			workDeployment.Status.AvailableReplicas = 3
 			workDeployment.Status.Replicas = 3
 			workDeployment.Status.ReadyReplicas = 3
-			_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).UpdateStatus(context.Background(), workDeployment, metav1.UpdateOptions{})
+			_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).UpdateStatus(ctx, workDeployment, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
@@ -930,15 +930,15 @@ var _ = Describe("Klusterlet", func() {
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "DeploymentsFunctional", metav1.ConditionFalse)
 
 			// Delete the hub kubeconfig secret
-			err = kubeClient.CoreV1().Secrets(klusterletNamespace).Delete(context.Background(), hubSecret.Name, metav1.DeleteOptions{})
+			err = kubeClient.CoreV1().Secrets(klusterletNamespace).Delete(ctx, hubSecret.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Update replica of deployment
-			registrationDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+			registrationDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, registrationDeploymentName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			registrationDeployment = registrationDeployment.DeepCopy()
 			registrationDeployment.Status.AvailableReplicas = 0
-			_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).UpdateStatus(context.Background(), registrationDeployment, metav1.UpdateOptions{})
+			_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).UpdateStatus(ctx, registrationDeployment, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertKlusterletCondition(
@@ -947,19 +947,19 @@ var _ = Describe("Klusterlet", func() {
 				"BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue)
 		})
 
-		It("should have correct available conditions", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("should have correct available conditions", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, registrationDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -971,14 +971,14 @@ var _ = Describe("Klusterlet", func() {
 			// Re-read the deployments on each attempt, since the operator may update them meanwhile.
 			for _, name := range []string{registrationDeploymentName, workDeploymentName} {
 				Eventually(func() error {
-					deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), name, metav1.GetOptions{})
+					deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, name, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
 					deployment.Status.AvailableReplicas = 1
 					deployment.Status.Replicas = 3
 					deployment.Status.ReadyReplicas = 3
-					_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).UpdateStatus(context.Background(), deployment, metav1.UpdateOptions{})
+					_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).UpdateStatus(ctx, deployment, metav1.UpdateOptions{})
 					return err
 				}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 			}
@@ -992,17 +992,17 @@ var _ = Describe("Klusterlet", func() {
 			registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 			workDeploymentName = fmt.Sprintf("%s-work-agent", klusterlet.Name)
 		})
-		AfterEach(func() {
-			Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(),
+		AfterEach(func(ctx SpecContext) {
+			Expect(operatorClient.OperatorV1().Klusterlets().Delete(ctx,
 				klusterlet.Name, metav1.DeleteOptions{})).To(BeNil())
 		})
 
-		It("feature gates configuration is nil or empty", func() {
+		It("feature gates configuration is nil or empty", func(ctx SpecContext) {
 			klusterlet.Spec.RegistrationConfiguration = nil
 			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkAgentConfiguration{}
 
 			By("Create the klusterlet with RegistrationConfiguration nil and WorkConfiguration empty")
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(),
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx,
 				klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -1016,11 +1016,11 @@ var _ = Describe("Klusterlet", func() {
 					"kubeconfig": util.NewKubeConfig(restConfig),
 				},
 			}
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(),
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(ctx,
 				bootStrapSecret, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
-			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(),
+			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(ctx,
 				helpers.HubKubeConfig, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1028,7 +1028,7 @@ var _ = Describe("Klusterlet", func() {
 			hubSecret = hubSecret.DeepCopy()
 			hubSecret.Data["cluster-name"] = []byte("testcluster")
 			hubSecret.Data["kubeconfig"] = util.NewKubeConfig(restConfig)
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(),
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(ctx,
 				hubSecret, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1044,27 +1044,27 @@ var _ = Describe("Klusterlet", func() {
 
 			By("Check the registration-agent has the expected feature gates")
 			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-				context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				ctx, registrationDeploymentName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).ShouldNot(
 				ContainElement("--feature-gates=AddonManagement=true"))
 
 			By("Check the work-agent has the expected feature gates")
 			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-				context.Background(), workDeploymentName, metav1.GetOptions{})
+				ctx, workDeploymentName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(workDeployment.Spec.Template.Spec.Containers[0].Args).ShouldNot(
 				ContainElement("--feature-gates="))
 
 		})
 
-		It("should set certDurationSeconds correctly", func() {
+		It("should set certDurationSeconds correctly", func(ctx SpecContext) {
 			klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{
 				ClientCertExpirationSeconds: 120,
 			}
 
 			By("Create the klusterlet with valid RegistrationConfiguration")
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(),
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx,
 				klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -1078,11 +1078,11 @@ var _ = Describe("Klusterlet", func() {
 					"kubeconfig": util.NewKubeConfig(restConfig),
 				},
 			}
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(),
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(ctx,
 				bootStrapSecret, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
-			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(),
+			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(ctx,
 				helpers.HubKubeConfig, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1090,7 +1090,7 @@ var _ = Describe("Klusterlet", func() {
 			hubSecret = hubSecret.DeepCopy()
 			hubSecret.Data["cluster-name"] = []byte("testcluster")
 			hubSecret.Data["kubeconfig"] = util.NewKubeConfig(restConfig)
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(),
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(ctx,
 				hubSecret, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1103,13 +1103,13 @@ var _ = Describe("Klusterlet", func() {
 
 			By("Check the registration-agent has the expected agrs")
 			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-				context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				ctx, registrationDeploymentName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
 				ContainElement("--client-cert-expiration-seconds=120"))
 		})
 
-		It("should be set correctly", func() {
+		It("should be set correctly", func(ctx SpecContext) {
 			klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{
 					{
@@ -1132,7 +1132,7 @@ var _ = Describe("Klusterlet", func() {
 			}
 
 			By("Create the klusterlet with valid RegistrationConfiguration and WorkConfiguration")
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(),
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx,
 				klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -1146,11 +1146,11 @@ var _ = Describe("Klusterlet", func() {
 					"kubeconfig": util.NewKubeConfig(restConfig),
 				},
 			}
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(),
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(ctx,
 				bootStrapSecret, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
-			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(),
+			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(ctx,
 				helpers.HubKubeConfig, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1158,7 +1158,7 @@ var _ = Describe("Klusterlet", func() {
 			hubSecret = hubSecret.DeepCopy()
 			hubSecret.Data["cluster-name"] = []byte("testcluster")
 			hubSecret.Data["kubeconfig"] = util.NewKubeConfig(restConfig)
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(),
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(ctx,
 				hubSecret, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1174,7 +1174,7 @@ var _ = Describe("Klusterlet", func() {
 
 			By("Check the registration-agent has the expected feature gates")
 			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-				context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				ctx, registrationDeploymentName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
 				ContainElement("--feature-gates=ClusterClaim=false"))
@@ -1185,13 +1185,13 @@ var _ = Describe("Klusterlet", func() {
 
 			By("Check the work-agent has the expected feature gates")
 			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-				context.Background(), workDeploymentName, metav1.GetOptions{})
+				ctx, workDeploymentName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(workDeployment.Spec.Template.Spec.Containers[0].Args).Should(
 				ContainElement("--feature-gates=ExecutorValidatingCaches=true"))
 		})
 
-		It("has invalid feature gates", func() {
+		It("has invalid feature gates", func(ctx SpecContext) {
 			klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{
 					{
@@ -1218,7 +1218,7 @@ var _ = Describe("Klusterlet", func() {
 			}
 
 			By("Create the klusterlet with invalid RegistrationConfiguration and WorkConfiguration")
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(),
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx,
 				klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -1232,11 +1232,11 @@ var _ = Describe("Klusterlet", func() {
 					"kubeconfig": util.NewKubeConfig(restConfig),
 				},
 			}
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(),
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(ctx,
 				bootStrapSecret, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
-			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(),
+			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(ctx,
 				helpers.HubKubeConfig, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1244,7 +1244,7 @@ var _ = Describe("Klusterlet", func() {
 			hubSecret = hubSecret.DeepCopy()
 			hubSecret.Data["cluster-name"] = []byte("testcluster")
 			hubSecret.Data["kubeconfig"] = util.NewKubeConfig(restConfig)
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(),
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(ctx,
 				hubSecret, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1260,7 +1260,7 @@ var _ = Describe("Klusterlet", func() {
 
 			By("Check the registration-agent only have the valid feature gates")
 			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-				context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				ctx, registrationDeploymentName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
 				ContainElement("--feature-gates=ClusterClaim=false"))
@@ -1269,7 +1269,7 @@ var _ = Describe("Klusterlet", func() {
 
 			By("Check the work-agent only have the valid feature gates")
 			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-				context.Background(), workDeploymentName, metav1.GetOptions{})
+				ctx, workDeploymentName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(workDeployment.Spec.Template.Spec.Containers[0].Args).Should(
 				ContainElement("--feature-gates=ExecutorValidatingCaches=true"))

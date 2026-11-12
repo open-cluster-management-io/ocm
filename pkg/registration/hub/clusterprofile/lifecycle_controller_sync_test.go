@@ -2,7 +2,6 @@ package clusterprofile
 
 import (
 	"cmp"
-	"context"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -838,7 +837,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 			}
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, c.key)
-			err := ctrl.sync(context.TODO(), syncCtx, c.key)
+			err := ctrl.sync(t.Context(), syncCtx, c.key)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

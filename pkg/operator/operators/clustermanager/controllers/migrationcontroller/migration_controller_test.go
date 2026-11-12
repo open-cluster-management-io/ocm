@@ -1,7 +1,6 @@
 package migrationcontroller
 
 import (
-	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -85,7 +84,7 @@ func TestSupportStorageVersionMigration(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset(c.existingObjects...)
-			actual, err := supportStorageVersionMigration(context.TODO(), fakeAPIExtensionClient)
+			actual, err := supportStorageVersionMigration(t.Context(), fakeAPIExtensionClient)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -165,7 +164,7 @@ func TestCheckCRDStorageVersion(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeCRDClient := fakeapiextensions.NewSimpleClientset(c.crds...)
 
-			err := checkCRDStorageVersion(context.TODO(),
+			err := checkCRDStorageVersion(t.Context(),
 				c.toCreateMigrations, fakeCRDClient)
 			if c.expectErr && err != nil {
 				return
@@ -223,7 +222,7 @@ func TestCreateStorageVersionMigrations(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(c.existingMigrations...)
 
-			err := createStorageVersionMigrations(context.TODO(),
+			err := createStorageVersionMigrations(t.Context(),
 				c.toCreateMigrations, newClusterManagerOwner(&operatorapiv1.ClusterManager{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "testhub",
@@ -447,7 +446,7 @@ func TestSyncStorageVersionMigrationsCondition(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(tt.existingMigrations...)
 
-			got, err := syncStorageVersionMigrationsCondition(context.Background(), toSyncMigrations, fakeMigrationClient.MigrationV1alpha1())
+			got, err := syncStorageVersionMigrationsCondition(t.Context(), toSyncMigrations, fakeMigrationClient.MigrationV1alpha1())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("syncStorageVersionMigrationsCondition() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -465,12 +464,12 @@ func TestSync(t *testing.T) {
 
 	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 	// Do not support migration
-	err := tc.sync(context.Background(), syncContext, "testhub")
+	err := tc.sync(t.Context(), syncContext, "testhub")
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
 
-	clusterManager, err = client.OperatorV1().ClusterManagers().Get(context.Background(), "testhub", metav1.GetOptions{})
+	clusterManager, err = client.OperatorV1().ClusterManagers().Get(t.Context(), "testhub", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
@@ -490,11 +489,11 @@ func TestSync(t *testing.T) {
 		newFakeCRD(migrationRequestCRDName, "v1", "v1"),
 		newFakeCRD("foos.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
 		newFakeCRD("bars.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"))
-	err = tc.sync(context.Background(), syncContext, "testhub")
+	err = tc.sync(t.Context(), syncContext, "testhub")
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
-	clusterManager, err = client.OperatorV1().ClusterManagers().Get(context.Background(), "testhub", metav1.GetOptions{})
+	clusterManager, err = client.OperatorV1().ClusterManagers().Get(t.Context(), "testhub", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}

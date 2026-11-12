@@ -83,7 +83,7 @@ func TestGRPCServerOptionsRunWithInvalidConfig(t *testing.T) {
 	opts := NewGRPCServerOptions()
 	opts.GRPCServerConfig = "/nonexistent/path/to/config.yaml"
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 	defer cancel()
 
 	controllerContext := &controllercmd.ControllerContext{
@@ -100,7 +100,7 @@ func TestGRPCServerOptionsRunWithInvalidConfig(t *testing.T) {
 func TestGRPCServerOptionsRunWithInvalidKubeConfig(t *testing.T) {
 	opts := NewGRPCServerOptions()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 	defer cancel()
 
 	// Invalid kubeconfig that should cause client creation to fail
@@ -157,7 +157,7 @@ func TestGRPCServerOptionsRunWithTLSOverride(t *testing.T) {
 			opts.TLSMinVersionOverride = c.tlsMinVersion
 			opts.TLSCipherSuitesOverride = c.tlsCipherSuites
 
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 			defer cancel()
 
 			controllerContext := &controllercmd.ControllerContext{
@@ -217,7 +217,7 @@ grpc_private_key_file: ` + keyFile + `
 	opts := NewGRPCServerOptions()
 	opts.GRPCServerConfig = configFile
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
 
 	controllerContext := &controllercmd.ControllerContext{

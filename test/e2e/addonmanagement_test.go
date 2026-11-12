@@ -106,11 +106,11 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 
 	var signerSecretNamespace string
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		signerSecretNamespace = "signer-secret-test-ns-" + rand.String(6)
 
 		By("create addon custom sign secret namespace")
-		_, err := hub.KubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+		_, err := hub.KubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: signerSecretNamespace,
 			},
@@ -120,7 +120,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		}
 
 		By("create addon custom sign secret")
-		err = copySignerSecret(context.TODO(), hub.KubeClient, "open-cluster-management-hub",
+		err = copySignerSecret(ctx, hub.KubeClient, "open-cluster-management-hub",
 			"signer-secret", signerSecretNamespace, customSignerSecretName)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -130,7 +130,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		}).Should(Succeed())
 
 		By(fmt.Sprintf("create addon template resources for cluster %v", universalClusterName))
-		err = createResourcesFromYamlFiles(context.Background(), hub.DynamicClient, hub.RestMapper, s,
+		err = createResourcesFromYamlFiles(ctx, hub.DynamicClient, hub.RestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
 				"Namespace":                   universalClusterName,
 				"AddonInstallNamespace":       addonInstallNamespace,
@@ -156,17 +156,17 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		}).Should(Succeed())
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx SpecContext) {
 		By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
 		err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Delete(
-			context.TODO(), addOnName, metav1.DeleteOptions{})
+			ctx, addOnName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			Fail(fmt.Sprintf("failed to delete managed cluster addon %v on cluster %v: %v", addOnName, universalClusterName, err))
 		}
 
 		Eventually(func() error {
 			_, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
-				context.TODO(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err == nil {
 				return fmt.Errorf("the managedClusterAddon %s should be deleted", addOnName)
 			}
@@ -176,7 +176,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 
 			// check works after addon is not found
 			works, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).List(
-				context.TODO(), metav1.ListOptions{})
+				ctx, metav1.ListOptions{})
 			if err == nil && len(works.Items) != 0 {
 				return fmt.Errorf("expected no works,but got: %+v", works.Items)
 			}
@@ -187,7 +187,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		}).ShouldNot(HaveOccurred())
 
 		By(fmt.Sprintf("delete addon template resources for cluster %v", universalClusterName))
-		err = deleteResourcesFromYamlFiles(context.Background(), hub.DynamicClient, hub.RestMapper, s,
+		err = deleteResourcesFromYamlFiles(ctx, hub.DynamicClient, hub.RestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
 				"Namespace":                   universalClusterName,
 				"AddonInstallNamespace":       addonInstallNamespace,
@@ -201,7 +201,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		Expect(err).ToNot(HaveOccurred())
 
 		By("delete addon custom sign secret")
-		err = hub.KubeClient.CoreV1().Secrets(signerSecretNamespace).Delete(context.TODO(),
+		err = hub.KubeClient.CoreV1().Secrets(signerSecretNamespace).Delete(ctx,
 			customSignerSecretName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			Fail(fmt.Sprintf("failed to delete custom signer secret %v/%v: %v",
@@ -209,7 +209,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		}
 
 		By("delete addon custom sign secret namespace")
-		err = hub.KubeClient.CoreV1().Namespaces().Delete(context.TODO(), signerSecretNamespace, metav1.DeleteOptions{})
+		err = hub.KubeClient.CoreV1().Namespaces().Delete(ctx, signerSecretNamespace, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			Fail(fmt.Sprintf("failed to delete custom signer secret namespace %v: %v", signerSecretNamespace, err))
 		}
@@ -223,14 +223,14 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 					clusterv1.ClusterNameLabelKey, universalClusterName),
 			}
 
-			csrs, err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(), listOpts)
+			csrs, err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().List(ctx, listOpts)
 			if err != nil {
 				return err
 			}
 
 			if len(csrs.Items) > 0 {
 				klog.Infof("Found %d CSRs to delete:", len(csrs.Items))
-				err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().DeleteCollection(context.TODO(),
+				err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().DeleteCollection(ctx,
 					metav1.DeleteOptions{}, listOpts)
 				if err != nil && !errors.IsNotFound(err) {
 					return err
@@ -243,17 +243,17 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		}).ShouldNot(HaveOccurred())
 	})
 
-	It("Template type addon should be functioning", func() {
+	It("Template type addon should be functioning", func(ctx SpecContext) {
 		By("Check hub kubeconfig secret is created")
 		Eventually(func() error {
-			_, err := hub.KubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
+			_, err := hub.KubeClient.CoreV1().Secrets(addonInstallNamespace).Get(ctx,
 				templateagent.HubKubeconfigSecretName(addOnName), metav1.GetOptions{})
 			return err
 		}).Should(Succeed())
 
 		By("Check custom client cert secret is created")
 		Eventually(func() error {
-			_, err := hub.KubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
+			_, err := hub.KubeClient.CoreV1().Secrets(addonInstallNamespace).Get(ctx,
 				templateagent.CustomSignedSecretName(addOnName, customSignerName), metav1.GetOptions{})
 			return err
 		}).Should(Succeed())
@@ -271,12 +271,12 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		}
 
 		_, err := hub.KubeClient.CoreV1().ConfigMaps(universalClusterName).Create(
-			context.Background(), configmap, metav1.CreateOptions{})
+			ctx, configmap, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(func() error {
 			copiedConfig, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
-				context.Background(), configmap.Name, metav1.GetOptions{})
+				ctx, configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -288,7 +288,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		}).ShouldNot(HaveOccurred())
 
 		By("Make sure manifestwork config is configured")
-		manifestWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(),
+		manifestWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(ctx,
 			fmt.Sprintf("addon-%s-deploy-0", addOnName), metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		foundDeploymentConfig := false
@@ -321,13 +321,13 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 
 		By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
 		err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Delete(
-			context.TODO(), addOnName, metav1.DeleteOptions{})
+			ctx, addOnName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("The pre-delete job should clean up the configmap after the addon is deleted")
 		Eventually(func() error {
 			_, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
-				context.Background(), configmap.Name, metav1.GetOptions{})
+				ctx, configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -340,7 +340,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 
 		Eventually(func() error {
 			_, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
-				context.TODO(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -354,7 +354,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("The pre-delete job should be deleted ")
 		Eventually(func() error {
 			_, err := spoke.KubeClient.BatchV1().Jobs(addonInstallNamespace).Get(
-				context.Background(), "hello-template-cleanup-configmap", metav1.GetOptions{})
+				ctx, "hello-template-cleanup-configmap", metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -367,7 +367,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 	})
 
 	It("Template type addon should be configured by addon deployment config for image override"+
-		"even there are cluster annotation config", func() {
+		"even there are cluster annotation config", func(ctx SpecContext) {
 		By("Prepare cluster annotation for addon image override config")
 		overrideRegistries := addonapiv1beta1.AddOnDeploymentConfigSpec{
 			// should be different from the registries in the addonDeploymentConfig
@@ -382,7 +382,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		Expect(err).ToNot(HaveOccurred())
 		Eventually(func() error {
 			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
-				context.Background(), universalClusterName, metav1.GetOptions{})
+				ctx, universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -397,19 +397,19 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 
 			newCluster.Annotations = annotations
 			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
-				context.Background(), newCluster, metav1.UpdateOptions{})
+				ctx, newCluster, metav1.UpdateOptions{})
 			return err
 		}).ShouldNot(HaveOccurred())
 
 		By("Prepare a AddOnDeploymentConfig for addon image override config")
 		Eventually(func() error {
-			return prepareImageOverrideAddOnDeploymentConfig(universalClusterName, addonInstallNamespace)
+			return prepareImageOverrideAddOnDeploymentConfig(ctx, universalClusterName, addonInstallNamespace)
 		}).ShouldNot(HaveOccurred())
 
 		By("Add the configs to ManagedClusterAddOn")
 		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
-				context.Background(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -427,7 +427,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 				},
 			}
 			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Update(
-				context.Background(), newAddon, metav1.UpdateOptions{})
+				ctx, newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -437,7 +437,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("Make sure addon is configured")
 		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
-				context.Background(), "hello-template-agent", metav1.GetOptions{})
+				ctx, "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -457,7 +457,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("Restore the managed cluster annotation")
 		Eventually(func() error {
 			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
-				context.Background(), universalClusterName, metav1.GetOptions{})
+				ctx, universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -465,7 +465,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 			newCluster := cluster.DeepCopy()
 			delete(newCluster.Annotations, clusterv1.ClusterImageRegistriesAnnotationKey)
 			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
-				context.Background(), newCluster, metav1.UpdateOptions{})
+				ctx, newCluster, metav1.UpdateOptions{})
 			return err
 		}).ShouldNot(HaveOccurred())
 
@@ -474,14 +474,14 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("Restore the configs to ManagedClusterAddOn")
 		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
-				context.Background(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
 			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{}
 			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Update(
-				context.Background(), newAddon, metav1.UpdateOptions{})
+				ctx, newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -491,7 +491,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("Make sure addon config is restored")
 		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
-				context.Background(), "hello-template-agent", metav1.GetOptions{})
+				ctx, "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -509,16 +509,16 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		}).ShouldNot(HaveOccurred())
 	})
 
-	It("Template type addon should be configured by addon deployment config for node placement", func() {
+	It("Template type addon should be configured by addon deployment config for node placement", func(ctx SpecContext) {
 		By("Prepare a AddOnDeploymentConfig for addon image override config")
 		Eventually(func() error {
-			return prepareNodePlacementAddOnDeploymentConfig(universalClusterName, addonInstallNamespace)
+			return prepareNodePlacementAddOnDeploymentConfig(ctx, universalClusterName, addonInstallNamespace)
 		}).ShouldNot(HaveOccurred())
 
 		By("Add the configs to ManagedClusterAddOn")
 		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
-				context.Background(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -536,7 +536,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 				},
 			}
 			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Update(
-				context.Background(), newAddon, metav1.UpdateOptions{})
+				ctx, newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -546,7 +546,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("Make sure addon is configured")
 		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
-				context.Background(), "hello-template-agent", metav1.GetOptions{})
+				ctx, "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -568,23 +568,23 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 
 	})
 
-	It("Template type addon should be configured by addon deployment config for namespace", func() {
+	It("Template type addon should be configured by addon deployment config for namespace", func(ctx SpecContext) {
 		By("Prepare a AddOnDeploymentConfig for namespace config")
 		overrideNamespace := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "another-addon-namespace",
 			},
 		}
-		_, err := spoke.KubeClient.CoreV1().Namespaces().Create(context.TODO(), overrideNamespace, metav1.CreateOptions{})
+		_, err := spoke.KubeClient.CoreV1().Namespaces().Create(ctx, overrideNamespace, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		Eventually(func() error {
-			return prepareInstallNamespace(universalClusterName, overrideNamespace.Name)
+			return prepareInstallNamespace(ctx, universalClusterName, overrideNamespace.Name)
 		}).ShouldNot(HaveOccurred())
 
 		By("Add the configs to ManagedClusterAddOn")
 		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
-				context.Background(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -602,7 +602,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 				},
 			}
 			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Update(
-				context.Background(), newAddon, metav1.UpdateOptions{})
+				ctx, newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -612,12 +612,12 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("Make sure addon is configured")
 		Eventually(func() error {
 			_, err := spoke.KubeClient.AppsV1().Deployments(overrideNamespace.Name).Get(
-				context.Background(), "hello-template-agent", metav1.GetOptions{})
+				ctx, "hello-template-agent", metav1.GetOptions{})
 			return err
 		}).ShouldNot(HaveOccurred())
 	})
 
-	It("Template type addon's image should be overrode by cluster annotation", func() {
+	It("Template type addon's image should be overrode by cluster annotation", func(ctx SpecContext) {
 		By("Prepare cluster annotation for addon image override config")
 		overrideRegistries := addonapiv1beta1.AddOnDeploymentConfigSpec{
 			Registries: registries,
@@ -626,7 +626,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		Expect(err).ToNot(HaveOccurred())
 		Eventually(func() error {
 			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
-				context.Background(), universalClusterName, metav1.GetOptions{})
+				ctx, universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -641,14 +641,14 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 
 			newCluster.Annotations = annotations
 			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
-				context.Background(), newCluster, metav1.UpdateOptions{})
+				ctx, newCluster, metav1.UpdateOptions{})
 			return err
 		}).ShouldNot(HaveOccurred())
 
 		By("Make sure addon is configured")
 		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
-				context.Background(), "hello-template-agent", metav1.GetOptions{})
+				ctx, "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -670,7 +670,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("Restore the managed cluster annotation")
 		Eventually(func() error {
 			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
-				context.Background(), universalClusterName, metav1.GetOptions{})
+				ctx, universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -678,14 +678,14 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 			newCluster := cluster.DeepCopy()
 			delete(newCluster.Annotations, clusterv1.ClusterImageRegistriesAnnotationKey)
 			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
-				context.Background(), newCluster, metav1.UpdateOptions{})
+				ctx, newCluster, metav1.UpdateOptions{})
 			return err
 		}).ShouldNot(HaveOccurred())
 
 		By("Make sure addon config is restored")
 		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
-				context.Background(), "hello-template-agent", metav1.GetOptions{})
+				ctx, "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -703,16 +703,16 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		}).ShouldNot(HaveOccurred())
 	})
 
-	It("Template type addon should be configured by addon deployment config for proxy", func() {
+	It("Template type addon should be configured by addon deployment config for proxy", func(ctx SpecContext) {
 		By("Prepare a AddOnDeploymentConfig for addon proxy config")
 		Eventually(func() error {
-			return prepareProxyAddOnDeploymentConfig(universalClusterName, addonInstallNamespace)
+			return prepareProxyAddOnDeploymentConfig(ctx, universalClusterName, addonInstallNamespace)
 		}).ShouldNot(HaveOccurred())
 
 		By("Add the configs to ManagedClusterAddOn")
 		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
-				context.Background(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -730,7 +730,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 				},
 			}
 			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Update(
-				context.Background(), newAddon, metav1.UpdateOptions{})
+				ctx, newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -740,7 +740,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("Make sure addon is configured")
 		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
-				context.Background(), "hello-template-agent", metav1.GetOptions{})
+				ctx, "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -781,23 +781,23 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 			return nil
 		}).ShouldNot(HaveOccurred())
 
-		cm, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(context.TODO(),
+		cm, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(ctx,
 			fmt.Sprintf("%s-proxy-ca", addOnName), metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(cm.Data).To(HaveKey("ca-bundle.crt"))
 		Expect(cm.Data["ca-bundle.crt"]).To(Equal(string(proxyConfig.CABundle)))
 	})
 
-	It("Template type addon should be configured by addon deployment config for resource requirement", func() {
+	It("Template type addon should be configured by addon deployment config for resource requirement", func(ctx SpecContext) {
 		By("Prepare a AddOnDeploymentConfig for addon resource requirement config")
 		Eventually(func() error {
-			return prepareResourceRequirementsAddOnDeploymentConfig(universalClusterName, addonInstallNamespace)
+			return prepareResourceRequirementsAddOnDeploymentConfig(ctx, universalClusterName, addonInstallNamespace)
 		}).ShouldNot(HaveOccurred())
 
 		By("Add the configs to ManagedClusterAddOn")
 		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
-				context.Background(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -815,7 +815,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 				},
 			}
 			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Update(
-				context.Background(), newAddon, metav1.UpdateOptions{})
+				ctx, newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -825,7 +825,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("Make sure addon is configured")
 		Eventually(func() error {
 			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
-				context.Background(), "hello-template-agent", metav1.GetOptions{})
+				ctx, "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -839,7 +839,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 			}
 
 			agentDaemonset, err := spoke.KubeClient.AppsV1().DaemonSets(addonInstallNamespace).Get(
-				context.Background(), "hello-template-agent-ds", metav1.GetOptions{})
+				ctx, "hello-template-agent-ds", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -854,7 +854,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		}).ShouldNot(HaveOccurred())
 	})
 
-	It("ClusterManagementAddon deletion should wait for ManagedClusterAddons cleanup", func() {
+	It("ClusterManagementAddon deletion should wait for ManagedClusterAddons cleanup", func(ctx SpecContext) {
 		By("Make sure addon is functioning before deletion")
 		configmap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -868,12 +868,12 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		}
 
 		_, err := hub.KubeClient.CoreV1().ConfigMaps(universalClusterName).Create(
-			context.Background(), configmap, metav1.CreateOptions{})
+			ctx, configmap, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(func() error {
 			copiedConfig, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
-				context.Background(), configmap.Name, metav1.GetOptions{})
+				ctx, configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -886,13 +886,13 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 
 		By("Delete the ClusterManagementAddon to trigger cascading deletion")
 		err = hub.AddonClient.AddonV1beta1().ClusterManagementAddOns().Delete(
-			context.TODO(), addOnName, metav1.DeleteOptions{})
+			ctx, addOnName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("The pre-delete job should clean up the configmap")
 		Eventually(func() error {
 			_, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
-				context.Background(), configmap.Name, metav1.GetOptions{})
+				ctx, configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -905,7 +905,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("ManagedClusterAddon should eventually be deleted after pre-delete job completes")
 		Eventually(func() error {
 			_, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
-				context.TODO(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -918,7 +918,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("The pre-delete job should be cleaned up")
 		Eventually(func() error {
 			_, err := spoke.KubeClient.BatchV1().Jobs(addonInstallNamespace).Get(
-				context.Background(), "hello-template-cleanup-configmap", metav1.GetOptions{})
+				ctx, "hello-template-cleanup-configmap", metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -931,7 +931,7 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 		By("Verify ClusterManagementAddon is deleted")
 		Eventually(func() error {
 			_, err := hub.AddonClient.AddonV1beta1().ClusterManagementAddOns().Get(
-				context.TODO(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -943,12 +943,12 @@ var _ = Describe("Addon management (v1beta1)", Ordered, Label("addon-manager"), 
 	})
 })
 
-func prepareInstallNamespace(namespace, installNamespace string) error {
+func prepareInstallNamespace(ctx context.Context, namespace, installNamespace string) error {
 	_, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(
-		context.Background(), namespaceOverrideConfigName, metav1.GetOptions{})
+		ctx, namespaceOverrideConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		if _, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Create(
-			context.Background(),
+			ctx,
 			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      namespaceOverrideConfigName,
@@ -969,12 +969,12 @@ func prepareInstallNamespace(namespace, installNamespace string) error {
 	return err
 }
 
-func prepareImageOverrideAddOnDeploymentConfig(namespace, installNamespace string) error {
+func prepareImageOverrideAddOnDeploymentConfig(ctx context.Context, namespace, installNamespace string) error {
 	_, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(
-		context.Background(), imageOverrideDeploymentConfigName, metav1.GetOptions{})
+		ctx, imageOverrideDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		if _, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Create(
-			context.Background(),
+			ctx,
 			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      imageOverrideDeploymentConfigName,
@@ -996,12 +996,12 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace, installNamespace strin
 	return err
 }
 
-func prepareNodePlacementAddOnDeploymentConfig(namespace, installNamespace string) error {
+func prepareNodePlacementAddOnDeploymentConfig(ctx context.Context, namespace, installNamespace string) error {
 	_, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(
-		context.Background(), nodePlacementDeploymentConfigName, metav1.GetOptions{})
+		ctx, nodePlacementDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		if _, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Create(
-			context.Background(),
+			ctx,
 			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      nodePlacementDeploymentConfigName,
@@ -1027,12 +1027,12 @@ func prepareNodePlacementAddOnDeploymentConfig(namespace, installNamespace strin
 	return err
 }
 
-func prepareProxyAddOnDeploymentConfig(namespace, installNamespace string) error {
+func prepareProxyAddOnDeploymentConfig(ctx context.Context, namespace, installNamespace string) error {
 	_, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(
-		context.Background(), proxyDeploymentConfigName, metav1.GetOptions{})
+		ctx, proxyDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		if _, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Create(
-			context.Background(),
+			ctx,
 			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      proxyDeploymentConfigName,
@@ -1058,12 +1058,12 @@ func prepareProxyAddOnDeploymentConfig(namespace, installNamespace string) error
 	return err
 }
 
-func prepareResourceRequirementsAddOnDeploymentConfig(namespace, installNamespace string) error {
+func prepareResourceRequirementsAddOnDeploymentConfig(ctx context.Context, namespace, installNamespace string) error {
 	_, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(
-		context.Background(), resourceRequirementsDeploymentConfigName, metav1.GetOptions{})
+		ctx, resourceRequirementsDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		if _, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Create(
-			context.Background(),
+			ctx,
 			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceRequirementsDeploymentConfigName,
@@ -1087,7 +1087,7 @@ func prepareResourceRequirementsAddOnDeploymentConfig(namespace, installNamespac
 }
 
 func copySignerSecret(ctx context.Context, kubeClient kubernetes.Interface, srcNs, srcName, dstNs, dstName string) error {
-	src, err := kubeClient.CoreV1().Secrets(srcNs).Get(context.Background(), srcName, metav1.GetOptions{})
+	src, err := kubeClient.CoreV1().Secrets(srcNs).Get(ctx, srcName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

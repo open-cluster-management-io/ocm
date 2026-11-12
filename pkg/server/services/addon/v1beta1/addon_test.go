@@ -60,7 +60,7 @@ func TestList(t *testing.T) {
 			}
 
 			service := NewAddonService(addonClient, addonInformer)
-			evts, err := service.List(context.Background(), types.ListOptions{ClusterName: c.clusterName})
+			evts, err := service.List(t.Context(), types.ListOptions{ClusterName: c.clusterName})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -182,7 +182,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 			addonInformer := addonInformers.Addon().V1beta1().ManagedClusterAddOns()
 
 			service := NewAddonService(addonClient, addonInformer)
-			err := service.HandleStatusUpdate(context.Background(), c.addonEvt)
+			err := service.HandleStatusUpdate(t.Context(), c.addonEvt)
 			if c.expectedError {
 				if err == nil {
 					t.Errorf("expected error, got nil")
@@ -202,7 +202,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 func TestEventHandlerFuncs(t *testing.T) {
 	handler := &addOnHandler{}
 	service := &AddonService{}
-	eventHandlerFuncs := service.EventHandlerFuncs(context.Background(), handler)
+	eventHandlerFuncs := service.EventHandlerFuncs(t.Context(), handler)
 
 	addon := &addonv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},

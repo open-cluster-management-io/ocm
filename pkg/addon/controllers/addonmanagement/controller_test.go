@@ -1,7 +1,6 @@
 package addonmanagement
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -484,7 +483,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 				managedClusterAddonIndexer: addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetIndexer(),
 			}
 
-			_, _, err = reconcile.reconcile(context.TODO(), c.clusterManagementAddon)
+			_, _, err = reconcile.reconcile(t.Context(), c.clusterManagementAddon)
 			if err != nil && !c.expectErr {
 				t.Errorf("expected no error when sync: %v", err)
 			}
@@ -687,7 +686,7 @@ func TestAddonManagementControllerSync(t *testing.T) {
 			syncCtx := testingcommon.NewFakeSyncContext(t, c.queueKey)
 
 			// Test sync method
-			ctx := context.TODO()
+			ctx := t.Context()
 			err = controller.sync(ctx, syncCtx, c.queueKey)
 
 			if c.expectError && err == nil {

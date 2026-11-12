@@ -1,7 +1,6 @@
 package addonconfiguration
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -177,7 +176,7 @@ func TestAddonConfigurationControllerSync(t *testing.T) {
 			syncCtx := testingcommon.NewFakeSyncContext(t, c.queueKey)
 
 			// Test sync method
-			ctx := context.TODO()
+			ctx := t.Context()
 			err = controller.sync(ctx, syncCtx, c.queueKey)
 
 			if c.expectError && err == nil {

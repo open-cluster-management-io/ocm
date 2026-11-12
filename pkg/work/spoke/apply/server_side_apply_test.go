@@ -85,7 +85,7 @@ func TestServerSideApply(t *testing.T) {
 				},
 			}
 			obj, err := applier.Apply(
-				context.TODO(), c.gvr, c.required, c.owner, option, syncContext.Recorder())
+				t.Context(), c.gvr, c.required, c.owner, option, syncContext.Recorder())
 			c.validateActions(t, dynamicClient.Actions())
 			if !c.conflict {
 				if err != nil {
@@ -2521,7 +2521,7 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 				},
 			}
 			_, err := applier.Apply(
-				context.TODO(), c.gvr, c.required, owner, option, syncContext.Recorder())
+				t.Context(), c.gvr, c.required, owner, option, syncContext.Recorder())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2641,7 +2641,7 @@ func TestServerSideApplyWithIgnoreFieldErrors(t *testing.T) {
 				},
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 			if c.cancelContext {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)

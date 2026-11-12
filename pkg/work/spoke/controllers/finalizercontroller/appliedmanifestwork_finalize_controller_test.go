@@ -1,7 +1,6 @@
 package finalizercontroller
 
 import (
-	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -283,7 +282,7 @@ func TestFinalize(t *testing.T) {
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
-			err = controller.syncAppliedManifestWork(context.TODO(), controllerContext, testingWork)
+			err = controller.syncAppliedManifestWork(t.Context(), controllerContext, testingWork)
 			if (err != nil) != c.expectErr {
 				t.Fatalf("expected error %v, got %v", c.expectErr, err)
 			}

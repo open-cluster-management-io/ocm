@@ -1,7 +1,6 @@
 package managedcluster
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -84,7 +83,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			}
 
 			fakeHubClient := kubefake.NewSimpleClientset()
-			ctx := context.TODO()
+			ctx := t.Context()
 			hubEventRecorder, err := events.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
 			if err != nil {

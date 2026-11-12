@@ -107,7 +107,7 @@ func TestSync(t *testing.T) {
 				lastLeaseDurationSeconds: c.controllerlastLeaseDurationSeconds,
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), "")
+			syncErr := ctrl.sync(t.Context(), testingcommon.NewFakeSyncContext(t, ""), "")
 			testingcommon.AssertError(t, syncErr, c.expectSyncErr)
 
 			if c.validateActions != nil {
@@ -140,7 +140,7 @@ func TestLeaseUpdater(t *testing.T) {
 	}
 
 	// start the updater
-	ctx := context.Background()
+	ctx := t.Context()
 	syncCtx := testingcommon.NewFakeSyncContext(t, "")
 	leaseUpdater.start(ctx, syncCtx, time.Second*1)
 

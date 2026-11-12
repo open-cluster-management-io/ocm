@@ -1,7 +1,6 @@
 package manifestworkreplicasetcontroller
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -58,7 +57,7 @@ func TestStatusReconcileAsExpected(t *testing.T) {
 		manifestWorkLister: mwLister,
 	}
 
-	mwrSetTest, _, err := mwrSetStatusController.reconcile(context.TODO(), mwrSetTest)
+	mwrSetTest, _, err := mwrSetStatusController.reconcile(t.Context(), mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +332,7 @@ func TestStatusReconcileNewGeneration(t *testing.T) {
 			}
 
 			reconciler := statusReconciler{manifestWorkLister: workInformerFactory.Work().V1().ManifestWorks().Lister()}
-			_, _, err := reconciler.reconcile(context.Background(), mwrSet)
+			_, _, err := reconciler.reconcile(t.Context(), mwrSet)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -397,7 +396,7 @@ func TestStatusReconcileAsProcessing(t *testing.T) {
 		manifestWorkLister: mwLister,
 	}
 
-	mwrSetTest, _, err := mwrSetStatusController.reconcile(context.TODO(), mwrSetTest)
+	mwrSetTest, _, err := mwrSetStatusController.reconcile(t.Context(), mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -489,7 +488,7 @@ func TestStatusReconcileNotAsExpected(t *testing.T) {
 		manifestWorkLister: mwLister,
 	}
 
-	mwrSetTest, _, err := mwrSetStatusController.reconcile(context.TODO(), mwrSetTest)
+	mwrSetTest, _, err := mwrSetStatusController.reconcile(t.Context(), mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -552,7 +551,7 @@ func TestStatusWithMultiPlacementsReconcileAsExpected(t *testing.T) {
 	mwrSetStatusController := statusReconciler{
 		manifestWorkLister: mwLister,
 	}
-	mwrSetTest, _, err = mwrSetStatusController.reconcile(context.TODO(), mwrSetTest)
+	mwrSetTest, _, err = mwrSetStatusController.reconcile(t.Context(), mwrSetTest)
 	assert.Nil(t, err)
 
 	// Check for the expected Summary
@@ -604,7 +603,7 @@ func TestStatusWithMWRSetSpecChangesReconcile(t *testing.T) {
 		manifestWorkLister: mwLister,
 	}
 
-	mwrSetTest, _, err = mwrSetStatusController.reconcile(context.TODO(), mwrSetTest)
+	mwrSetTest, _, err = mwrSetStatusController.reconcile(t.Context(), mwrSetTest)
 	assert.Nil(t, err)
 
 	// Check for the expected Summary
@@ -627,7 +626,7 @@ func TestStatusWithMWRSetSpecChangesReconcile(t *testing.T) {
 	mwTemplate := helpertest.CreateTestManifestWorkSpecWithSecret("v2", "kindtest", "ns-test", "name-test")
 	mwTemplate.DeepCopyInto(&mwrSetTest.Spec.ManifestWorkTemplate)
 
-	mwrSetTest, _, err = mwrSetStatusController.reconcile(context.TODO(), mwrSetTest)
+	mwrSetTest, _, err = mwrSetStatusController.reconcile(t.Context(), mwrSetTest)
 	assert.Nil(t, err)
 
 	// Check for the expected Summary

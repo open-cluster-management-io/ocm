@@ -142,7 +142,7 @@ func TestResourceApplyMetricOnValidationFailure(t *testing.T) {
 	before := resourceApplyMetricValue(t, outcomeFailed)
 
 	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
-	if err := controller.toController().sync(context.TODO(), syncContext, work.Name); err == nil {
+	if err := controller.toController().sync(t.Context(), syncContext, work.Name); err == nil {
 		t.Fatal("expected validation error, got nil")
 	}
 
@@ -431,7 +431,7 @@ func TestResourceApplyMetricFeatureGate(t *testing.T) {
 		before := resourceApplyMetricValue(t, "applied")
 
 		syncContext := testingcommon.NewFakeSyncContext(t, workKey)
-		if err := controller.toController().sync(context.TODO(), syncContext, work.Name); err != nil {
+		if err := controller.toController().sync(t.Context(), syncContext, work.Name); err != nil {
 			t.Fatalf("sync failed: %v", err)
 		}
 
@@ -455,7 +455,7 @@ func TestResourceApplyMetricFeatureGate(t *testing.T) {
 		before := resourceApplyMetricValue(t, "applied")
 
 		syncContext := testingcommon.NewFakeSyncContext(t, workKey)
-		if err := controller.toController().sync(context.TODO(), syncContext, work.Name); err != nil {
+		if err := controller.toController().sync(t.Context(), syncContext, work.Name); err != nil {
 			t.Fatalf("sync failed: %v", err)
 		}
 
@@ -481,7 +481,7 @@ func TestManifestWorkApplyMetric(t *testing.T) {
 	before := manifestWorkApplyMetricValue(t, "applied")
 
 	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
-	if err := controller.toController().sync(context.TODO(), syncContext, work.Name); err != nil {
+	if err := controller.toController().sync(t.Context(), syncContext, work.Name); err != nil {
 		t.Fatalf("sync failed: %v", err)
 	}
 
@@ -491,7 +491,7 @@ func TestManifestWorkApplyMetric(t *testing.T) {
 	}
 	persistedWork, err := controller.workClient.WorkV1().
 		ManifestWorks(work.Namespace).
-		Get(context.TODO(), work.Name, metav1.GetOptions{})
+		Get(t.Context(), work.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get persisted ManifestWork: %v", err)
 	}
@@ -501,7 +501,7 @@ func TestManifestWorkApplyMetric(t *testing.T) {
 		withUnstructuredObject()
 
 	secondSyncContext := testingcommon.NewFakeSyncContext(t, workKey)
-	if err := secondController.toController().sync(context.TODO(), secondSyncContext, persistedWork.Name); err != nil {
+	if err := secondController.toController().sync(t.Context(), secondSyncContext, persistedWork.Name); err != nil {
 		t.Fatalf("second sync failed: %v", err)
 	}
 
@@ -581,7 +581,7 @@ func TestSync(t *testing.T) {
 				withKubeObject(c.spokeObject...).
 				withUnstructuredObject(c.spokeDynamicObject...)
 			syncContext := testingcommon.NewFakeSyncContext(t, workKey)
-			err := controller.toController().sync(context.TODO(), syncContext, work.Name)
+			err := controller.toController().sync(t.Context(), syncContext, work.Name)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
 			}
@@ -651,7 +651,7 @@ func TestFailedToApplyResource(t *testing.T) {
 			return true, &corev1.Secret{}, fmt.Errorf("fake error")
 		})
 		syncContext := testingcommon.NewFakeSyncContext(t, workKey)
-		err := controller.toController().sync(context.TODO(), syncContext, work.Name)
+		err := controller.toController().sync(t.Context(), syncContext, work.Name)
 		if err == nil {
 			t.Errorf("Should return an err")
 		}
@@ -708,7 +708,7 @@ func TestFailedToApplyResource(t *testing.T) {
 			withUnstructuredObject(tc.spokeDynamicObject...)
 
 		syncContext := testingcommon.NewFakeSyncContext(t, workKey)
-		err := controller.toController().sync(context.TODO(), syncContext, work.Name)
+		err := controller.toController().sync(t.Context(), syncContext, work.Name)
 		if err == nil {
 			t.Errorf("Expected an error from sync due to invalid JQ expression")
 		}
@@ -872,7 +872,7 @@ func TestUpdateStrategy(t *testing.T) {
 						map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}}), nil
 				})
 			syncContext := testingcommon.NewFakeSyncContext(t, workKey)
-			err := controller.toController().sync(context.TODO(), syncContext, work.Name)
+			err := controller.toController().sync(t.Context(), syncContext, work.Name)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
 			}
@@ -909,7 +909,7 @@ func TestServerSideApplyConflict(t *testing.T) {
 		return true, nil, errors.NewConflict(schema.GroupResource{Resource: "newobjects"}, "n1", fmt.Errorf("conflict error"))
 	})
 	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
-	err := controller.toController().sync(context.TODO(), syncContext, work.Name)
+	err := controller.toController().sync(t.Context(), syncContext, work.Name)
 	if err != nil {
 		t.Errorf("Should be success with no err: %v", err)
 	}
@@ -1587,7 +1587,7 @@ func TestApplyManifestsInDependencyOrder(t *testing.T) {
 		withUnstructuredObject()
 
 	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
-	err := controller.toController().sync(context.TODO(), syncContext, work.Name)
+	err := controller.toController().sync(t.Context(), syncContext, work.Name)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

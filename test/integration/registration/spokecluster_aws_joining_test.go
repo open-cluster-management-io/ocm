@@ -42,7 +42,7 @@ var _ = Describe("Joining Process for aws flow", Ordered, func() {
 		startHub(awsHubOption)
 
 		// stop hub with awsOption and restart hub with default option
-		DeferCleanup(func() {
+		DeferCleanup(func(ctx SpecContext) {
 			stopHub()
 			startHub(hubOption)
 		})
@@ -56,7 +56,7 @@ var _ = Describe("Joining Process for aws flow", Ordered, func() {
 	})
 
 	assertJoiningSucceed := func() {
-		It("managedcluster should join successfully for aws flow", func() {
+		It("managedcluster should join successfully for aws flow", func(ctx SpecContext) {
 			var err error
 
 			managedClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1"
@@ -187,7 +187,7 @@ var _ = Describe("Joining Process for aws flow", Ordered, func() {
 
 		})
 
-		It("managedcluster should join successfully with auto approval of managed cluster in patterns for aws flow", func() {
+		It("managedcluster should join successfully with auto approval of managed cluster in patterns for aws flow", func(ctx SpecContext) {
 
 			managedClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1"
 			managedClusterRoleSuffix := "7f8141296c75f2871e3d030f85c35692"
@@ -230,7 +230,7 @@ var _ = Describe("Joining Process for aws flow", Ordered, func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 		})
 
-		It("managedcluster should not join successfully with auto approval rejected of managed cluster not in patterns for aws flow", func() {
+		It("managedcluster should not join successfully with auto approval rejected of managed cluster not in patterns for aws flow", func(ctx SpecContext) {
 
 			managedClusterArn := "arn:aws:eks:us-west-1:123456789012:cluster/managed-cluster2"
 			managedClusterRoleSuffix := "7f8141296c75f2871e3d030f85c35692"
@@ -294,6 +294,6 @@ var _ = Describe("Joining Process for aws flow", Ordered, func() {
 })
 
 func contains(slice []string, value string) bool {
-	stringSet := sets.New[string](slice...)
+	stringSet := sets.New(slice...)
 	return stringSet.Has(value)
 }

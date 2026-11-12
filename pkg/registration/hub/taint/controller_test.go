@@ -1,7 +1,6 @@
 package taint
 
 import (
-	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -108,7 +107,7 @@ func TestSyncTaintCluster(t *testing.T) {
 					*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](
 					clusterClient.ClusterV1().ManagedClusters()),
 				clusterInformerFactory.Cluster().V1().ManagedClusters().Lister()}
-			syncErr := ctrl.sync(context.TODO(),
+			syncErr := ctrl.sync(t.Context(),
 				testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName),
 				testinghelpers.TestManagedClusterName,
 			)

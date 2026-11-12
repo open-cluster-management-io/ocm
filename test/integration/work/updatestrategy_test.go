@@ -30,19 +30,19 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 	var err error
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		clusterName = rand.String(5)
 		workName = fmt.Sprintf("update-strategy-work-%s", rand.String(5))
 
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
 		}
-		_, err := spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := spokeKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
-		go startWorkAgent(ctx, clusterName)
+		var runCtx context.Context
+		runCtx, cancel = context.WithCancel(context.Background())
+		go startWorkAgent(runCtx, clusterName)
 
 		// reset manifests
 		manifests = nil
@@ -52,11 +52,11 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 		work = util.NewManifestWork(clusterName, workName, manifests)
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx SpecContext) {
 		if cancel != nil {
 			cancel()
 		}
-		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
+		err := spokeKubeClient.CoreV1().Namespaces().Delete(ctx, clusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -69,7 +69,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			manifests = append(manifests, util.ToManifest(object))
 		})
 
-		It("deployed resource should not be updated when work is updated", func() {
+		It("deployed resource should not be updated when work is updated", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -84,7 +84,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -94,7 +94,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -108,7 +108,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
@@ -116,7 +116,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -132,19 +132,19 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 	Context("Read only strategy", func() {
 		var cm *corev1.ConfigMap
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			cm = util.NewConfigmap(clusterName, "cm1", map[string]string{"test": "testdata"}, []string{})
-			_, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Create(context.TODO(), cm, metav1.CreateOptions{})
+			_, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Create(ctx, cm, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			manifests = append(manifests, util.ToManifest(cm))
 		})
 
-		AfterEach(func() {
-			err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Delete(context.TODO(), "cm1", metav1.DeleteOptions{})
+		AfterEach(func(ctx SpecContext) {
+			err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Delete(ctx, "cm1", metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("read cm from the cluster", func() {
+		It("read cm from the cluster", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -169,7 +169,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -177,7 +177,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("get configmap values from the work")
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -206,20 +206,20 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("update configmap")
 			Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, "cm1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
 				cm.Data["test"] = "testdata-updated"
 
-				_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Update(context.Background(), cm, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Update(ctx, cm, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			By("get updated configmap values from the work")
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -257,7 +257,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			manifests = append(manifests, util.ToManifest(object))
 		})
 
-		It("deployed resource should be applied when work is updated", func() {
+		It("deployed resource should be applied when work is updated", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -272,7 +272,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -281,7 +281,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			// update work
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -295,12 +295,12 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -313,7 +313,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("should get conflict if a field is taken by another manager", func() {
+		It("should get conflict if a field is taken by another manager", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -328,7 +328,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -340,14 +340,14 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			patch, err := object.MarshalJSON()
 			Expect(err).ToNot(HaveOccurred())
 			_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Patch(
-				context.Background(), "deploy1", types.ApplyPatchType, patch, metav1.PatchOptions{Force: ptr.To[bool](true), FieldManager: "test-integration"})
+				ctx, "deploy1", types.ApplyPatchType, patch, metav1.PatchOptions{Force: ptr.To[bool](true), FieldManager: "test-integration"})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Update deployment by work
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -361,7 +361,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
@@ -372,7 +372,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			// remove the replica field and apply should work
 			unstructured.RemoveNestedField(object.Object, "spec", "replicas")
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -386,7 +386,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
@@ -394,7 +394,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("two manifest works with different field manager", func() {
+		It("two manifest works with different field manager", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -409,7 +409,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -438,7 +438,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work1, metav1.CreateOptions{})
+			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work1, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work1.Namespace, work1.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -448,7 +448,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -462,7 +462,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
@@ -471,7 +471,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -487,7 +487,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			err = unstructured.SetNestedField(object.Object, "another-sa", "spec", "template", "spec", "serviceAccountName")
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -501,7 +501,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
@@ -510,7 +510,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				[]metav1.ConditionStatus{metav1.ConditionFalse}, eventuallyTimeout, eventuallyInterval)
 		})
 
-		It("with delete options", func() {
+		It("with delete options", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -525,7 +525,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -554,14 +554,14 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work1, metav1.CreateOptions{})
+			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work1, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work1.Namespace, work1.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -575,7 +575,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			// update deleteOption of the first work
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -589,12 +589,12 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -607,7 +607,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("IgnoreField with onSpokeChange", func() {
+		It("IgnoreField with onSpokeChange", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -630,7 +630,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -638,7 +638,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("Update deployment replica to 2")
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -648,14 +648,14 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				deploy.Spec.Replicas = new(int32(2))
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(ctx, deploy, metav1.UpdateOptions{})
 
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			By("Update manifestwork with force apply to trigger a reconcile")
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -668,7 +668,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
@@ -677,7 +677,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("Deployment replicas should not be updated")
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -695,7 +695,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			By("update manifestwork's deployment replica to 3")
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -709,12 +709,12 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -727,7 +727,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("IgnoreField with onSpokePresent", func() {
+		It("IgnoreField with onSpokePresent", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -750,7 +750,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -758,7 +758,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("Update deployment replica to 2")
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -768,7 +768,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				deploy.Spec.Replicas = new(int32(2))
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(ctx, deploy, metav1.UpdateOptions{})
 
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
@@ -779,7 +779,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			By("update manifestwork's deployment replica to 3")
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -793,7 +793,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
@@ -802,7 +802,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("Deployment replica should not be changed")
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -815,7 +815,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("IgnoreField does not delete a spoke-managed field when the work is updated", func() {
+		It("IgnoreField does not delete a spoke-managed field when the work is updated", func(ctx SpecContext) {
 			// reproducer for https://github.com/open-cluster-management-io/ocm/issues/1785:
 			// a field applied and owned by the work agent must survive a manifest update
 			// when the field is ignored. With the removal-based implementation, server
@@ -858,7 +858,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			}
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
-				context.Background(), work, metav1.CreateOptions{})
+				ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
@@ -869,7 +869,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			cmObject["data"].(map[string]interface{})["managed-key"] = "b"
 			Eventually(func() error {
 				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(
-					context.Background(), work.Name, metav1.GetOptions{})
+					ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -883,7 +883,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
@@ -894,7 +894,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			By("the ignored field must survive and the managed key must be updated")
 			Eventually(func() error {
 				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(
-					context.Background(), "cm1", metav1.GetOptions{})
+					ctx, "cm1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -911,7 +911,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("IgnoreField with JSONPointer onSpokePresent", func() {
+		It("IgnoreField with JSONPointer onSpokePresent", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -934,7 +934,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -942,7 +942,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("Update deployment replica to 2")
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -952,7 +952,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				deploy.Spec.Replicas = new(int32(2))
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(ctx, deploy, metav1.UpdateOptions{})
 
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
@@ -963,7 +963,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			By("update manifestwork's deployment replica to 3")
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -977,7 +977,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
@@ -986,7 +986,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("Deployment replica should not be changed")
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -999,7 +999,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("IgnoreField with JQPathExpression to filter container ENV variable", func() {
+		It("IgnoreField with JQPathExpression to filter container ENV variable", func(ctx SpecContext) {
 			// Create deployment with container that has JAVA_OPTS env var
 			deployWithEnv := object.DeepCopy()
 			err = unstructured.SetNestedSlice(deployWithEnv.Object, []interface{}{
@@ -1045,7 +1045,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -1053,7 +1053,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("Verify deployment has both env vars after initial apply")
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1072,7 +1072,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("Change JAVA_OPTS value on spoke side")
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1087,7 +1087,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 						break
 					}
 				}
-				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(ctx, deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
@@ -1114,7 +1114,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1128,7 +1128,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				}
 
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
-					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+					ctx, updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
@@ -1137,7 +1137,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("JAVA_OPTS should remain at spoke value (-Xmx1024m), not updated to hub value (-Xmx2048m)")
 			Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(ctx, "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1163,7 +1163,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		It("IgnoreField with invalid JQPathExpression should fail with AppliedManifestSSAIgnoreFieldError", func() {
+		It("IgnoreField with invalid JQPathExpression should fail with AppliedManifestSSAIgnoreFieldError", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -1188,7 +1188,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionFalse,
@@ -1196,7 +1196,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("Verify manifest condition has AppliedManifestSSAIgnoreFieldError reason")
 			Eventually(func() error {
-				appliedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				appliedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1224,7 +1224,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 		})
 	})
 
-	It("should not increase the workload generation when nothing changes", func() {
+	It("should not increase the workload generation when nothing changes", func(ctx SpecContext) {
 		nestedWorkNamespace := "default"
 		nestedWorkName := fmt.Sprintf("nested-work-%s", rand.String(5))
 
@@ -1252,12 +1252,12 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			},
 		}
-		_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+		_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// make sure the nested work is created
 		Eventually(func() error {
-			_, err := spokeWorkClient.WorkV1().ManifestWorks(nestedWorkNamespace).Get(context.Background(), nestedWorkName, metav1.GetOptions{})
+			_, err := spokeWorkClient.WorkV1().ManifestWorks(nestedWorkNamespace).Get(ctx, nestedWorkName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -1267,7 +1267,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 		// make sure the nested work is not updated
 		Consistently(func() error {
-			nestedWork, err := spokeWorkClient.WorkV1().ManifestWorks(nestedWorkNamespace).Get(context.Background(), nestedWorkName, metav1.GetOptions{})
+			nestedWork, err := spokeWorkClient.WorkV1().ManifestWorks(nestedWorkNamespace).Get(ctx, nestedWorkName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -1281,28 +1281,28 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 	})
 
 	Context("wildcard to filter all resources", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			cm1 := util.NewConfigmap(clusterName, "cm1",
 				map[string]string{"test1": "testdata", "test2": "test2"}, []string{})
-			_, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Create(context.TODO(), cm1, metav1.CreateOptions{})
+			_, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Create(ctx, cm1, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			manifests = append(manifests, util.ToManifest(cm1))
 
 			cm2 := util.NewConfigmap(clusterName, "cm2",
 				map[string]string{"test1": "testdata", "test2": "test2"}, []string{})
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Create(context.TODO(), cm2, metav1.CreateOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Create(ctx, cm2, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			manifests = append(manifests, util.ToManifest(cm2))
 		})
 
-		AfterEach(func() {
-			err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Delete(context.TODO(), "cm1", metav1.DeleteOptions{})
+		AfterEach(func(ctx SpecContext) {
+			err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Delete(ctx, "cm1", metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
-			err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Delete(context.TODO(), "cm2", metav1.DeleteOptions{})
+			err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Delete(ctx, "cm2", metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("read cms from the cluster", func() {
+		It("read cms from the cluster", func(ctx SpecContext) {
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -1348,7 +1348,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(ctx, work, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -1356,7 +1356,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("get configmap values from the work")
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1387,14 +1387,14 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			Eventually(func() error {
 				cmName := []string{"cm1", "cm2"}
 				for _, name := range cmName {
-					cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), name, metav1.GetOptions{})
+					cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, name, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
 
 					cm.Data["test1"] = "testdata-updated"
 
-					_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Update(context.Background(), cm, metav1.UpdateOptions{})
+					_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Update(ctx, cm, metav1.UpdateOptions{})
 					if err != nil {
 						return err
 					}
@@ -1404,7 +1404,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 
 			By("get updated configmap values from the work")
 			Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(ctx, work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

@@ -156,7 +156,7 @@ func TestAggregateApprover(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			aggregated := NewAggregatedHubDriver(c.approvers...)
-			err := aggregated.Cleanup(context.Background(), testinghelpers.NewManagedCluster())
+			err := aggregated.Cleanup(t.Context(), testinghelpers.NewManagedCluster())
 			if err != nil && !c.expectErr {
 				t.Errorf("should have no err but got %v", err)
 			}

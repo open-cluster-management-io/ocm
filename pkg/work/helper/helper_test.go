@@ -1,7 +1,6 @@
 package helper
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -341,7 +340,7 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, c.existingResources...)
-			actual, err := DeleteAppliedResources(context.TODO(), c.resourcesToRemove, "testing", fakeDynamicClient, c.owner)
+			actual, err := DeleteAppliedResources(t.Context(), c.resourcesToRemove, "testing", fakeDynamicClient, c.owner)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
@@ -591,7 +590,7 @@ func TestApplyOwnerReferences(t *testing.T) {
 			object := newSecret("ns1", "n1", false, "ns1-n1", c.existing...)
 			fakeClient := fakedynamic.NewSimpleDynamicClient(scheme, object)
 			gvr := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
-			err := ApplyOwnerReferences(context.TODO(), fakeClient, gvr, object, c.required)
+			err := ApplyOwnerReferences(t.Context(), fakeClient, gvr, object, c.required)
 			if err != nil {
 				t.Errorf("apply err: %v", err)
 			}
