@@ -49,6 +49,7 @@ type HubConfig struct {
 	AutoApprovedCSRUsers              string
 	AutoApprovedARNPatterns           string
 	AwsResourceTags                   string
+	AwsResourceManagement             string
 	Labels                            map[string]string
 	LabelsString                      string
 	GRPCAuthEnabled                   bool

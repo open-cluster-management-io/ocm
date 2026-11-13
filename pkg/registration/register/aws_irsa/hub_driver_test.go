@@ -128,7 +128,7 @@ func TestAccept(t *testing.T) {
 		[]string{
 			"arn:aws:eks:us-west-2:123456789012:cluster/.*",
 			"arn:aws:eks:us-west-1:123456789012:cluster/.*",
-		}, []string{},
+		}, []string{}, "",
 	)
 
 	if err != nil {
@@ -146,12 +146,50 @@ func TestAccept(t *testing.T) {
 }
 
 func TestNewDriverValidation(t *testing.T) {
-	// Test with an invalid manager cluster approval pattern
-	_, err := NewAWSIRSAHubDriver(t.Context(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{
-		"arn:(aws:eks:us-west-2:123456789012:cluster/.*", // bad pattern
-	}, []string{})
-	if err == nil {
-		t.Errorf("Error expected")
+	cases := []struct {
+		name               string
+		patterns           []string
+		resourceManagement string
+		expectErr          bool
+		expected           operatorv1.AwsResourceManagement
+	}{
+		{
+			name:      "invalid auto approval pattern",
+			patterns:  []string{"arn:(aws:eks:us-west-2:123456789012:cluster/.*"},
+			expectErr: true,
+		},
+		{
+			name:     "resource management defaults to Managed",
+			expected: operatorv1.AwsResourceManagementManaged,
+		},
+		{
+			name:               "UseExisting resource management",
+			resourceManagement: "UseExisting",
+			expected:           operatorv1.AwsResourceManagementUseExisting,
+		},
+		{
+			name:               "invalid resource management",
+			resourceManagement: "Unmanaged",
+			expectErr:          true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			driver, err := NewAWSIRSAHubDriver(t.Context(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+				c.patterns, []string{}, c.resourceManagement)
+			if c.expectErr {
+				if err == nil {
+					t.Errorf("Error expected")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := driver.(*AWSIRSAHubDriver).resourceManagement; got != c.expected {
+				t.Errorf("expected resource management %q, got %q", c.expected, got)
+			}
+		})
 	}
 }
 
@@ -611,7 +649,7 @@ func TestCleanup(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			awsIrsaHubDriver, err := NewAWSIRSAHubDriver(t.Context(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{}, []string{})
+			awsIrsaHubDriver, err := NewAWSIRSAHubDriver(t.Context(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{}, []string{}, "")
 			if err != nil {
 				t.Errorf("error creating AWSIRSAHubDriver")
 				return
@@ -1418,5 +1456,177 @@ func TestParseTagsForAccessEntries(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// useExistingCluster's role suffix matches useExistingHubClusterArn.
+const useExistingHubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster"
+
+func useExistingCluster() *clusterv1.ManagedCluster {
+	return &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "managed-cluster",
+			Annotations: map[string]string{
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn: "arn:aws:eks:us-west-2:123456789013:cluster/managed-cluster",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: commonhelper.Md5HashSuffix(
+					"123456789012", "hub-cluster", "123456789013", "managed-cluster"),
+			},
+		},
+	}
+}
+
+// newUseExistingDriver returns a driver whose AWS calls are answered by describe. Any other operation fails the
+// test, and calls records every operation that reached the transport.
+func newUseExistingDriver(t *testing.T, calls *[]string,
+	describe func(*eks.DescribeAccessEntryInput) (*eks.DescribeAccessEntryOutput, error)) *AWSIRSAHubDriver {
+	t.Helper()
+	cfg := aws.Config{
+		Region: "us-west-2",
+		// Fails the test if UseExisting ever needs the hub's credentials to build an ARN.
+		Credentials: aws.CredentialsProviderFunc(func(context.Context) (aws.Credentials, error) {
+			return aws.Credentials{AccessKeyID: "test", SecretAccessKey: "test", AccountID: "999999999999"}, nil
+		}),
+		APIOptions: []func(*middleware.Stack) error{func(stack *middleware.Stack) error {
+			return stack.Initialize.Add(
+				middleware.InitializeMiddlewareFunc("mockUseExisting",
+					func(ctx context.Context, in middleware.InitializeInput, _ middleware.InitializeHandler) (
+						middleware.InitializeOutput, middleware.Metadata, error) {
+						op := middleware.GetOperationName(ctx)
+						*calls = append(*calls, op)
+						input, ok := in.Parameters.(*eks.DescribeAccessEntryInput)
+						if !ok || describe == nil {
+							t.Errorf("unexpected AWS operation %s", op)
+							return middleware.InitializeOutput{}, middleware.Metadata{}, fmt.Errorf("unexpected operation %s", op)
+						}
+						out, err := describe(input)
+						return middleware.InitializeOutput{Result: out}, middleware.Metadata{}, err
+					}),
+				middleware.Before,
+			)
+		}},
+	}
+	driver, err := NewAWSIRSAHubDriver(t.Context(), useExistingHubClusterArn, []string{}, []string{"k=v"}, "UseExisting")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := driver.(*AWSIRSAHubDriver)
+	d.cfg = cfg
+	return d
+}
+
+func TestCreatePermissionsUseExisting(t *testing.T) {
+	cluster := useExistingCluster()
+	suffix := cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix]
+	expectedArn := "arn:aws:iam::123456789012:role/ocm-hub-" + suffix
+	entry := func(username string, groups ...string) (*eks.DescribeAccessEntryOutput, error) {
+		return &eks.DescribeAccessEntryOutput{AccessEntry: &ekstypes.AccessEntry{
+			AccessEntryArn:   aws.String("arn:aws:eks:us-west-2:123456789012:access-entry/hub-cluster/role/123456789012/x"),
+			Username:         aws.String(username),
+			KubernetesGroups: groups,
+		}}, nil
+	}
+
+	cases := []struct {
+		name        string
+		cluster     *clusterv1.ManagedCluster
+		describe    func() (*eks.DescribeAccessEntryOutput, error)
+		expectCalls int
+		expectErr   string
+	}{
+		{
+			name:    "access entry matches",
+			cluster: cluster,
+			describe: func() (*eks.DescribeAccessEntryOutput, error) {
+				return entry("managed-cluster", "open-cluster-management:managed-cluster")
+			},
+			expectCalls: 1,
+		},
+		{
+			name:    "access entry has extra groups",
+			cluster: cluster,
+			describe: func() (*eks.DescribeAccessEntryOutput, error) {
+				return entry("managed-cluster", "other", "open-cluster-management:managed-cluster")
+			},
+			expectCalls: 1,
+		},
+		{
+			name:    "access entry not found",
+			cluster: cluster,
+			describe: func() (*eks.DescribeAccessEntryOutput, error) {
+				return nil, &ekstypes.ResourceNotFoundException{Message: aws.String("not found")}
+			},
+			expectCalls: 1,
+			expectErr:   "access entry for principal " + expectedArn + " not found on EKS cluster hub-cluster",
+		},
+		{
+			name:    "access entry has wrong username",
+			cluster: cluster,
+			describe: func() (*eks.DescribeAccessEntryOutput, error) {
+				return entry("someone", "open-cluster-management:managed-cluster")
+			},
+			expectCalls: 1,
+			expectErr:   `has username "someone"`,
+		},
+		{
+			name:        "access entry lacks the cluster group",
+			cluster:     cluster,
+			describe:    func() (*eks.DescribeAccessEntryOutput, error) { return entry("managed-cluster", "other") },
+			expectCalls: 1,
+			expectErr:   `expected username "managed-cluster" and Kubernetes group "open-cluster-management:managed-cluster"`,
+		},
+		{
+			name:        "describe access entry denied",
+			cluster:     cluster,
+			describe:    func() (*eks.DescribeAccessEntryOutput, error) { return nil, fmt.Errorf("AccessDeniedException") },
+			expectCalls: 1,
+			expectErr:   "failed to describe access entry for principal " + expectedArn,
+		},
+		{
+			name: "role suffix computed against another hub",
+			cluster: func() *clusterv1.ManagedCluster {
+				c := useExistingCluster()
+				c.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix] = "7f8141296c75f2871e3d030f85c35692"
+				return c
+			}(),
+			expectErr: "is different from the current hub cluster",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var calls []string
+			var describe func(*eks.DescribeAccessEntryInput) (*eks.DescribeAccessEntryOutput, error)
+			if c.describe != nil {
+				describe = func(in *eks.DescribeAccessEntryInput) (*eks.DescribeAccessEntryOutput, error) {
+					if aws.ToString(in.ClusterName) != "hub-cluster" || aws.ToString(in.PrincipalArn) != expectedArn {
+						t.Errorf("unexpected DescribeAccessEntry input: cluster %q, principal %q",
+							aws.ToString(in.ClusterName), aws.ToString(in.PrincipalArn))
+					}
+					return c.describe()
+				}
+			}
+			driver := newUseExistingDriver(t, &calls, describe)
+
+			err := driver.CreatePermissions(t.Context(), c.cluster)
+			if c.expectErr == "" && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if c.expectErr != "" && (err == nil || !strings.Contains(err.Error(), c.expectErr)) {
+				t.Fatalf("expected error containing %q, got %v", c.expectErr, err)
+			}
+			if len(calls) != c.expectCalls {
+				t.Errorf("expected %d AWS calls, got %v", c.expectCalls, calls)
+			}
+		})
+	}
+}
+
+func TestCleanupUseExisting(t *testing.T) {
+	var calls []string
+	driver := newUseExistingDriver(t, &calls, nil)
+	if err := driver.Cleanup(t.Context(), useExistingCluster()); err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 0 {
+		t.Errorf("expected no AWS calls, got %v", calls)
 	}
 }
