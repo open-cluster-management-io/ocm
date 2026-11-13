@@ -5,34 +5,23 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"time"
 
 	"gopkg.in/yaml.v2"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
-	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
-	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
-	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
-	cloudeventsaddon "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon"
-	cloudeventsaddonv1beta1 "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
-	cloudeventscluster "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	cloudeventscsr "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
-	cloudeventsevent "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
-	cloudeventslease "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
 	cloudeventsoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
 	cloudeventsserviceaccount "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/serviceaccount"
-	cloudeventsstore "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/constants"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/builder"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/cert"
@@ -74,22 +63,10 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 	}
 	d.configTemplate = configData
 
-	clusterWatchStore := cloudeventsstore.NewAgentInformerWatcherStore[*clusterv1.ManagedCluster]()
-	clusterClientHolder, err := cloudeventscluster.NewClientHolder(
-		ctx,
-		cloudeventsoptions.NewGenericClientOptions(
-			config,
-			cloudeventscluster.NewManagedClusterCodec(),
-			secretOption.ClusterName,
-		).
-			WithClusterName(secretOption.ClusterName).
-			WithClientWatcherStore(clusterWatchStore))
+	clients, err := NewCloudEventsClients(ctx, config, secretOption.ClusterName, bootstrapped)
 	if err != nil {
 		return nil, err
 	}
-	clusterClient := clusterClientHolder.ClusterInterface()
-	clusterInformers := clusterinformers.NewSharedInformerFactory(
-		clusterClient, 10*time.Minute).Cluster().V1().ManagedClusters()
 
 	csrClientHolder, err := cloudeventscsr.NewAgentClientHolder(ctx,
 		cloudeventsoptions.NewGenericClientOptions(
@@ -107,70 +84,15 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 	}
 	d.control = csrControl
 
-	// Initialize the cluster client and CSR control in the bootstrap phase.
-	// Other clients should not be initialized, since they require
-	// permissions that are not allowed in the bootstrap phase.
+	// Only the cluster client and CSR control are initialized in the bootstrap phase.
 	if bootstrapped {
-		return &register.Clients{
-			ClusterClient:   clusterClient,
-			ClusterInformer: clusterInformers,
-		}, nil
-	}
-
-	leaseWatchStore := cloudeventsstore.NewSimpleStore[*coordv1.Lease]()
-	leaseClient, err := cloudeventslease.NewLeaseClient(
-		ctx,
-		cloudeventsoptions.NewGenericClientOptions(
-			config,
-			cloudeventslease.NewLeaseCodec(),
-			secretOption.ClusterName,
-		).WithClusterName(secretOption.ClusterName).WithClientWatcherStore(leaseWatchStore),
-		secretOption.ClusterName,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	eventClient, err := cloudeventsevent.NewClientHolder(
-		ctx,
-		cloudeventsoptions.NewGenericClientOptions(
-			config,
-			cloudeventsevent.NewEventCodec(),
-			secretOption.ClusterName,
-		).WithClusterName(secretOption.ClusterName).WithSubscription(false).WithResyncEnabled(false),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	addonWatchStore := cloudeventsstore.NewAgentInformerWatcherStore[*addonv1beta1.ManagedClusterAddOn]()
-	addonClient, err := cloudeventsaddon.ManagedClusterAddOnInterface(
-		ctx,
-		cloudeventsoptions.NewGenericClientOptions(
-			config,
-			cloudeventsaddonv1beta1.NewManagedClusterAddOnCodec(),
-			secretOption.ClusterName,
-		).WithClusterName(secretOption.ClusterName).WithClientWatcherStore(addonWatchStore))
-	if err != nil {
-		return nil, err
-	}
-	addonInformer := addoninformers.NewSharedInformerFactoryWithOptions(
-		addonClient, 10*time.Minute, addoninformers.WithNamespace(secretOption.ClusterName)).
-		Addon().V1beta1().ManagedClusterAddOns()
-
-	clients := &register.Clients{
-		ClusterClient:   clusterClient,
-		ClusterInformer: clusterInformers,
-		AddonClient:     addonClient,
-		AddonInformer:   addonInformer,
-		LeaseClient:     leaseClient,
-		EventsClient:    eventClient,
+		return clients, nil
 	}
 
 	// Initialize addon clients for addon mode
 	d.addonClients = &register.AddOnClients{
-		AddonClient:   addonClient,
-		AddonInformer: addonInformer,
+		AddonClient:   clients.AddonClient,
+		AddonInformer: clients.AddonInformer,
 	}
 
 	// Initialize gRPC token control for token-based addon authentication

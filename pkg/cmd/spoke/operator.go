@@ -71,6 +71,9 @@ func NewKlusterletAgentCmd() *cobra.Command {
 	commonOptions := commonoptions.NewAgentOptions()
 	workOptions := work.NewWorkloadAgentOptions()
 	registrationOption := registration.NewSpokeAgentOptions()
+	// One process, one SVID: the work part uses the registration agent's SPIFFE settings (the
+	// klusterlet role), whose flags are added once below.
+	workOptions.SPIFFE = registrationOption.RegisterDriverOption.SPIFFEOption
 
 	agentConfig := singletonspoke.NewAgentConfig(commonOptions, registrationOption, workOptions, cancel)
 	cmdConfig := commonOptions.CommonOpts.

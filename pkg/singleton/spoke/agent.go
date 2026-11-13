@@ -68,5 +68,5 @@ func (a *AgentConfig) RunSpokeAgent(ctx context.Context, controllerContext *cont
 }
 
 func (o *AgentConfig) HealthCheckers() []healthz.HealthChecker {
-	return o.registrationConfig.HealthCheckers()
+	return append(o.registrationConfig.HealthCheckers(), o.workConfig.HealthCheckers()...)
 }

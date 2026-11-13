@@ -2,11 +2,15 @@ package spoke
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -24,6 +28,8 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/agent/codec"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/builder"
+	grpcoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc"
+	ocmspiffe "open-cluster-management.io/sdk-go/pkg/spiffe"
 
 	"open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
@@ -38,6 +44,9 @@ import (
 type WorkAgentConfig struct {
 	agentOptions *options.AgentOptions
 	workOptions  *WorkloadAgentOptions
+
+	// spiffeSource is the Workload API source of the agent's SVID, when it connects with SPIFFE.
+	spiffeSource atomic.Pointer[ocmspiffe.X509Source]
 }
 
 // NewWorkAgentConfig returns a WorkAgentConfig
@@ -209,7 +218,39 @@ func (o *WorkAgentConfig) newWorkClientAndInformer(
 	var watcherStore *store.AgentInformerWatcherStore
 	var hubHost string
 
-	if o.workOptions.WorkloadSourceDriver == "kube" {
+	if o.workOptions.SPIFFE.Enabled() {
+		// The agent's own SVID is its hub credential; nothing is read from a file or Secret.
+		watcherStore = store.NewAgentInformerWatcherStore()
+		grpcOptions, closer, err := grpcoptions.NewSPIFFEGRPCOptions(ctx, grpcoptions.SPIFFEConfig{
+			URL:               o.workOptions.SPIFFE.HubEndpoint,
+			HubSPIFFEID:       o.workOptions.SPIFFE.HubSPIFFEID,
+			AgentSPIFFEID:     o.workOptions.SPIFFE.AgentSPIFFEID,
+			WorkloadAPISocket: o.workOptions.SPIFFE.WorkloadAPISocket,
+		})
+		if err != nil {
+			return "", nil, nil, err
+		}
+		if src, ok := closer.(*ocmspiffe.X509Source); ok {
+			o.spiffeSource.Store(src)
+		}
+		go func() {
+			<-ctx.Done()
+			_ = closer.Close()
+		}()
+		clientID := o.workOptions.CloudEventsClientID
+		if clientID == "" {
+			clientID = o.agentOptions.SpokeClusterName + "-work-agent"
+		}
+		clientHolder, err := cloudeventswork.NewAgentClientHolder(ctx, cloudeventsoptions.NewGenericClientOptions(
+			grpcOptions, codec.NewManifestBundleCodec(), clientID).
+			WithClusterName(o.agentOptions.SpokeClusterName).
+			WithClientWatcherStore(watcherStore))
+		if err != nil {
+			return "", nil, nil, err
+		}
+		hubHost = o.workOptions.SPIFFE.HubEndpoint
+		workClient = clientHolder.WorkInterface()
+	} else if o.workOptions.WorkloadSourceDriver == "kube" {
 		config, err := clientcmd.BuildConfigFromFlags("", o.workOptions.WorkloadSourceConfig)
 		if err != nil {
 			return "", nil, nil, err
@@ -259,4 +300,19 @@ func (o *WorkAgentConfig) newWorkClientAndInformer(
 	informer := factory.Work().V1().ManifestWorks()
 
 	return hubHost, workClient.WorkV1().ManifestWorks(o.agentOptions.SpokeClusterName), informer, nil
+}
+
+// HealthCheckers reports the agent's SVID: not ready, with the expected and received IDs, while
+// the Workload API has no SVID with the agent's ID.
+func (o *WorkAgentConfig) HealthCheckers() []healthz.HealthChecker {
+	return []healthz.HealthChecker{healthz.NamedCheck("spiffe-svid", func(_ *http.Request) error {
+		if !o.workOptions.SPIFFE.Enabled() {
+			return nil
+		}
+		src := o.spiffeSource.Load()
+		if src == nil {
+			return fmt.Errorf("the Workload API source is not open yet")
+		}
+		return src.Ready()
+	})}
 }

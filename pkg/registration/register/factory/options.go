@@ -11,6 +11,7 @@ import (
 	awsirsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 	"open-cluster-management.io/ocm/pkg/registration/register/grpc"
+	"open-cluster-management.io/ocm/pkg/registration/register/spiffe"
 	"open-cluster-management.io/ocm/pkg/registration/register/token"
 )
 
@@ -20,6 +21,7 @@ type Options struct {
 	AWSIRSAOption    *awsirsa.AWSOption
 	GRPCOption       *grpc.Option
 	TokenOption      *token.Option
+	SPIFFEOption     *spiffe.Option
 
 	// AddonKubeClientRegistrationAuth specifies the authentication method for addons
 	// with registration type KubeClient. Possible values are "csr" (default) and "token".
@@ -32,6 +34,7 @@ func NewOptions() *Options {
 		AWSIRSAOption:                   awsirsa.NewAWSOption(),
 		GRPCOption:                      grpc.NewOptions(),
 		TokenOption:                     token.NewTokenOption(),
+		SPIFFEOption:                    spiffe.NewOption(),
 		AddonKubeClientRegistrationAuth: "csr", // default to csr
 	}
 }
@@ -45,6 +48,7 @@ func (s *Options) AddFlags(fs *pflag.FlagSet) {
 	s.AWSIRSAOption.AddFlags(fs)
 	s.GRPCOption.AddFlags(fs)
 	s.TokenOption.AddFlags(fs)
+	s.SPIFFEOption.AddFlags(fs)
 }
 
 func (s *Options) Validate() error {
@@ -60,6 +64,8 @@ func (s *Options) Validate() error {
 		return s.AWSIRSAOption.Validate()
 	case operatorv1.GRPCAuthType:
 		return s.GRPCOption.Validate()
+	case operatorv1.SPIFFEAuthType:
+		return s.SPIFFEOption.Validate()
 	default:
 		return s.CSROption.Validate()
 	}
@@ -83,6 +89,8 @@ func (s *Options) Driver(secretOption register.SecretOption) (register.RegisterD
 		return awsirsa.NewAWSIRSADriver(s.AWSIRSAOption, secretOption), nil
 	case operatorv1.GRPCAuthType:
 		return grpc.NewGRPCDriver(s.GRPCOption, s.CSROption, secretOption)
+	case operatorv1.SPIFFEAuthType:
+		return spiffe.NewSPIFFEDriver(s.SPIFFEOption), nil
 	default:
 		return csr.NewCSRDriver(s.CSROption, secretOption)
 	}
