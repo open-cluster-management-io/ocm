@@ -85,6 +85,8 @@ var CRDPaths = []string{
 	"./vendor/open-cluster-management.io/api/cluster/v1beta2/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
 	// spoke
 	"./vendor/open-cluster-management.io/api/cluster/v1alpha1/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
+	// the work agent of the SPIFFE spec
+	"./vendor/open-cluster-management.io/api/work/v1/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml",
 	// external API deps
 	"./test/integration/testdeps/capi/cluster.x-k8s.io_clusters.yaml",
 	"./manifests/klusterlet/managed/clusterproperties.crd.yaml",
