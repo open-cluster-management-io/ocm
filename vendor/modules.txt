@@ -2144,9 +2144,11 @@ open-cluster-management.io/sdk-go/pkg/server/grpc
 open-cluster-management.io/sdk-go/pkg/server/grpc/authn
 open-cluster-management.io/sdk-go/pkg/server/grpc/authz
 open-cluster-management.io/sdk-go/pkg/server/grpc/metrics
+open-cluster-management.io/sdk-go/pkg/server/grpc/spiffe
 open-cluster-management.io/sdk-go/pkg/spiffe
 open-cluster-management.io/sdk-go/pkg/spiffe/idtemplate
 open-cluster-management.io/sdk-go/pkg/testing
+open-cluster-management.io/sdk-go/pkg/testing/fakespire
 open-cluster-management.io/sdk-go/pkg/tls
 open-cluster-management.io/sdk-go/test/integration/cloudevents/util
 # sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03
