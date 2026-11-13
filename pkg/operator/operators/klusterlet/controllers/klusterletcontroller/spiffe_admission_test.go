@@ -252,3 +252,57 @@ func TestSPIFFERolePairs(t *testing.T) {
 		t.Errorf("Singleton pairs %v", got)
 	}
 }
+
+func TestSPIFFEAdmissionDowngrade(t *testing.T) {
+	for _, otherSPIFFE := range []bool{false, true} {
+		k := spiffeKlusterlet()
+		kube := fakekube.NewSimpleClientset()
+		r := newAdmissionReconcile(kube)
+		k, _, err := r.reconcile(context.TODO(), k, spiffeConfig(k))
+		if err != nil || k.Status.SPIFFE == nil {
+			t.Fatalf("activation: %v", err)
+		}
+		// The Klusterlet moves back to grpc; spiffeWorkAgents no longer lists it.
+		r.spiffeWorkAgents = func() (map[string]string, error) {
+			if otherSPIFFE {
+				return map[string]string{"other": "system:serviceaccount:other:work-sa"}, nil
+			}
+			return map[string]string{}, nil
+		}
+		config := spiffeConfig(k)
+		config.RegistrationDriver = RegistrationDriver{AuthType: operatorapiv1.GRPCAuthType}
+		k, state, err := r.reconcile(context.TODO(), k, config)
+		if err != nil || state != reconcileContinue {
+			t.Fatalf("got state %v, err %v", state, err)
+		}
+		if k.Status.SPIFFE != nil || readyCondition(k) != nil {
+			t.Errorf("status.spiffe %+v and condition %+v left", k.Status.SPIFFE, readyCondition(k))
+		}
+		policies, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicies().List(context.TODO(), metav1.ListOptions{})
+		bindings, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().List(context.TODO(), metav1.ListOptions{})
+		want := 0
+		if otherSPIFFE {
+			want = 1 // the shared label policy stays for the other Klusterlet
+		}
+		if len(policies.Items) != want || len(bindings.Items) != want {
+			t.Errorf("other spiffe Klusterlet %v: %d policies and %d bindings left, want %d", otherSPIFFE,
+				len(policies.Items), len(bindings.Items), want)
+		}
+		if want == 1 && policies.Items[0].Name != namespaceLabelPolicyName {
+			t.Errorf("kept %s", policies.Items[0].Name)
+		}
+		ns, _ := kube.CoreV1().Namespaces().Get(context.TODO(), helpers.DefaultAddonNamespace, metav1.GetOptions{})
+		if _, ok := ns.Labels[SPIFFEAddOnNamespaceLabel]; ok {
+			t.Error("the add-on namespace keeps its spiffe label")
+		}
+
+		// Nothing left to do: the next reconcile makes no call.
+		kube.ClearActions()
+		if _, _, err := r.reconcile(context.TODO(), k, config); err != nil {
+			t.Fatal(err)
+		}
+		if n := len(kube.Actions()); n != 0 {
+			t.Errorf("%d calls after cleanup, want none", n)
+		}
+	}
+}

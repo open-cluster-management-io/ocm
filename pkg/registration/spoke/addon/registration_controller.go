@@ -385,6 +385,14 @@ func (c *addOnRegistrationController) startSPIFFERegistration(ctx context.Contex
 			cond.Status, cond.Reason, cond.Message = metav1.ConditionFalse, ReasonSPIFFEConfigFailed, err.Error()
 		}
 		cmName = name
+		if err == nil {
+			// The add-on's hub kubeconfig from a previous driver: the add-on agent now uses its SVID.
+			legacy := fmt.Sprintf("%s-hub-kubeconfig", config.addOnName)
+			err := kubeClient.CoreV1().Secrets(config.InstallationNamespace).Delete(ctx, legacy, metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				return nil, err
+			}
+		}
 	}
 
 	// The hub's add-on manager owns the condition when all is well; replace it only with a refusal,

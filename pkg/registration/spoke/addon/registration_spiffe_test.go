@@ -51,7 +51,9 @@ func TestSPIFFEAddOnRegistration(t *testing.T) {
 			if err := informers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore().Add(addOn); err != nil {
 				t.Fatal(err)
 			}
-			kubeClient := kubefake.NewSimpleClientset([]runtime.Object{dedicated, shared}...)
+			// A hub kubeconfig left by the csr driver before the switch to spiffe.
+			legacy := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "my-addon-hub-kubeconfig", Namespace: c.namespace}}
+			kubeClient := kubefake.NewSimpleClientset([]runtime.Object{dedicated, shared, legacy}...)
 			controller := &addOnRegistrationController{
 				clusterName:     cluster,
 				spokeKubeClient: kubeClient,
@@ -94,6 +96,9 @@ func TestSPIFFEAddOnRegistration(t *testing.T) {
 					if cm.Data[k] != v {
 						t.Errorf("ConfigMap %s = %q, want %q", k, cm.Data[k], v)
 					}
+				}
+				if _, err := kubeClient.CoreV1().Secrets(c.namespace).Get(context.TODO(), "my-addon-hub-kubeconfig", metav1.GetOptions{}); err == nil {
+					t.Error("the add-on's hub kubeconfig from the previous driver is still there")
 				}
 				stop2, _ := controller.startRegistration(context.TODO(), registrationConfig{addOnName: "my-addon",
 					registration: addonv1beta1.RegistrationConfig{Type: c.regType}, addonInstallOption: addonInstallOption{InstallationNamespace: c.namespace}})

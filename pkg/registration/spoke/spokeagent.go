@@ -504,6 +504,13 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		go hubDriverInformer.Run(ctx.Done())
 	}
 	go hubClient.ClusterInformer.Informer().Run(ctx.Done())
+	if secretless {
+		// Once the cluster is reachable with the new identity, the Secrets of a previous driver
+		// are no longer needed; none may stay on the cluster.
+		go registration.CleanupLegacyHubCredentials(ctx, o.agentOptions.SpokeClusterName, hubClient.ClusterInformer,
+			managementKubeClient.CoreV1().Secrets(o.agentOptions.ComponentNamespace),
+			o.registrationOption.HubKubeconfigSecret, o.registrationOption.BootstrapKubeconfigSecret)
+	}
 	go namespacedManagementKubeInformerFactory.Start(ctx.Done())
 	go hubClient.AddonInformer.Informer().Run(ctx.Done())
 

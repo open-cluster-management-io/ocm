@@ -352,6 +352,14 @@ type spiffeAdmissionReconcile struct {
 func (r *spiffeAdmissionReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	if config.RegistrationDriver.AuthType != operatorapiv1.SPIFFEAuthType {
+		if klusterlet.Status.SPIFFE == nil &&
+			meta.FindStatusCondition(klusterlet.Status.Conditions, operatorapiv1.ConditionSPIFFEAdmissionReady) == nil {
+			return klusterlet, reconcileContinue, nil
+		}
+		// The Klusterlet left the spiffe driver: remove what it installed for it.
+		if err := r.removeSPIFFE(ctx, klusterlet); err != nil {
+			return klusterlet, reconcileStop, err
+		}
 		return klusterlet, reconcileContinue, nil
 	}
 	managed := r.managedClusterClients.kubeClient
@@ -696,4 +704,46 @@ func (r *spiffeAdmissionReconcile) ensureAddOnNamespace(ctx context.Context, klu
 func (r *spiffeAdmissionReconcile) clean(_ context.Context, klusterlet *operatorapiv1.Klusterlet,
 	_ klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	return klusterlet, reconcileContinue, nil
+}
+
+// removeSPIFFE undoes the spiffe driver's admission state when a Klusterlet moves to another
+// driver: its policies and bindings, the shared namespace label policy when no other Klusterlet
+// uses spiffe, its add-on namespace labels, and its status.spiffe and SPIFFEAdmissionReady.
+func (r *spiffeAdmissionReconcile) removeSPIFFE(ctx context.Context, klusterlet *operatorapiv1.Klusterlet) error {
+	managed := r.managedClusterClients.kubeClient
+	names := []struct {
+		client kubernetes.Interface
+		name   string
+	}{
+		{r.kubeClient, agentPolicyPrefix + klusterlet.Name},
+		{managed, addOnPolicyPrefix + klusterlet.Name},
+	}
+	others, err := r.spiffeWorkAgents()
+	if err != nil {
+		return err
+	}
+	delete(others, klusterlet.Name)
+	if len(others) == 0 {
+		names = append(names, struct {
+			client kubernetes.Interface
+			name   string
+		}{managed, namespaceLabelPolicyName})
+	}
+	for _, n := range names {
+		bindings := n.client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings()
+		if err := bindings.Delete(ctx, n.name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		policies := n.client.AdmissionregistrationV1().ValidatingAdmissionPolicies()
+		if err := policies.Delete(ctx, n.name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	if err := r.unlabelUntrusted(ctx, klusterlet.Name, nil); err != nil {
+		return err
+	}
+	klusterlet.Status.SPIFFE = nil
+	meta.RemoveStatusCondition(&klusterlet.Status.Conditions, operatorapiv1.ConditionSPIFFEAdmissionReady)
+	klog.FromContext(ctx).Info("removed the spiffe admission state", "klusterlet", klusterlet.Name)
+	return nil
 }

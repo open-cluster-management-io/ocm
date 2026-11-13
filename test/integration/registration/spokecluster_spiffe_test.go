@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"path"
 	"time"
 
@@ -481,6 +482,158 @@ var _ = Describe("Registration using SPIFFE", Ordered, Label("spiffe-test"), fun
 			mca := &addonv1beta1.ManagedClusterAddOn{ObjectMeta: metav1.ObjectMeta{Name: "my-addon", Namespace: cluster}}
 			return permissionDenied(agent.UpdateAddOnStatus(ctx, mca))
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+	})
+
+	It("a cluster moves from csr to spiffe and back without losing anything", func() {
+		ctx := context.Background()
+		cluster := fmt.Sprintf("spiffe-migrate-%s", rand.String(5))
+		hubSecret := cluster + "-hub-kubeconfig-secret"
+		bootstrapSecret := cluster + "-bootstrap-hub-kubeconfig"
+		hubKubeconfigDir := path.Join(util.TestDir, cluster, "hub-kubeconfig")
+		addOnNamespace := cluster + "-addon"
+		commOptions := commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = cluster
+
+		joinWithCSR := func() context.CancelFunc {
+			stop := runAgent(cluster, &spoke.SpokeAgentOptions{
+				BootstrapKubeconfig:      bootstrapKubeConfigFile,
+				HubKubeconfigSecret:      hubSecret,
+				ClusterHealthCheckPeriod: time.Minute,
+				RegisterDriverOption:     factory.NewOptions(),
+			}, commOptions, spokeCfg)
+			Eventually(func() error {
+				return authn.ApproveSpokeClusterCSR(kubeClient, cluster, 24*time.Hour)
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+			Eventually(func() error {
+				_, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubSecret)
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+			return stop
+		}
+		joined := func() error {
+			mc, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, cluster, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if !meta.IsStatusConditionTrue(mc.Status.Conditions, clusterv1.ManagedClusterConditionJoined) {
+				return fmt.Errorf("not joined: %v", mc.Status.Conditions)
+			}
+			return nil
+		}
+		clusterCSRs := func() int {
+			csrs, err := kubeClient.CertificatesV1().CertificateSigningRequests().List(ctx, metav1.ListOptions{
+				LabelSelector: clusterv1.ClusterNameLabelKey + "=" + cluster})
+			Expect(err).NotTo(HaveOccurred())
+			return len(csrs.Items)
+		}
+		roleBindings := func() map[string]string {
+			rbs, err := kubeClient.RbacV1().RoleBindings(cluster).List(ctx, metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			out := map[string]string{}
+			for _, rb := range rbs.Items {
+				out[rb.Name] = string(rb.UID)
+			}
+			return out
+		}
+
+		By("the cluster joins with csr")
+		stopCSRAgent := joinWithCSR()
+		Expect(util.AcceptManagedCluster(clusterClient, cluster)).To(Succeed())
+		Eventually(joined, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+		By("it has a ManifestWork and an add-on whose agent used a hub kubeconfig Secret")
+		work, err := workClient.WorkV1().ManifestWorks(cluster).Create(ctx, &workv1.ManifestWork{
+			ObjectMeta: metav1.ObjectMeta{Name: "w1", Namespace: cluster}}, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		mca, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(cluster).Create(ctx, &addonv1beta1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-addon", Namespace: cluster}}, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		// What the add-on manager reports once the add-on is installed in a dedicated namespace.
+		mca.Status.Namespace = addOnNamespace
+		mca.Status.Registrations = []addonv1beta1.RegistrationConfig{{Type: addonv1beta1.KubeClient,
+			KubeClient: &addonv1beta1.KubeClientConfig{Subject: addonv1beta1.KubeClientSubject{BaseSubject: addonv1beta1.BaseSubject{
+				User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:my-addon:agent:my-addon", cluster)}}}}}
+		_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(cluster).UpdateStatus(ctx, mca, metav1.UpdateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: addOnNamespace,
+			Labels: map[string]string{"open-cluster-management.io/spiffe-addon-namespace": "klusterlet"}}}, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		for _, sec := range []*corev1.Secret{
+			{ObjectMeta: metav1.ObjectMeta{Name: "my-addon-hub-kubeconfig", Namespace: addOnNamespace}},
+			{ObjectMeta: metav1.ObjectMeta{Name: bootstrapSecret, Namespace: testNamespace}},
+		} {
+			_, err = kubeClient.CoreV1().Secrets(sec.Namespace).Create(ctx, sec, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+		}
+		before, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, cluster, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		rbsBefore, csrsBefore := roleBindings(), clusterCSRs()
+		Expect(rbsBefore).NotTo(BeEmpty())
+
+		By("its agent switches to spiffe")
+		stopCSRAgent()
+		api := fakespire.Start(GinkgoTB(), spiffeCA)
+		api.SetSVIDs(spiffeCA.Issue(GinkgoTB(), registrationID(cluster), time.Hour))
+		driverOption := factory.NewOptions()
+		driverOption.RegistrationAuth = operatorv1.SPIFFEAuthType
+		driverOption.AddonKubeClientRegistrationAuth = operatorv1.SPIFFEAuthType
+		driverOption.SPIFFEOption.HubEndpoint = hubAddr
+		driverOption.SPIFFEOption.HubSPIFFEID = spiffeHubID
+		driverOption.SPIFFEOption.AgentSPIFFEID = registrationID(cluster)
+		driverOption.SPIFFEOption.WorkloadAPISocket = api.Addr
+		driverOption.SPIFFEOption.TrustDomain = spiffeTD
+		stopSPIFFEAgent := runAgent(cluster, &spoke.SpokeAgentOptions{
+			HubKubeconfigSecret:       hubSecret,
+			BootstrapKubeconfigSecret: bootstrapSecret,
+			ClusterHealthCheckPeriod:  time.Minute,
+			RegisterDriverOption:      driverOption,
+		}, commOptions, spokeCfg)
+
+		By("the old hub credentials go once the cluster is reachable with the SVID")
+		for _, s := range []struct{ ns, name string }{
+			{testNamespace, hubSecret}, {testNamespace, bootstrapSecret}, {addOnNamespace, "my-addon-hub-kubeconfig"},
+		} {
+			Eventually(func() bool {
+				_, err := kubeClient.CoreV1().Secrets(s.ns).Get(ctx, s.name, metav1.GetOptions{})
+				return apierrors.IsNotFound(err)
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue(), "Secret %s/%s", s.ns, s.name)
+		}
+		Eventually(func() error {
+			lease, err := kubeClient.CoordinationV1().Leases(cluster).Get(ctx, "managed-cluster-lease", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if lease.Spec.RenewTime == nil || time.Since(lease.Spec.RenewTime.Time) > 30*time.Second {
+				return fmt.Errorf("lease not renewed: %v", lease.Spec.RenewTime)
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+		By("nothing on the hub was recreated")
+		after, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, cluster, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(after.UID).To(Equal(before.UID), "ManagedCluster must not be recreated")
+		Expect(meta.IsStatusConditionTrue(after.Status.Conditions, clusterv1.ManagedClusterConditionJoined)).To(BeTrue())
+		workAfter, err := workClient.WorkV1().ManifestWorks(cluster).Get(ctx, "w1", metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(workAfter.UID).To(Equal(work.UID))
+		mcaAfter, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(cluster).Get(ctx, "my-addon", metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(mcaAfter.UID).To(Equal(mca.UID))
+		Expect(roleBindings()).To(Equal(rbsBefore))
+		Expect(clusterCSRs()).To(Equal(csrsBefore), "no CSR with spiffe")
+
+		By("it moves back to csr with a new bootstrap kubeconfig")
+		stopSPIFFEAgent()
+		// A new agent pod mounts the (now absent) hub kubeconfig Secret: its directory is empty.
+		Expect(os.RemoveAll(hubKubeconfigDir)).To(Succeed())
+		stopCSRAgent = joinWithCSR()
+		defer stopCSRAgent()
+		Eventually(joined, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+		back, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, cluster, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(back.UID).To(Equal(before.UID), "ManagedCluster must not be recreated")
 	})
 
 	It("leaves no Secret or ConfigMap with key material in the SPIFFE clusters' namespaces", func() {

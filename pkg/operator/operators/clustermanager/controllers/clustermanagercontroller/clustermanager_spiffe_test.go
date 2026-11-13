@@ -258,3 +258,43 @@ func TestSPIFFEHubRendering(t *testing.T) {
 		})
 	}
 }
+
+// Removing grpc from a hub whose clusters all moved to spiffe deletes the grpc listener's Service
+// and keeps the gRPC server, which now serves the SPIFFE listener only.
+func TestSPIFFEHubRemovingGRPC(t *testing.T) {
+	ctx := t.Context()
+	td := &operatorapiv1.SPIFFERegistrationConfig{TrustDomain: "ocm-hub.example.org"}
+	cm := spiffeClusterManager([]string{operatorapiv1.SPIFFEAuthType}, td, true)
+	tc := newTestController(t, cm)
+	ns := helpers.ClusterManagerNamespace(cm.Name, cm.Spec.DeployOption.Mode)
+	setup(t, tc, setDeployment(cm.Name, ns))
+	if err := tc.clusterManagerController.sync(ctx, testingcommon.NewFakeSyncContext(t, cm.Name), cm.Name); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	deleted, kept := false, false
+	for _, a := range append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...) {
+		switch a := a.(type) {
+		case clienttesting.DeleteActionImpl:
+			if a.GetResource().Resource == "services" && a.GetName() == "testhub-grpc-server" {
+				deleted = true
+			}
+			if a.GetResource().Resource == "deployments" && a.GetName() == "testhub-grpc-server" {
+				t.Error("the gRPC server Deployment was deleted; it serves the SPIFFE listener")
+			}
+		case clienttesting.CreateActionImpl:
+			if d, ok := a.Object.(*appsv1.Deployment); ok && d.Name == "testhub-grpc-server" {
+				kept = true
+			}
+		case clienttesting.UpdateActionImpl:
+			if d, ok := a.Object.(*appsv1.Deployment); ok && d.Name == "testhub-grpc-server" {
+				kept = true
+			}
+		}
+	}
+	if !deleted {
+		t.Error("the grpc Service wasn't deleted")
+	}
+	if !kept {
+		t.Error("the gRPC server Deployment isn't rendered")
+	}
+}
