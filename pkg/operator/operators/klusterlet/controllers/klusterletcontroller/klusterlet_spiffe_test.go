@@ -157,6 +157,9 @@ func TestSPIFFEKlusterletRendering(t *testing.T) {
 						t.Errorf("%s: args %q miss %q", name, args, want)
 					}
 				}
+				if w[0] == "registration" && !strings.Contains(args, KlusterletNameClusterAnnotation+"=") {
+					t.Errorf("%s: args %q don't report the Klusterlet name", name, args)
+				}
 				for _, unwanted := range []string{"--bootstrap-kubeconfig", "--workload-source-config", "--grpc-config"} {
 					if strings.Contains(args, unwanted) {
 						t.Errorf("%s: args %q have %q", name, args, unwanted)

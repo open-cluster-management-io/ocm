@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"time"
@@ -50,6 +51,11 @@ const (
 	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 	klusterletNamespaceLabelKey           = "operator.open-cluster-management.io/klusterlet"
 )
+
+// KlusterletNameClusterAnnotation is the ManagedCluster annotation in which a spiffe registration
+// agent reports its Klusterlet's name. The add-on framework reads it as
+// agent.KlusterletNameAnnotation.
+const KlusterletNameClusterAnnotation = "agent.open-cluster-management.io/klusterlet-name"
 
 // buildClusterAnnotationsString renders the ClusterAnnotations map into the
 // comma-separated "key1=value1,key2=value2" form consumed by the registration
@@ -480,7 +486,17 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 				klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.ReservedClusterClaimSuffixes, ",")
 		}
 
-		config.ClusterAnnotationsString = buildClusterAnnotationsString(klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations)
+		clusterAnnotations := klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations
+		if config.RegistrationDriver.AuthType == operatorapiv1.SPIFFEAuthType {
+			// The add-on manager labels dedicated add-on namespaces with the Klusterlet's name,
+			// which the admission policy matches; the agent reports it on the ManagedCluster.
+			clusterAnnotations = maps.Clone(clusterAnnotations)
+			if clusterAnnotations == nil {
+				clusterAnnotations = map[string]string{}
+			}
+			clusterAnnotations[KlusterletNameClusterAnnotation] = klusterlet.Name
+		}
+		config.ClusterAnnotationsString = buildClusterAnnotationsString(clusterAnnotations)
 		config.ClusterLabelsString = buildClusterLabelsString(klusterlet.Spec.RegistrationConfiguration.ClusterLabels)
 
 		// Set AddOnKubeClientRegistrationAuth from the Klusterlet spec
