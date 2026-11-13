@@ -110,6 +110,10 @@ spec:
           {{ if .GRPCAutoApprovedUsers }}
           - "--auto-approved-grpc-users={{ .GRPCAutoApprovedUsers }}"
           {{ end }}
+          {{ if .SPIFFEAuthEnabled }}
+          - "--spiffe-max-svid-lifetime={{ .SPIFFEMaxSVIDLifetime }}"
+          - "--spiffe-max-clock-skew={{ .SPIFFEMaxClockSkew }}"
+          {{ end }}
           {{- if .TLSMinVersion }}
           - "--tls-min-version={{ .TLSMinVersion }}"
           {{- end }}

@@ -259,6 +259,16 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		config.GRPCEndpointType = helpers.GRPCServerEndpointType(clusterManager)
 	}
 
+	// The spiffe driver adds the SPIFFE listener to the gRPC server. Settings the CRD can't check
+	// are checked here; when they are wrong, nothing is rendered for SPIFFE and the Applied
+	// condition says why.
+	var spiffeErr error
+	if spiffeCfg := helpers.SPIFFEConfig(clusterManager); spiffeCfg != nil &&
+		helpers.FeatureGateEnabled(registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates, ocmfeature.SPIFFERegistration) {
+		spiffeErr = fillSPIFFEConfig(&config, clusterManager, spiffeCfg)
+	}
+	config.GRPCServerEnabled = config.GRPCAuthEnabled || config.SPIFFEAuthEnabled
+
 	// Set TLS config for all managed hub component deployments
 	config.TLSMinVersion = n.tlsMinVersion
 	config.TLSCipherSuites = n.tlsCipherSuites
@@ -364,7 +374,14 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	// Update status
 	meta.SetStatusCondition(&clusterManager.Status.Conditions, featureGateCondition)
 	clusterManager.Status.ObservedGeneration = clusterManager.Generation
-	if len(errs) == 0 {
+	if len(errs) == 0 && spiffeErr != nil {
+		meta.SetStatusCondition(&clusterManager.Status.Conditions, metav1.Condition{
+			Type:    operatorapiv1.ConditionClusterManagerApplied,
+			Status:  metav1.ConditionFalse,
+			Reason:  ReasonInvalidSPIFFEConfiguration,
+			Message: fmt.Sprintf("The spiffe registration driver is not deployed: %v", spiffeErr),
+		})
+	} else if len(errs) == 0 {
 		meta.SetStatusCondition(&clusterManager.Status.Conditions, metav1.Condition{
 			Type:    operatorapiv1.ConditionClusterManagerApplied,
 			Status:  metav1.ConditionTrue,
@@ -592,4 +609,37 @@ func getIdentityCreatorRoleAndTags(cm operatorapiv1.ClusterManager) string {
 	hubClusterAccountId, hubClusterName := commonhelper.GetAwsAccountIdAndClusterName(awsIrsa.HubClusterArn)
 	return commonhelper.BuildIamRoleArn(commonhelper.GetAwsPartition(awsIrsa.HubClusterArn), hubClusterAccountId,
 		hubClusterName+"_managed-cluster-identity-creator")
+}
+
+// ReasonInvalidSPIFFEConfiguration is the reason of a false Applied condition when the spiffe
+// registration driver's settings are invalid.
+const ReasonInvalidSPIFFEConfiguration = "InvalidSPIFFEConfiguration"
+
+// fillSPIFFEConfig fills the SPIFFE settings of the hub config, or returns why they are invalid.
+func fillSPIFFEConfig(config *manifests.HubConfig, cm *operatorapiv1.ClusterManager,
+	c *operatorapiv1.SPIFFERegistrationConfig) error {
+	serverID, err := helpers.SPIFFEServerID(c)
+	if err != nil {
+		return err
+	}
+	config.SPIFFEAuthEnabled = true
+	config.SPIFFETrustDomain = c.TrustDomain
+	config.SPIFFEAgentTrustDomains = strings.Join(c.GetAgentTrustDomains(), ",")
+	config.SPIFFEServerID = serverID
+	config.SPIFFEWorkloadAPISocket = c.WorkloadAPISocket
+	if config.SPIFFEWorkloadAPISocket == "" {
+		config.SPIFFEWorkloadAPISocket = "unix:///spiffe-workload-api/spire-agent.sock"
+	}
+	config.SPIFFEAgentIDTemplate = c.GetAgentIDTemplate()
+	config.SPIFFEAddOnAgentIDTemplate = c.GetAddOnAgentIDTemplate()
+	config.SPIFFEMaxSVIDLifetime = (24 * time.Hour).String()
+	if c.MaxSVIDLifetime != nil {
+		config.SPIFFEMaxSVIDLifetime = c.MaxSVIDLifetime.Duration.String()
+	}
+	config.SPIFFEMaxClockSkew = (5 * time.Minute).String()
+	if c.MaxClockSkew != nil {
+		config.SPIFFEMaxClockSkew = c.MaxClockSkew.Duration.String()
+	}
+	config.SPIFFEEndpointType = helpers.SPIFFEServerEndpointType(cm)
+	return nil
 }

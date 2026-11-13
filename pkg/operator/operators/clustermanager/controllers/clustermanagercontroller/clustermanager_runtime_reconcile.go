@@ -82,8 +82,8 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		}
 	}
 
-	// Remove grpc server deployment if the grpc auth is disabled
-	if !config.GRPCAuthEnabled {
+	// Remove grpc server deployment if neither grpc nor spiffe is a registration driver
+	if !config.GRPCServerEnabled {
 		_, _, err := cleanResources(ctx, c.kubeClient, cm, config, grpcServerDeploymentFiles...)
 		if err != nil {
 			return cm, reconcileStop, err
@@ -118,13 +118,14 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 				if registrationDriver.GRPC != nil {
 					config.GRPCAutoApprovedUsers = strings.Join(registrationDriver.GRPC.AutoApprovedIdentities, ",")
 				}
-
-				// Prefer ServerConfiguration image when set; otherwise fall back to registration image.
-				if sc := cm.Spec.ServerConfiguration; sc == nil || strings.TrimSpace(sc.ImagePullSpec) == "" {
-					config.GRPCServerImage = cm.Spec.RegistrationImagePullSpec
-				} else {
-					config.GRPCServerImage = sc.ImagePullSpec
-				}
+			}
+		}
+		if config.GRPCServerEnabled {
+			// Prefer ServerConfiguration image when set; otherwise fall back to registration image.
+			if sc := cm.Spec.ServerConfiguration; sc == nil || strings.TrimSpace(sc.ImagePullSpec) == "" {
+				config.GRPCServerImage = cm.Spec.RegistrationImagePullSpec
+			} else {
+				config.GRPCServerImage = sc.ImagePullSpec
 			}
 		}
 		config.EnabledRegistrationDrivers = strings.Join(enabledRegistrationDrivers, ",")
@@ -137,7 +138,7 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		clusterManagerNamespace := helpers.ClusterManagerNamespace(cm.Name, cm.Spec.DeployOption.Mode)
 		err := c.ensureSAKubeconfigs(ctx, cm.Name, clusterManagerNamespace,
 			c.hubKubeConfig, c.hubKubeClient, c.kubeClient, c.recorder,
-			config.WorkControllerEnabled, config.AddOnManagerEnabled, config.GRPCAuthEnabled)
+			config.WorkControllerEnabled, config.AddOnManagerEnabled, config.GRPCServerEnabled)
 		if err != nil {
 			meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
 				Type:    operatorapiv1.ConditionClusterManagerApplied,
@@ -188,7 +189,7 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	if config.WorkControllerEnabled {
 		deployResources = append(deployResources, workControllerDeploymentFiles...)
 	}
-	if config.GRPCAuthEnabled {
+	if config.GRPCServerEnabled {
 		deployResources = append(deployResources, grpcServerDeploymentFiles...)
 	}
 	for _, file := range deployResources {

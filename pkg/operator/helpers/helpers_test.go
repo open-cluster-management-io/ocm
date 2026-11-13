@@ -2550,6 +2550,7 @@ func TestNetworkPolicyTemplateRendering(t *testing.T) {
 					{protocol: corev1.ProtocolTCP, port: 9443}, // WorkWebhook.Port
 					{protocol: corev1.ProtocolTCP, port: 9443}, // AddonWebhook.Port
 					{protocol: corev1.ProtocolTCP, port: 8090}, // grpc-server
+					{protocol: corev1.ProtocolTCP, port: 8091}, // grpc-server, SPIFFE listener
 					{protocol: corev1.ProtocolTCP, port: 443},  // grpc-server
 					{protocol: corev1.ProtocolTCP, port: 9443}, // placement debug
 				},

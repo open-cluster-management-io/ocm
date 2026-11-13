@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .ClusterManagerName }}-grpc-server-spiffe
+  namespace: {{ .ClusterManagerNamespace }}
+{{ if gt (len .Labels) 0 }}
+  labels:
+  {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+  {{ end }}
+{{ end }}
+spec:
+  selector:
+    app: {{ .ClusterManagerName }}-grpc-server
+  ports:
+    - protocol: TCP
+  {{ if eq .SPIFFEEndpointType "loadBalancer" }}
+      port: 443
+  {{ else }}
+      port: 8091
+  {{ end }}
+      targetPort: 8091
+  {{ if eq .SPIFFEEndpointType "loadBalancer" }}
+  type: LoadBalancer
+  {{ else }}
+  type: ClusterIP
+  {{ end }}
