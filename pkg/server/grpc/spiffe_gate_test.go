@@ -9,6 +9,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	grpcauthn "open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
@@ -34,6 +36,15 @@ type ctxStream struct {
 
 func (s *ctxStream) Context() context.Context { return s.ctx }
 
+func addOnLister(t *testing.T, addOns ...*addonv1beta1.ManagedClusterAddOn) addonlisterv1beta1.ManagedClusterAddOnLister {
+	t.Helper()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	for _, a := range addOns {
+		require.NoError(t, indexer.Add(a))
+	}
+	return addonlisterv1beta1.NewManagedClusterAddOnLister(indexer)
+}
+
 func clusterLister(t *testing.T, clusters ...*clusterv1.ManagedCluster) clusterlisterv1.ManagedClusterLister {
 	t.Helper()
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
@@ -51,20 +62,30 @@ func pinnedCluster(name, td string) *clusterv1.ManagedCluster {
 	return c
 }
 
-func TestPinningAuthorizer(t *testing.T) {
+func TestClusterGate(t *testing.T) {
 	agent := func(cluster, td string) context.Context {
 		return context.WithValue(context.Background(), grpcauthn.ContextOCMIdentityKey,
 			grpcauthn.OCMIdentity{ClusterName: cluster, TrustDomain: td, Role: grpcauthn.RoleWork})
 	}
-	addon := func(cluster, td string) context.Context {
+	addonNamed := func(cluster, td, name string) context.Context {
 		return context.WithValue(context.Background(), grpcauthn.ContextOCMIdentityKey,
-			grpcauthn.OCMIdentity{ClusterName: cluster, TrustDomain: td, AddOnName: "my-addon", AgentName: "a"})
+			grpcauthn.OCMIdentity{ClusterName: cluster, TrustDomain: td, AddOnName: name, AgentName: "a"})
 	}
+	addon := func(cluster, td string) context.Context { return addonNamed(cluster, td, "my-addon") }
+	now := metav1.Now()
+	deleting := pinnedCluster("deleting", "ocm-hub.example.org")
+	deleting.DeletionTimestamp = &now
+	addOns := addOnLister(t,
+		&addonv1beta1.ManagedClusterAddOn{ObjectMeta: metav1.ObjectMeta{Namespace: "cluster2", Name: "my-addon"}},
+		&addonv1beta1.ManagedClusterAddOn{ObjectMeta: metav1.ObjectMeta{Namespace: "cluster2", Name: "going-addon",
+			DeletionTimestamp: &now, Finalizers: []string{"x"}}},
+	)
 	lister := clusterLister(t,
 		pinnedCluster("cluster1", "ocm-hub.example.org"),
 		pinnedCluster("cluster2", "east.example.org"),
 		pinnedCluster("cluster3", "west.example.org"),
 		pinnedCluster("legacy", ""),
+		deleting,
 	)
 	several := []string{"ocm-hub.example.org", "east.example.org", "west.example.org"}
 
@@ -84,11 +105,16 @@ func TestPinningAuthorizer(t *testing.T) {
 		{"unpinned, one trust domain", agent("legacy", "ocm-hub.example.org"), []string{"ocm-hub.example.org"}, ""},
 		{"unpinned, several trust domains", agent("legacy", "ocm-hub.example.org"), several, "is not pinned to a trust domain"},
 		{"no SPIFFE identity", context.Background(), several, "no SPIFFE identity"},
+		{"cluster being deleted", agent("deleting", "ocm-hub.example.org"), several, "cluster deleting is being deleted"},
+		{"add-on not enabled", addonNamed("cluster2", "east.example.org", "other-addon"), several,
+			"add-on other-addon is not enabled on cluster cluster2"},
+		{"add-on being deleted", addonNamed("cluster2", "east.example.org", "going-addon"), several,
+			"add-on going-addon on cluster cluster2 is being deleted"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			next := &countingAuthorizer{}
-			a := &pinningAuthorizer{next: next, clusters: lister, trustDomains: c.tds}
+			a := &clusterGate{next: next, clusters: lister, addOns: addOns, trustDomains: c.tds}
 
 			decision, _, err := a.AuthorizeRequest(c.ctx, nil)
 			streamDecision, _, streamErr := a.AuthorizeStream(c.ctx, &ctxStream{ctx: c.ctx}, &grpc.StreamServerInfo{})

@@ -1,0 +1,107 @@
+package grpc
+
+import (
+	"context"
+	"fmt"
+
+	"google.golang.org/grpc"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
+	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	grpcauthn "open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
+	"open-cluster-management.io/sdk-go/pkg/server/grpc/authz"
+)
+
+// authorizer is what the SPIFFE listener needs from the SAR authorizer.
+type authorizer interface {
+	authz.UnaryAuthorizer
+	authz.StreamAuthorizer
+}
+
+// clusterGate runs before the SubjectAccessReview on the SPIFFE listener and refuses:
+//   - an agent whose SVID is in a different trust domain than the one its cluster is pinned to.
+//     Without it, a federated trust domain could issue an SVID for another trust domain's
+//     cluster and act as that cluster: the OCM user comes from the SVID's path, not its trust
+//     domain;
+//   - every agent of a cluster that is being deleted. A closed connection is reopened at once,
+//     and the SVIDs issued before the deletion stay valid until they expire;
+//   - an add-on agent whose ManagedClusterAddOn is gone or being deleted.
+//
+// A denied cluster (hubAcceptsClient false) is left to its RBAC, which the hub removes.
+type clusterGate struct {
+	next         authorizer
+	clusters     clusterlisterv1.ManagedClusterLister
+	addOns       addonlisterv1beta1.ManagedClusterAddOnLister
+	trustDomains []string
+}
+
+var _ authorizer = &clusterGate{}
+
+func (a *clusterGate) AuthorizeRequest(ctx context.Context, req any) (authz.Decision, context.Context, error) {
+	if err := a.check(ctx); err != nil {
+		return authz.DecisionDeny, ctx, err
+	}
+	return a.next.AuthorizeRequest(ctx, req)
+}
+
+func (a *clusterGate) AuthorizeStream(ctx context.Context, ss grpc.ServerStream, info *grpc.StreamServerInfo) (authz.Decision, grpc.ServerStream, error) {
+	if err := a.check(ss.Context()); err != nil {
+		return authz.DecisionDeny, nil, err
+	}
+	return a.next.AuthorizeStream(ctx, ss, info)
+}
+
+// check applies the gate to the cluster and add-on in the SVID. The next authorizer makes sure
+// the request is about the cluster in the SVID, so the SVID's cluster is the one to check.
+func (a *clusterGate) check(ctx context.Context) error {
+	id, ok := grpcauthn.OCMIdentityFromContext(ctx)
+	if !ok {
+		return fmt.Errorf("no SPIFFE identity in the request")
+	}
+	cluster, err := a.clusters.Get(id.ClusterName)
+	if apierrors.IsNotFound(err) {
+		// The registration agent may create its cluster; the cluster service pins it then.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if cluster.DeletionTimestamp != nil {
+		return fmt.Errorf("cluster %s is being deleted", id.ClusterName)
+	}
+	if err := a.checkAddOn(id); err != nil {
+		return err
+	}
+	pinned, ok := cluster.Annotations[clusterv1.SPIFFETrustDomainAnnotationKey]
+	if !ok {
+		// A cluster created before the switch from another driver, or by an admin.
+		if len(a.trustDomains) != 1 {
+			return fmt.Errorf("cluster %q is not pinned to a trust domain: an admin must set the %s annotation",
+				id.ClusterName, clusterv1.SPIFFETrustDomainAnnotationKey)
+		}
+		pinned = a.trustDomains[0]
+	}
+	if pinned != id.TrustDomain {
+		return fmt.Errorf("cluster %q is pinned to trust domain %q, not %q", id.ClusterName, pinned, id.TrustDomain)
+	}
+	return nil
+}
+
+func (a *clusterGate) checkAddOn(id grpcauthn.OCMIdentity) error {
+	if !id.IsAddOn() {
+		return nil
+	}
+	addon, err := a.addOns.ManagedClusterAddOns(id.ClusterName).Get(id.AddOnName)
+	if apierrors.IsNotFound(err) {
+		return fmt.Errorf("add-on %s is not enabled on cluster %s", id.AddOnName, id.ClusterName)
+	}
+	if err != nil {
+		return err
+	}
+	if addon.DeletionTimestamp != nil {
+		return fmt.Errorf("add-on %s on cluster %s is being deleted", id.AddOnName, id.ClusterName)
+	}
+	return nil
+}

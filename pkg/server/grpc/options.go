@@ -125,12 +125,34 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 			clients.AddOnInformers.Addon().V1beta1().ManagedClusterAddOns().Lister(),
 		))
 
+	// The SPIFFE listener closes connections when the hub withdraws access, and gates new
+	// requests on the cluster and add-on state.
+	var spiffeGate *clusterGate
+	if o.SPIFFE.Enabled {
+		clusterInformer := clients.ClusterInformers.Cluster().V1().ManagedClusters()
+		addOnInformer := clients.AddOnInformers.Addon().V1beta1().ManagedClusterAddOns()
+		if _, err := clusterInformer.Informer().AddEventHandler(clusterRevocationHandler(o.registry)); err != nil {
+			return err
+		}
+		if _, err := addOnInformer.Informer().AddEventHandler(addOnRevocationHandler(o.registry)); err != nil {
+			return err
+		}
+		spiffeGate = &clusterGate{
+			clusters:     clusterInformer.Lister(),
+			addOns:       addOnInformer.Lister(),
+			trustDomains: spiffeCfg.trustDomains,
+		}
+	}
+
 	// start clients
 	go clients.Run(ctx)
 
 	// initialize and run the listeners. Both share the broker, so a cluster sees the same
 	// resources on either; the authorizer is shared too.
 	authorizer := grpcauthz.NewSARAuthorizer(clients.KubeClient)
+	if spiffeGate != nil {
+		spiffeGate.next = authorizer
+	}
 	register := func(s *grpc.Server) {
 		pbv1.RegisterCloudEventServiceServer(s, grpcEventServer)
 	}
@@ -149,8 +171,7 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 	}
 	if o.SPIFFE.Enabled {
 		g.Go(func() error {
-			return o.runSPIFFEListener(ctx, spiffeCfg, serverOptions, authorizer,
-				clients.ClusterInformers.Cluster().V1().ManagedClusters().Lister(), register)
+			return o.runSPIFFEListener(ctx, spiffeCfg, serverOptions, spiffeGate, register)
 		})
 	}
 	return g.Wait()
