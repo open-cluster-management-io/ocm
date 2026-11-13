@@ -2,7 +2,6 @@ package spoke
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"sync/atomic"
@@ -311,7 +310,9 @@ func (o *WorkAgentConfig) HealthCheckers() []healthz.HealthChecker {
 		}
 		src := o.spiffeSource.Load()
 		if src == nil {
-			return fmt.Errorf("the Workload API source is not open yet")
+			// Not started yet, for example while waiting to become the leader. Failing here would
+			// make the liveness probe restart the agent before it can start.
+			return nil
 		}
 		return src.Ready()
 	})}

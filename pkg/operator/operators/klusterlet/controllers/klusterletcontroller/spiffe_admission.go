@@ -470,8 +470,15 @@ func (r *spiffeAdmissionReconcile) recover(ctx context.Context, klusterlet *oper
 	}
 	setAdmissionRecord(klusterlet, noted)
 	setAdmissionReady(klusterlet, metav1.ConditionTrue, "Recorded", "recovery finished and the admission state is recorded")
-	return klusterlet, reconcileContinue, nil
+	// Start no agent in this pass: the record must be stored first. Other controllers write the
+	// Klusterlet status too, so this pass's status write can conflict; agents started now would
+	// then be deleted by the next recovery. The next pass finds the record and starts them.
+	return klusterlet, reconcileStop, commonhelpers.NewRequeueError(
+		"SPIFFE recovery finished; starting the agents once the record is stored", recordedRequeue)
 }
+
+// recordedRequeue is how soon the agents start after recovery finished.
+const recordedRequeue = time.Second
 
 type nsTarget struct {
 	client    kubernetes.Interface

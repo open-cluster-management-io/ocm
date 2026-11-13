@@ -13,6 +13,7 @@ import (
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,6 +24,7 @@ import (
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
@@ -86,6 +88,7 @@ func buildClusterLabelsString(labels map[string]string) string {
 type klusterletController struct {
 	patcher                       patcher.Patcher[*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus]
 	klusterletLister              operatorlister.KlusterletLister
+	klusterletClient              operatorv1client.KlusterletInterface
 	kubeClient                    kubernetes.Interface
 	kubeVersion                   *version.Version
 	operatorNamespace             string
@@ -129,6 +132,7 @@ func NewKlusterletController(
 		patcher: patcher.NewPatcher[
 			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient),
 		klusterletLister:              klusterletInformer.Lister(),
+		klusterletClient:              klusterletClient,
 		kubeVersion:                   kubeVersion,
 		operatorNamespace:             operatorNamespace,
 		cache:                         resourceapply.NewResourceCache(),
@@ -614,10 +618,54 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	// If we get here, we have successfully applied everything.
 	_, updatedErr := n.patcher.PatchStatus(ctx, klusterlet, klusterlet.Status, originalKlusterlet.Status)
+	if errors.IsConflict(updatedErr) && spiffeStatusChanged(originalKlusterlet, klusterlet) {
+		// Other controllers write the status too. The SPIFFE admission record must not be lost:
+		// a lost record makes the next pass run recovery again and distrust the add-on namespace
+		// it just created.
+		updatedErr = n.storeSPIFFEStatus(ctx, klusterlet)
+	}
 	if updatedErr != nil {
 		errs = append(errs, updatedErr)
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+// spiffeConditionTypes are the conditions the SPIFFE admission reconcile owns.
+var spiffeConditionTypes = []string{operatorapiv1.ConditionSPIFFEAdmissionReady, ConditionAddOnNamespaceNotDedicated}
+
+func spiffeStatusChanged(old, updated *operatorapiv1.Klusterlet) bool {
+	if !equality.Semantic.DeepEqual(old.Status.SPIFFE, updated.Status.SPIFFE) {
+		return true
+	}
+	for _, t := range spiffeConditionTypes {
+		if !equality.Semantic.DeepEqual(meta.FindStatusCondition(old.Status.Conditions, t),
+			meta.FindStatusCondition(updated.Status.Conditions, t)) {
+			return true
+		}
+	}
+	return false
+}
+
+// storeSPIFFEStatus writes only the SPIFFE status fields onto the latest Klusterlet, retrying on
+// conflicts. The other fields are left to the next sync.
+func (n *klusterletController) storeSPIFFEStatus(ctx context.Context, desired *operatorapiv1.Klusterlet) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		latest, err := n.klusterletClient.Get(ctx, desired.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		status := latest.Status.DeepCopy()
+		status.SPIFFE = desired.Status.SPIFFE.DeepCopy()
+		for _, t := range spiffeConditionTypes {
+			if c := meta.FindStatusCondition(desired.Status.Conditions, t); c != nil {
+				meta.SetStatusCondition(&status.Conditions, *c)
+			} else {
+				meta.RemoveStatusCondition(&status.Conditions, t)
+			}
+		}
+		_, err = n.patcher.PatchStatus(ctx, latest, *status, latest.Status)
+		return err
+	})
 }
 
 // populateTLSConfig reads TLS configuration from ocm-tls-profile ConfigMap

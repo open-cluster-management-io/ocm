@@ -2,16 +2,18 @@ package klusterletcontroller
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
@@ -59,8 +61,19 @@ func renderSPIFFEKlusterlet(t *testing.T, name string, mode operatorapiv1.Instal
 	if controller.managedKubeClient != nil {
 		servePolicyAPI(controller.managedKubeClient, "system:admin")
 	}
+	// The first sync runs recovery and stores the admission record; the agents start on the next.
 	if err := controller.controller.sync(context.TODO(), syncContext, name); err != nil {
 		t.Fatalf("sync: %v", err)
+	}
+	stored, err := controller.operatorClient.OperatorV1().Klusterlets().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := controller.operatorStore.Update(stored); err != nil {
+		t.Fatal(err)
+	}
+	if err := controller.controller.sync(context.TODO(), syncContext, name); err != nil {
+		t.Fatalf("second sync: %v", err)
 	}
 
 	r := spiffeKlusterletRendering{deployments: map[string]*appsv1.Deployment{}}
@@ -76,17 +89,12 @@ func renderSPIFFEKlusterlet(t *testing.T, name string, mode operatorapiv1.Instal
 			t.Errorf("created %s in spiffe mode", s.GetName())
 		}
 	}
-	for _, a := range controller.operatorClient.Actions() {
-		p, ok := a.(clienttesting.PatchActionImpl)
-		if !ok || p.GetSubresource() != "status" {
-			continue
-		}
-		k := &operatorapiv1.Klusterlet{}
-		if err := json.Unmarshal(p.Patch, k); err != nil {
-			t.Fatal(err)
-		}
-		r.status = k
+	// The status as stored after both syncs.
+	final, err := controller.operatorClient.OperatorV1().Klusterlets().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
 	}
+	r.status = final
 	return r
 }
 
@@ -233,4 +241,39 @@ func servePolicyAPI(c *fakekube.Clientset, user string) {
 		return true, &authenticationv1.SelfSubjectReview{Status: authenticationv1.SelfSubjectReviewStatus{
 			UserInfo: authenticationv1.UserInfo{Username: user}}}, nil
 	})
+}
+
+// Another controller writes the status during the first sync: the admission record and the
+// add-on namespace's UID are still stored, or the next sync would distrust the namespace.
+func TestSPIFFEStatusStoredDespiteConflict(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "open-cluster-management-agent", "cluster1")
+	klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = operatorapiv1.RegistrationDriver{
+		AuthType: operatorapiv1.SPIFFEAuthType,
+		SPIFFE:   &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "hub:443", HubSPIFFEID: testSPIFFEHubID}}
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		newNamespace("open-cluster-management-agent"))
+	servePolicyAPI(controller.kubeClient, "system:serviceaccount:open-cluster-management:klusterlet")
+	conflicts := 1
+	controller.operatorClient.PrependReactor("patch", "klusterlets", func(a clienttesting.Action) (bool, runtime.Object, error) {
+		if a.GetSubresource() == "status" && conflicts > 0 {
+			conflicts--
+			return true, nil, apierrors.NewConflict(schema.GroupResource{Group: operatorapiv1.GroupName, Resource: "klusterlets"}, "klusterlet", fmt.Errorf("modified"))
+		}
+		return false, nil, nil
+	})
+	_ = controller.controller.sync(context.TODO(), syncContext, "klusterlet")
+
+	stored, err := controller.operatorClient.OperatorV1().Klusterlets().Get(context.TODO(), "klusterlet", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status.SPIFFE == nil || len(stored.Status.SPIFFE.AdmissionPolicies) != 3 ||
+		stored.Status.SPIFFE.AddOnNamespace == nil {
+		t.Fatalf("status.spiffe %+v, want the admission record and the add-on namespace", stored.Status.SPIFFE)
+	}
+	if c := meta.FindStatusCondition(stored.Status.Conditions, operatorapiv1.ConditionSPIFFEAdmissionReady); c == nil ||
+		c.Status != metav1.ConditionTrue {
+		t.Errorf("SPIFFEAdmissionReady %+v", c)
+	}
 }
