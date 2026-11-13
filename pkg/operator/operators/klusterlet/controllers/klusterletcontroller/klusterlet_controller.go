@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -30,6 +31,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
+	"open-cluster-management.io/sdk-go/pkg/spiffe/idtemplate"
 	sdktls "open-cluster-management.io/sdk-go/pkg/tls"
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
@@ -259,6 +261,15 @@ type klusterletConfig struct {
 	NetworkPoliciesEnabled bool
 	TLSMinVersion          string
 	TLSCipherSuites        string
+
+	// The spiffe registration driver's settings. The agents' SPIFFE IDs are rendered from the
+	// Klusterlet's agentIDTemplate; only the roles of the install mode are set.
+	SPIFFEHubEndpoint         string
+	SPIFFEHubID               string
+	SPIFFEWorkloadAPISocket   string
+	SPIFFERegistrationAgentID string
+	SPIFFEWorkAgentID         string
+	SPIFFEKlusterletAgentID   string
 }
 
 // If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.
@@ -439,6 +450,22 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			config.RegistrationDriver = RegistrationDriver{
 				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
 			}
+		}
+
+		if config.RegistrationDriver.AuthType == operatorapiv1.SPIFFEAuthType {
+			agentIDs, err := fillSPIFFEConfig(&config, klusterlet)
+			if err != nil {
+				// Render no agents with an identity the hub would refuse.
+				meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
+					Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse,
+					Reason: ReasonInvalidSPIFFEConfiguration, Message: err.Error()})
+				_, updatedErr := n.patcher.PatchStatus(ctx, klusterlet, klusterlet.Status, originalKlusterlet.Status)
+				return updatedErr
+			}
+			if klusterlet.Status.SPIFFE == nil {
+				klusterlet.Status.SPIFFE = &operatorapiv1.KlusterletSPIFFEStatus{}
+			}
+			klusterlet.Status.SPIFFE.AgentIDs = agentIDs
 		}
 
 		// include clusterClaimConfig info if it exists
@@ -676,4 +703,75 @@ func serviceAccountName(suffix string, klusterlet *operatorapiv1.Klusterlet) str
 		return fmt.Sprintf("%s-work-sa", klusterlet.Name)
 	}
 	return fmt.Sprintf("%s-%s", klusterlet.Name, suffix)
+}
+
+// ReasonInvalidSPIFFEConfiguration is the reason of a false Applied condition when the spiffe
+// driver's settings can't produce valid agent SPIFFE IDs.
+const ReasonInvalidSPIFFEConfiguration = "InvalidSPIFFEConfiguration"
+
+// fillSPIFFEConfig fills the spiffe settings and renders each agent's SPIFFE ID from the
+// Klusterlet's agentIDTemplate. {trustDomain} is the agents' trust domain (spiffe.trustDomain, or
+// the trust domain of hubSPIFFEID), {cluster} the cluster name, {role} the agent's role, and
+// {namespace} the namespace the agent pods run in (the Klusterlet's namespace on the management
+// cluster in hosted modes). It returns the IDs for status.spiffe.agentIDs.
+func fillSPIFFEConfig(config *klusterletConfig, klusterlet *operatorapiv1.Klusterlet) ([]operatorapiv1.SPIFFEAgentID, error) {
+	c := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.SPIFFE
+	if c == nil {
+		return nil, fmt.Errorf("spiffe is required when authType is spiffe")
+	}
+	if klusterlet.Spec.ClusterName == "" {
+		return nil, fmt.Errorf("clusterName is required when authType is spiffe")
+	}
+	hubID, err := spiffeid.FromString(c.HubSPIFFEID)
+	if err != nil {
+		return nil, fmt.Errorf("hubSPIFFEID %q: %w", c.HubSPIFFEID, err)
+	}
+	trustDomain := c.TrustDomain
+	if trustDomain == "" {
+		trustDomain = hubID.TrustDomain().Name()
+	}
+	agentTmpl, err := idtemplate.Compile(idtemplate.KindAgent, c.GetAgentIDTemplate())
+	if err != nil {
+		return nil, err
+	}
+	addOnTmpl, err := idtemplate.Compile(idtemplate.KindAddOnAgent, c.GetAddOnAgentIDTemplate())
+	if err != nil {
+		return nil, err
+	}
+	if idtemplate.Overlaps(agentTmpl, addOnTmpl) {
+		return nil, fmt.Errorf("agentIDTemplate %q and addOnAgentIDTemplate %q can match the same SPIFFE ID", agentTmpl, addOnTmpl)
+	}
+
+	roles := []string{"registration", "work"}
+	if helpers.IsSingleton(klusterlet.Spec.DeployOption.Mode) {
+		roles = []string{"klusterlet"}
+	}
+	var ids []operatorapiv1.SPIFFEAgentID
+	for _, role := range roles {
+		id, err := agentTmpl.Render(trustDomain, map[string]string{
+			idtemplate.Cluster:   klusterlet.Spec.ClusterName,
+			idtemplate.Role:      role,
+			idtemplate.Namespace: config.AgentNamespace,
+		})
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, operatorapiv1.SPIFFEAgentID{Role: role, SPIFFEID: id.String()})
+		switch role {
+		case "registration":
+			config.SPIFFERegistrationAgentID = id.String()
+		case "work":
+			config.SPIFFEWorkAgentID = id.String()
+		case "klusterlet":
+			config.SPIFFEKlusterletAgentID = id.String()
+		}
+	}
+
+	config.SPIFFEHubEndpoint = c.HubEndpoint
+	config.SPIFFEHubID = hubID.String()
+	config.SPIFFEWorkloadAPISocket = c.WorkloadAPISocket
+	if config.SPIFFEWorkloadAPISocket == "" {
+		config.SPIFFEWorkloadAPISocket = "unix:///spiffe-workload-api/spire-agent.sock"
+	}
+	return ids, nil
 }
