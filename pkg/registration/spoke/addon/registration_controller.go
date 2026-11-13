@@ -202,6 +202,10 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 		kubeClient = c.managementKubeClient
 	}
 
+	if c.addonAuthConfig.GetKubeClientAuth() == SPIFFEDriver {
+		return c.startSPIFFERegistration(ctx, kubeClient, config)
+	}
+
 	kubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
 		kubeClient, 10*time.Minute, informers.WithNamespace(config.InstallationNamespace))
 
@@ -325,4 +329,62 @@ func (c *addOnRegistrationController) cleanup(ctx context.Context, addOnName str
 
 	delete(c.addOnRegistrationConfigs, addOnName)
 	return nil
+}
+
+const (
+	// SPIFFEDriver is the add-on driver with which each add-on agent authenticates with its own
+	// SPIRE-issued SVID.
+	SPIFFEDriver = "spiffe"
+
+	ReasonCustomSignerNotSupported   = "CustomSignerNotSupported"
+	ReasonAddOnNamespaceNotDedicated = "AddOnNamespaceNotDedicated"
+	ReasonSPIFFERegistrationReady    = "SPIFFERegistrationReady"
+	// addOnNamespaceLabel marks a dedicated add-on namespace; the Klusterlet's admission policy
+	// lets only the operator or the work agent set it, at creation.
+	addOnNamespaceLabel = "open-cluster-management.io/spiffe-addon-namespace"
+)
+
+// startSPIFFERegistration handles a registration with the spiffe add-on driver. There is no
+// credential to create: the add-on agent gets its own SVID from SPIRE. The registration agent only
+// refuses what the driver can't support, and reports it in the RegistrationApplied condition.
+func (c *addOnRegistrationController) startSPIFFERegistration(ctx context.Context, kubeClient kubernetes.Interface,
+	config registrationConfig) (context.CancelFunc, error) {
+	update := c.generateStatusUpdate(c.clusterName, config.addOnName)
+	cond := metav1.Condition{
+		Type:    addonv1beta1.ManagedClusterAddOnRegistrationApplied,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonSPIFFERegistrationReady,
+		Message: "the add-on agent authenticates with its own SVID",
+	}
+	switch {
+	case config.registration.Type != addonv1beta1.KubeClient:
+		cond.Status, cond.Reason = metav1.ConditionFalse, ReasonCustomSignerNotSupported
+		cond.Message = "customSigner registrations are not supported with the spiffe driver: the hub does not sign certificates"
+	default:
+		ns, err := kubeClient.CoreV1().Namespaces().Get(ctx, config.InstallationNamespace, metav1.GetOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return nil, err
+		}
+		if err != nil || ns.Labels[addOnNamespaceLabel] == "" {
+			cond.Status, cond.Reason = metav1.ConditionFalse, ReasonAddOnNamespaceNotDedicated
+			cond.Message = fmt.Sprintf("install namespace %s is not a dedicated add-on namespace; move %s to a namespace of its own",
+				config.InstallationNamespace, config.addOnName)
+		}
+	}
+
+	// The hub's add-on manager owns the condition when all is well; replace it only with a refusal,
+	// or to clear a refusal this controller set earlier.
+	addOn, err := c.hubAddOnLister.ManagedClusterAddOns(c.clusterName).Get(config.addOnName)
+	if err != nil {
+		return nil, err
+	}
+	current := meta.FindStatusCondition(addOn.Status.Conditions, addonv1beta1.ManagedClusterAddOnRegistrationApplied)
+	ownRefusal := current != nil && (current.Reason == ReasonCustomSignerNotSupported || current.Reason == ReasonAddOnNamespaceNotDedicated)
+	if cond.Status == metav1.ConditionFalse || ownRefusal {
+		if err := update(ctx, cond); err != nil {
+			return nil, err
+		}
+	}
+	_, stop := context.WithCancel(ctx)
+	return stop, nil
 }

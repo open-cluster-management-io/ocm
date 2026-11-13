@@ -3,6 +3,7 @@ package spiffe
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -37,8 +38,9 @@ type SPIFFEDriver struct {
 }
 
 var (
-	_ register.RegisterDriver   = &SPIFFEDriver{}
-	_ register.SecretlessDriver = &SPIFFEDriver{}
+	_ register.RegisterDriver     = &SPIFFEDriver{}
+	_ register.SecretlessDriver   = &SPIFFEDriver{}
+	_ register.AddonDriverFactory = &SPIFFEDriver{}
 )
 
 // NewSPIFFEDriver returns the spiffe driver.
@@ -138,4 +140,11 @@ func (d *SPIFFEDriver) Close() error {
 		return nil
 	}
 	return d.source.Close()
+}
+
+// Fork is never used for add-on credentials: with the spiffe add-on driver each add-on agent has
+// its own SVID, and the add-on registration controller creates nothing. Implementing
+// AddonDriverFactory makes the agent run that controller, which reports the add-ons' status.
+func (d *SPIFFEDriver) Fork(addonName string, _ register.AddonAuthConfig, _ register.SecretOption) (register.RegisterDriver, error) {
+	return nil, fmt.Errorf("add-on %s: the spiffe driver creates no add-on credentials", addonName)
 }

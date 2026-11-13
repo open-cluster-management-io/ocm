@@ -43,7 +43,7 @@ func (s *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.RegistrationAuth, "registration-auth", s.RegistrationAuth,
 		"The type of authentication to use to authenticate with hub.")
 	fs.StringVar(&s.AddonKubeClientRegistrationAuth, "addon-kubeclient-registration-auth", s.AddonKubeClientRegistrationAuth,
-		"The authentication method for addons with registration type KubeClient. Possible values are 'csr' (default) and 'token'.")
+		"The authentication method for addons with registration type KubeClient. Possible values are 'csr' (default), 'token' and 'spiffe'.")
 	s.CSROption.AddFlags(fs)
 	s.AWSIRSAOption.AddFlags(fs)
 	s.GRPCOption.AddFlags(fs)
@@ -53,10 +53,15 @@ func (s *Options) AddFlags(fs *pflag.FlagSet) {
 
 func (s *Options) Validate() error {
 	switch s.AddonKubeClientRegistrationAuth {
-	case "", "csr", "token":
+	case "", "csr", "token", operatorv1.SPIFFEAuthType:
 		// valid values
 	default:
 		return fmt.Errorf("unsupported addon-kubeclient-registration-auth: %s", s.AddonKubeClientRegistrationAuth)
+	}
+	// A spiffe agent has no hub kubeconfig to request add-on credentials with, and a spiffe add-on
+	// needs the hub's SPIFFE listener.
+	if (s.RegistrationAuth == operatorv1.SPIFFEAuthType) != (s.AddonKubeClientRegistrationAuth == operatorv1.SPIFFEAuthType) {
+		return fmt.Errorf("--addon-kubeclient-registration-auth=spiffe goes with --registration-auth=spiffe, and only with it")
 	}
 
 	switch s.RegistrationAuth {

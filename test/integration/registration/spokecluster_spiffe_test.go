@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
@@ -308,6 +309,7 @@ var _ = Describe("Registration using SPIFFE", Ordered, Label("spiffe-test"), fun
 
 		driverOption := factory.NewOptions()
 		driverOption.RegistrationAuth = operatorv1.SPIFFEAuthType
+		driverOption.AddonKubeClientRegistrationAuth = operatorv1.SPIFFEAuthType
 		driverOption.SPIFFEOption.HubEndpoint = hubAddr
 		driverOption.SPIFFEOption.HubSPIFFEID = spiffeHubID
 		driverOption.SPIFFEOption.AgentSPIFFEID = registrationID(cluster)
@@ -419,6 +421,65 @@ var _ = Describe("Registration using SPIFFE", Ordered, Label("spiffe-test"), fun
 		Eventually(func() bool {
 			w, err := workClient.WorkV1().ManifestWorks(cluster).Get(ctx, "work1", metav1.GetOptions{})
 			return err == nil && meta.IsStatusConditionTrue(w.Status.Conditions, workv1.WorkApplied)
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+	})
+
+	It("an add-on agent acts for its own add-on only, until the add-on is disabled", func() {
+		ctx := context.Background()
+		cluster := fmt.Sprintf("spiffe-addon-%s", rand.String(5))
+		registration, _ := newAgent(cluster, registrationID(cluster), time.Hour)
+		Expect(registration.CreateCluster(ctx, cluster, nil)).To(Succeed())
+		accept(cluster)
+		Eventually(func() error {
+			_, err := kubeClient.CoreV1().Namespaces().Get(ctx, cluster, metav1.GetOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+		addonID := func(addon string) string {
+			return fmt.Sprintf("spiffe://%s/ocm/cluster/%s/addon/%s/agent/%s-agent", spiffeTD, cluster, addon, addon)
+		}
+		for _, name := range []string{"my-addon", "other-addon"} {
+			_, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(cluster).Create(ctx, &addonv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: cluster}}, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			// The hub RBAC the add-on manager creates for the add-on's groups.
+			group := fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", cluster, name)
+			_, err = kubeClient.RbacV1().Roles(cluster).Create(ctx, &rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				// The SubjectAccessReview for add-on events carries no resource name, so no
+				// resourceNames here; the SPIFFE check refuses another add-on by name.
+				Rules: []rbacv1.PolicyRule{{APIGroups: []string{addonv1beta1.GroupName}, Resources: []string{"managedclusteraddons", "managedclusteraddons/status"},
+					Verbs: []string{"get", "list", "watch", "update", "patch"}}},
+			}, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = kubeClient.RbacV1().RoleBindings(cluster).Create(ctx, &rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: name},
+				Subjects:   []rbacv1.Subject{{APIGroup: rbacv1.GroupName, Kind: "Group", Name: group}},
+			}, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+		}
+		agent, _ := newAgent(cluster, addonID("my-addon"), time.Hour)
+		update := func(name string) error {
+			mca, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(cluster).Get(ctx, name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			mca.Status.Namespace = "my-addon-ns"
+			return agent.UpdateAddOnStatus(ctx, mca)
+		}
+
+		By("the add-on agent updates its own add-on's status")
+		Eventually(func() error { return update("my-addon") }, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+		By("but not another add-on's")
+		Expect(permissionDenied(update("other-addon"))).To(BeTrue())
+
+		By("disabling the add-on cuts its agent off")
+		Expect(addOnClient.AddonV1beta1().ManagedClusterAddOns(cluster).Delete(ctx, "my-addon", metav1.DeleteOptions{})).To(Succeed())
+		Eventually(func() bool {
+			mca := &addonv1beta1.ManagedClusterAddOn{ObjectMeta: metav1.ObjectMeta{Name: "my-addon", Namespace: cluster}}
+			return permissionDenied(agent.UpdateAddOnStatus(ctx, mca))
 		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	})
 

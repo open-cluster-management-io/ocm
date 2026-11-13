@@ -14,7 +14,9 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
 	clusterce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	leasece "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
 	grpcoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc"
@@ -91,6 +93,19 @@ func (a *SPIFFEAgent) UpdateLease(ctx context.Context, lease *coordinationv1.Lea
 		SubResource:         types.SubResourceSpec,
 		Action:              types.UpdateRequestAction,
 	}, lease)
+	if err != nil {
+		return err
+	}
+	return a.publish(ctx, evt)
+}
+
+// UpdateAddOnStatus writes addon's status, as an add-on agent does.
+func (a *SPIFFEAgent) UpdateAddOnStatus(ctx context.Context, addon *addonv1beta1.ManagedClusterAddOn) error {
+	evt, err := addonce.NewManagedClusterAddOnCodec().Encode(a.Cluster, types.CloudEventsType{
+		CloudEventsDataType: addonce.ManagedClusterAddOnEventDataType,
+		SubResource:         types.SubResourceStatus,
+		Action:              types.UpdateRequestAction,
+	}, addon)
 	if err != nil {
 		return err
 	}
