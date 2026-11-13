@@ -3,6 +3,7 @@ package hub
 import (
 	"context"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -45,6 +46,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedcluster"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclusterset"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclustersetbinding"
+	"open-cluster-management.io/ocm/pkg/registration/hub/spiffe"
 	"open-cluster-management.io/ocm/pkg/registration/hub/taint"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	awsirsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
@@ -69,6 +71,11 @@ type HubManagerOptions struct {
 	GRPCCAFile            string
 	GRPCCAKeyFile         string
 	GRPCSigningDuration   time.Duration
+
+	// SPIFFEMaxSVIDLifetime and SPIFFEMaxClockSkew size the delete guard of the spiffe driver:
+	// a deleted cluster is held until deletionTimestamp + both.
+	SPIFFEMaxSVIDLifetime time.Duration
+	SPIFFEMaxClockSkew    time.Duration
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -79,7 +86,15 @@ func NewHubManagerOptions() *HubManagerOptions {
 		ImportOption:               importeroptions.New(),
 		EnabledRegistrationDrivers: []string{operatorv1.CSRAuthType},
 		GRPCSigningDuration:        720 * time.Hour,
+		SPIFFEMaxSVIDLifetime:      24 * time.Hour,
+		SPIFFEMaxClockSkew:         5 * time.Minute,
 	}
+}
+
+// spiffeEnabled reports whether the spiffe registration driver is enabled.
+func (m *HubManagerOptions) spiffeEnabled() bool {
+	return features.HubMutableFeatureGate.Enabled(ocmfeature.SPIFFERegistration) &&
+		slices.Contains(m.EnabledRegistrationDrivers, operatorv1.SPIFFEAuthType)
 }
 
 // AddFlags registers flags for manager
@@ -112,6 +127,10 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&m.GRPCCAFile, "grpc-ca-file", m.GRPCCAFile, "ca file to sign client cert for grpc")
 	fs.StringVar(&m.GRPCCAKeyFile, "grpc-key-file", m.GRPCCAKeyFile, "ca key file to sign client cert for grpc")
 	fs.DurationVar(&m.GRPCSigningDuration, "grpc-signing-duration", m.GRPCSigningDuration, "The max length of duration signed certificates will be given.")
+	fs.DurationVar(&m.SPIFFEMaxSVIDLifetime, "spiffe-max-svid-lifetime", m.SPIFFEMaxSVIDLifetime,
+		"At least the longest SVID TTL SPIRE issues to OCM agents. A deleted cluster of the spiffe driver is held this long plus --spiffe-max-clock-skew.")
+	fs.DurationVar(&m.SPIFFEMaxClockSkew, "spiffe-max-clock-skew", m.SPIFFEMaxClockSkew,
+		"The allowed clock difference between the hub and SPIRE.")
 	m.ImportOption.AddFlags(fs)
 }
 
@@ -316,6 +335,16 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		addOnInformers.Addon().V1beta1().ManagedClusterAddOns(),
 	)
 
+	var spiffeDeleteGuard factory.Controller
+	if m.spiffeEnabled() {
+		spiffeDeleteGuard = spiffe.NewDeleteGuardController(
+			clusterClient,
+			clusterInformers.Cluster().V1().ManagedClusters(),
+			m.SPIFFEMaxSVIDLifetime, m.SPIFFEMaxClockSkew,
+			len(m.EnabledRegistrationDrivers) == 1,
+		)
+	}
+
 	var defaultManagedClusterSetController, globalManagedClusterSetController factory.Controller
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		defaultManagedClusterSetController = managedclusterset.NewDefaultManagedClusterSetController(
@@ -394,6 +423,9 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	go clusterroleController.Run(ctx, 1)
 	go addOnHealthCheckController.Run(ctx, 1)
 	go addOnFeatureDiscoveryController.Run(ctx, 1)
+	if spiffeDeleteGuard != nil {
+		go spiffeDeleteGuard.Run(ctx, 1)
+	}
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		go defaultManagedClusterSetController.Run(ctx, 1)
 		go globalManagedClusterSetController.Run(ctx, 1)
