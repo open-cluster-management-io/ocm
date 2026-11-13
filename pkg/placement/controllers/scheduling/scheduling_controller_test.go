@@ -1307,7 +1307,7 @@ func TestBind(t *testing.T) {
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
 					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
-					WithDecisions(newSelectedClusters(128)[100:]...).Build(),
+					WithDecisions("cluster200", "cluster201").Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch", "delete")
@@ -1346,6 +1346,39 @@ func TestBind(t *testing.T) {
 				}
 				if len(placementDecision.Status.Decisions) != 0 {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, len(placementDecision.Status.Decisions))
+				}
+			},
+		},
+		{
+			// cluster100 moves from decision-1 to decision-2 and cluster1 moves the other way.
+			// Both must be added to their new placementdecision before being removed from the old one.
+			name:      "add clusters moving between placementdecisions before removing them",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
+			clusters:  newClusters(101),
+			initObjs: []runtime.Object{
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
+					WithDecisions(newSelectedClusters(101)[1:]...).Build(),
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 2)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
+					WithDecisions(newSelectedClusters(101)[0]).Build(),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch", "patch")
+				selectedClusters := newSelectedClusters(101)
+				for i, expected := range [][]string{selectedClusters, {selectedClusters[0], selectedClusters[100]}} {
+					placementDecision := &clusterapiv1beta1.PlacementDecision{}
+					if err := json.Unmarshal(actions[i].(clienttesting.PatchActionImpl).Patch, placementDecision); err != nil {
+						t.Fatal(err)
+					}
+					if len(placementDecision.Status.Decisions) != len(expected) {
+						t.Errorf("expected %d decisions in patch %d, got %d", len(expected), i, len(placementDecision.Status.Decisions))
+					}
+					assertClustersSelected(t, placementDecision.Status.Decisions, expected...)
 				}
 			},
 		},

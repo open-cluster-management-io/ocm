@@ -533,6 +533,15 @@ func (c *schedulingController) bind(
 	clusterScores PrioritizerScore,
 	status *framework.Status,
 ) error {
+	// If a cluster is moving from one placementdecision to another, updating them one by one
+	// would leave it missing from all of them for a moment, and consumers like the addon manager
+	// would treat it as removed. Add the moving clusters first and leave the removals to the next
+	// reconcile, which these updates trigger.
+	staged, err := c.addMovingClusters(ctx, placement, placementdecisions)
+	if err != nil || staged {
+		return err
+	}
+
 	var errs []error
 	placementDecisionNames := sets.NewString()
 
@@ -575,6 +584,87 @@ func (c *schedulingController) bind(
 			"Decision %s is deleted with placement %s in namespace %s", pd.Name, placement.Name, placement.Namespace)
 	}
 	return errorhelpers.NewMultiLineAggregate(errs)
+}
+
+// addMovingClusters checks whether applying placementdecisions would remove a cluster from one
+// existing placementdecision and add it to another. If so, it only adds the new clusters to each
+// placementdecision, keeping the ones it has, and returns true.
+func (c *schedulingController) addMovingClusters(
+	ctx context.Context,
+	placement *clusterapiv1beta1.Placement,
+	placementdecisions []*clusterapiv1beta1.PlacementDecision,
+) (bool, error) {
+	requirement, err := labels.NewRequirement(clusterapiv1beta1.PlacementLabel, selection.Equals, []string{placement.Name})
+	if err != nil {
+		return false, err
+	}
+	pds, err := c.placementDecisionLister.PlacementDecisions(placement.Namespace).List(labels.NewSelector().Add(*requirement))
+	if err != nil {
+		return false, err
+	}
+	existing := map[string]*clusterapiv1beta1.PlacementDecision{}
+	for _, pd := range pds {
+		existing[pd.Name] = pd
+	}
+
+	wanted := map[string]sets.Set[string]{}
+	added := sets.New[string]()
+	for _, pd := range placementdecisions {
+		wanted[pd.Name] = decisionClusterNames(pd.Status.Decisions)
+		old := sets.New[string]()
+		if e, ok := existing[pd.Name]; ok {
+			old = decisionClusterNames(e.Status.Decisions)
+		}
+		added = added.Union(wanted[pd.Name].Difference(old))
+	}
+	removed := sets.New[string]()
+	for name, pd := range existing {
+		removed = removed.Union(decisionClusterNames(pd.Status.Decisions).Difference(wanted[name]))
+	}
+	if added.Intersection(removed).Len() == 0 {
+		return false, nil
+	}
+
+	placementDecisionPatcher := patcher.NewPatcher[
+		*clusterapiv1beta1.PlacementDecision, interface{}, clusterapiv1beta1.PlacementDecisionStatus](
+		c.clusterClient.ClusterV1beta1().PlacementDecisions(placement.Namespace))
+
+	var errs []error
+	for _, pd := range placementdecisions {
+		old, ok := existing[pd.Name]
+		if !ok {
+			// a new placementdecision has nothing to remove, so create it as is
+			if err := c.createOrUpdatePlacementDecision(ctx, placement, pd, nil, nil); err != nil {
+				errs = append(errs, err)
+			}
+			continue
+		}
+		oldNames := decisionClusterNames(old.Status.Decisions)
+		merged := append([]clusterapiv1beta1.ClusterDecision{}, old.Status.Decisions...)
+		for _, d := range pd.Status.Decisions {
+			if !oldNames.Has(d.ClusterName) {
+				merged = append(merged, d)
+			}
+		}
+		if len(merged) == len(old.Status.Decisions) {
+			continue
+		}
+		newPlacementDecision := old.DeepCopy()
+		newPlacementDecision.Status.Decisions = merged
+		if _, err := placementDecisionPatcher.PatchStatus(
+			ctx, newPlacementDecision, newPlacementDecision.Status, old.Status); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return true, errorhelpers.NewMultiLineAggregate(errs)
+}
+
+func decisionClusterNames(decisions []clusterapiv1beta1.ClusterDecision) sets.Set[string] {
+	names := sets.New[string]()
+	for _, d := range decisions {
+		names.Insert(d.ClusterName)
+	}
+	return names
 }
 
 // createOrUpdatePlacementDecision creates a new PlacementDecision if it does not exist and
