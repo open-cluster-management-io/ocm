@@ -860,7 +860,11 @@ func fillSPIFFEConfig(config *klusterletConfig, klusterlet *operatorapiv1.Kluste
 // spiffeWorkAgents maps every Klusterlet that uses the spiffe driver to its work agent's user on
 // the managed cluster, for the add-on namespace label policy.
 func (n *klusterletController) spiffeWorkAgents() (map[string]string, error) {
-	klusterlets, err := n.klusterletLister.List(labels.Everything())
+	return spiffeWorkAgentsFrom(n.klusterletLister)
+}
+
+func spiffeWorkAgentsFrom(lister operatorlister.KlusterletLister) (map[string]string, error) {
+	klusterlets, err := lister.List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}

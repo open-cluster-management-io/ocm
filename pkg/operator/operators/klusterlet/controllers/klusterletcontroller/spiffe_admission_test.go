@@ -306,3 +306,20 @@ func activate(t *testing.T, r *spiffeAdmissionReconcile, k *operatorapiv1.Kluste
 	}
 	return k
 }
+
+func TestSPIFFEAdmissionCleanOnDelete(t *testing.T) {
+	k := spiffeKlusterlet()
+	kube := fakekube.NewSimpleClientset()
+	r := newAdmissionReconcile(kube)
+	k = activate(t, r, k, spiffeConfig(k))
+	// The deleted Klusterlet is the only spiffe one left.
+	r.spiffeWorkAgents = func() (map[string]string, error) { return map[string]string{"klusterlet": "x"}, nil }
+	if _, _, err := r.clean(context.TODO(), k, spiffeConfig(k)); err != nil {
+		t.Fatal(err)
+	}
+	policies, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicies().List(context.TODO(), metav1.ListOptions{})
+	bindings, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().List(context.TODO(), metav1.ListOptions{})
+	if len(policies.Items) != 0 || len(bindings.Items) != 0 {
+		t.Errorf("%d policies and %d bindings left after the Klusterlet was deleted", len(policies.Items), len(bindings.Items))
+	}
+}

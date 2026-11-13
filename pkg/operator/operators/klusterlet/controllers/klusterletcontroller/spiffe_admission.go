@@ -708,8 +708,16 @@ func (r *spiffeAdmissionReconcile) ensureAddOnNamespace(ctx context.Context, klu
 	return nil
 }
 
-func (r *spiffeAdmissionReconcile) clean(_ context.Context, klusterlet *operatorapiv1.Klusterlet,
+// clean removes the Klusterlet's admission policies and bindings when it is deleted (and the
+// shared namespace label policy when no other Klusterlet uses spiffe).
+func (r *spiffeAdmissionReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	_ klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	if klusterlet.Status.SPIFFE == nil {
+		return klusterlet, reconcileContinue, nil
+	}
+	if err := r.removeSPIFFE(ctx, klusterlet); err != nil {
+		return klusterlet, reconcileStop, err
+	}
 	return klusterlet, reconcileContinue, nil
 }
 

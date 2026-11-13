@@ -172,6 +172,14 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		// resources on managed clusters, but just clean the resources on the hosting cluster and finish the cleanup
 		if cleanupManagedClusterResources {
 			reconcilers = append(reconcilers,
+				// The spiffe driver's admission policies go with the Klusterlet.
+				&spiffeAdmissionReconcile{
+					managedClusterClients: managedClusterClients,
+					kubeClient:            n.kubeClient,
+					spiffeWorkAgents: func() (map[string]string, error) {
+						return spiffeWorkAgentsFrom(n.klusterletLister)
+					},
+				},
 				&crdReconcile{
 					managedClusterClients: managedClusterClients,
 					recorder:              controllerContext.Recorder(),
