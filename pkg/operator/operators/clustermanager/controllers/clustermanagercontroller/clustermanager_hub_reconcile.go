@@ -93,9 +93,12 @@ var (
 		"cluster-manager/hub/grpc-server/service.yaml",
 	}
 
-	// spiffeServiceFiles expose the SPIFFE listener.
+	// spiffeServiceFiles expose the SPIFFE listener and give SPIFFE agents their pre-acceptance
+	// permission.
 	spiffeServiceFiles = []string{
 		"cluster-manager/hub/grpc-server/service-spiffe.yaml",
+		"cluster-manager/hub/grpc-server/spiffe-agent-clusterrole.yaml",
+		"cluster-manager/hub/grpc-server/spiffe-agent-clusterrolebinding.yaml",
 	}
 
 	// hubNetworkPolicyBaseFiles are always-on NetworkPolicy resources for open-cluster-management-hub.

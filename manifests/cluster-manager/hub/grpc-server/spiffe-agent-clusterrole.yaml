@@ -1,0 +1,18 @@
+# Before acceptance, a SPIFFE agent may only create, get and watch its own ManagedCluster. There is
+# no bootstrap stage: the agent's SVID maps to the group below from its first connection. "Its
+# own" is enforced by the SPIFFE listener, which refuses any event for another cluster than the
+# one in the SVID. Applied only with the spiffe registration driver.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:spiffe-agent
+{{ if gt (len .Labels) 0 }}
+  labels:
+  {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+  {{ end }}
+{{ end }}
+rules:
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclusters"]
+  verbs: ["get", "create", "list", "watch"]

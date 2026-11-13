@@ -7,6 +7,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,6 +24,7 @@ type spiffeRendering struct {
 	services    map[string]*corev1.Service
 	deployments map[string]*appsv1.Deployment
 	secrets     []string
+	bindings    map[string]*rbacv1.ClusterRoleBinding
 	applied     *metav1.Condition
 }
 
@@ -35,7 +37,8 @@ func renderSPIFFEHub(t *testing.T, cm *operatorapiv1.ClusterManager) spiffeRende
 	if err := tc.clusterManagerController.sync(ctx, testingcommon.NewFakeSyncContext(t, cm.Name), cm.Name); err != nil {
 		t.Fatalf("sync: %v", err)
 	}
-	r := spiffeRendering{services: map[string]*corev1.Service{}, deployments: map[string]*appsv1.Deployment{}}
+	r := spiffeRendering{services: map[string]*corev1.Service{}, deployments: map[string]*appsv1.Deployment{},
+		bindings: map[string]*rbacv1.ClusterRoleBinding{}}
 	for _, a := range append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...) {
 		if a.GetVerb() != createVerb && a.GetVerb() != "update" {
 			continue
@@ -56,6 +59,8 @@ func renderSPIFFEHub(t *testing.T, cm *operatorapiv1.ClusterManager) spiffeRende
 			r.deployments[o.Name] = o
 		case *corev1.Secret:
 			r.secrets = append(r.secrets, o.Name)
+		case *rbacv1.ClusterRoleBinding:
+			r.bindings[o.Name] = o
 		}
 	}
 	for _, a := range tc.operatorClient.Actions() {
@@ -182,6 +187,11 @@ func TestSPIFFEHubRendering(t *testing.T) {
 		if r.applied == nil || r.applied.Status != metav1.ConditionTrue {
 			t.Errorf("Applied condition %+v, want True", r.applied)
 		}
+		b := r.bindings["open-cluster-management:spiffe-agent"]
+		if b == nil || len(b.Subjects) != 1 || b.Subjects[0].Kind != "Group" ||
+			b.Subjects[0].Name != "system:open-cluster-management:managed-clusters" {
+			t.Errorf("pre-acceptance binding %+v, want the managed-clusters group", b)
+		}
 	})
 
 	t.Run("spiffe and grpc", func(t *testing.T) {
@@ -209,7 +219,8 @@ func TestSPIFFEHubRendering(t *testing.T) {
 
 	t.Run("feature gate off", func(t *testing.T) {
 		r := renderSPIFFEHub(t, spiffeClusterManager([]string{operatorapiv1.SPIFFEAuthType}, td, false))
-		if r.deployments["testhub-grpc-server"] != nil || r.services["testhub-grpc-server-spiffe"] != nil {
+		if r.deployments["testhub-grpc-server"] != nil || r.services["testhub-grpc-server-spiffe"] != nil ||
+			r.bindings["open-cluster-management:spiffe-agent"] != nil {
 			t.Error("SPIFFE is rendered without the SPIFFERegistration feature gate")
 		}
 	})
