@@ -172,6 +172,8 @@ spec:
           - "--spiffe-hub-endpoint={{ .SPIFFEHubEndpoint }}"
           - "--spiffe-hub-id={{ .SPIFFEHubID }}"
           - "--spiffe-agent-id={{ .SPIFFEKlusterletAgentID }}"
+          - "--spiffe-trust-domain={{ .SPIFFETrustDomain }}"
+          - "--spiffe-addon-agent-id-template={{ .SPIFFEAddOnAgentIDTemplate }}"
           - "--spiffe-workload-api-socket={{ .SPIFFEWorkloadAPISocket }}"
           {{end}}
           {{if .TLSMinVersion}}

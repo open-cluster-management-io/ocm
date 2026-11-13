@@ -16,6 +16,11 @@ rules:
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
+# With the spiffe add-on driver, the agent writes each add-on's non-secret hub connection settings
+# (<addon>-spiffe ConfigMap) instead of a hub kubeconfig Secret.
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "create", "delete", "update"]
 # Allow agent to list addons lease
 - apiGroups: ["coordination.k8s.io"]
   resources: ["leases"]

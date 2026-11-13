@@ -8,6 +8,8 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
+
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 )
 
 // DefaultWorkloadAPISocket is where the SPIFFE CSI driver mounts the SPIRE agent's Workload API.
@@ -24,11 +26,17 @@ type Option struct {
 	AgentSPIFFEID string
 	// WorkloadAPISocket is the local SPIRE agent's Workload API address.
 	WorkloadAPISocket string
+	// TrustDomain is the agents' own trust domain; default the trust domain of HubSPIFFEID. The
+	// registration agent renders add-on agents' IDs in it.
+	TrustDomain string
+	// AddOnAgentIDTemplate is the layout of add-on agent SPIFFE IDs (the Klusterlet's
+	// addOnAgentIDTemplate).
+	AddOnAgentIDTemplate string
 }
 
 // NewOption returns the default settings.
 func NewOption() *Option {
-	return &Option{WorkloadAPISocket: DefaultWorkloadAPISocket}
+	return &Option{WorkloadAPISocket: DefaultWorkloadAPISocket, AddOnAgentIDTemplate: operatorv1.DefaultSPIFFEAddOnAgentIDTemplate}
 }
 
 // AddFlags adds the spiffe driver's flags.
@@ -41,6 +49,10 @@ func (o *Option) AddFlags(fs *pflag.FlagSet) {
 		"The SPIFFE ID this agent must get from the Workload API.")
 	fs.StringVar(&o.WorkloadAPISocket, "spiffe-workload-api-socket", o.WorkloadAPISocket,
 		"Address of the local SPIRE agent's Workload API.")
+	fs.StringVar(&o.TrustDomain, "spiffe-trust-domain", o.TrustDomain,
+		"The agents' own SPIFFE trust domain. Default: the trust domain of --spiffe-hub-id.")
+	fs.StringVar(&o.AddOnAgentIDTemplate, "spiffe-addon-agent-id-template", o.AddOnAgentIDTemplate,
+		"SPIFFE ID layout of add-on agents; must equal the hub's.")
 }
 
 // Enabled reports whether the agent connects to the hub with its SVID.
@@ -63,4 +75,16 @@ func (o *Option) Validate() error {
 		return errors.New("--spiffe-workload-api-socket is required with --registration-auth=spiffe")
 	}
 	return nil
+}
+
+// AgentTrustDomain returns TrustDomain, or the trust domain of HubSPIFFEID.
+func (o *Option) AgentTrustDomain() (string, error) {
+	if o.TrustDomain != "" {
+		return o.TrustDomain, nil
+	}
+	hubID, err := spiffeid.FromString(o.HubSPIFFEID)
+	if err != nil {
+		return "", fmt.Errorf("--spiffe-hub-id %q: %w", o.HubSPIFFEID, err)
+	}
+	return hubID.TrustDomain().Name(), nil
 }

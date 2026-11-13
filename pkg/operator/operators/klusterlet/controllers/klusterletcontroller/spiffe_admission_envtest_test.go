@@ -107,6 +107,23 @@ func TestSPIFFEAdmissionPoliciesInAPIServer(t *testing.T) {
 		return err
 	})
 
+	// Each policy becomes active on its own.
+	waitDenied(t, func() error {
+		_, err := as(envAlice).AppsV1().Deployments(envAddOnNS).Create(ctx, deployment(envAddOnNS, "probe"), metav1.CreateOptions{})
+		if err == nil {
+			_ = admin.AppsV1().Deployments(envAddOnNS).Delete(ctx, "probe", metav1.DeleteOptions{})
+		}
+		return err
+	})
+	waitDenied(t, func() error {
+		_, err := as(envAlice).CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name: "probe-ns", Labels: map[string]string{SPIFFEAddOnNamespaceLabel: "klusterlet"}}}, metav1.CreateOptions{})
+		if err == nil {
+			_ = admin.CoreV1().Namespaces().Delete(ctx, "probe-ns", metav1.DeleteOptions{})
+		}
+		return err
+	})
+
 	// Agent namespace: Deployments, ReplicaSets, Pods.
 	x, err := as(envOperator).AppsV1().Deployments(envAgentNS).Create(ctx, deployment(envAgentNS, "x"), metav1.CreateOptions{})
 	must(err)

@@ -272,6 +272,9 @@ type klusterletConfig struct {
 	SPIFFERegistrationAgentID string
 	SPIFFEWorkAgentID         string
 	SPIFFEKlusterletAgentID   string
+	// The registration agent renders add-on agents' IDs from these.
+	SPIFFETrustDomain          string
+	SPIFFEAddOnAgentIDTemplate string
 }
 
 // If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.
@@ -779,6 +782,8 @@ func fillSPIFFEConfig(config *klusterletConfig, klusterlet *operatorapiv1.Kluste
 		}
 	}
 
+	config.SPIFFETrustDomain = trustDomain
+	config.SPIFFEAddOnAgentIDTemplate = addOnTmpl.String()
 	config.SPIFFEHubEndpoint = c.HubEndpoint
 	config.SPIFFEHubID = hubID.String()
 	config.SPIFFEWorkloadAPISocket = c.WorkloadAPISocket

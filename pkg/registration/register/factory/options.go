@@ -100,3 +100,8 @@ func (s *Options) Driver(secretOption register.SecretOption) (register.RegisterD
 		return csr.NewCSRDriver(s.CSROption, secretOption)
 	}
 }
+
+// GetSPIFFEOption returns the spiffe driver's settings, for the add-on registration controller.
+func (s *Options) GetSPIFFEOption() *spiffe.Option {
+	return s.SPIFFEOption
+}
