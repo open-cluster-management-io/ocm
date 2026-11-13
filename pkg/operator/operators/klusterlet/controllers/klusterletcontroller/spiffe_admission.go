@@ -312,6 +312,10 @@ func apply(ctx context.Context, o admissionObjects) error {
 	return nil
 }
 
+// PolicyAPIServed reports whether the cluster serves admissionregistration.k8s.io/v1
+// ValidatingAdmissionPolicies.
+func PolicyAPIServed(c kubernetes.Interface) (bool, error) { return policyAPIServed(c) }
+
 func policyAPIServed(c kubernetes.Interface) (bool, error) {
 	resources, err := c.Discovery().ServerResourcesForGroupVersion(admissionv1.SchemeGroupVersion.String())
 	if apierrors.IsNotFound(err) {

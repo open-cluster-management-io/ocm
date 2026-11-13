@@ -6,15 +6,19 @@ import (
 	"strings"
 	"testing"
 
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 
+	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -321,5 +325,31 @@ func TestSPIFFEAdmissionCleanOnDelete(t *testing.T) {
 	bindings, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().List(context.TODO(), metav1.ListOptions{})
 	if len(policies.Items) != 0 || len(bindings.Items) != 0 {
 		t.Errorf("%d policies and %d bindings left after the Klusterlet was deleted", len(policies.Items), len(bindings.Items))
+	}
+}
+
+func TestSPIFFEAdmissionQueueKeys(t *testing.T) {
+	spiffeK := spiffeKlusterlet()
+	other := newKlusterlet("other", "open-cluster-management-agent", "cluster2")
+	store := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	for _, k := range []*operatorapiv1.Klusterlet{spiffeK, other} {
+		if err := store.Add(k); err != nil {
+			t.Fatal(err)
+		}
+	}
+	keys := spiffeAdmissionQueueKeys(operatorlister.NewKlusterletLister(store))
+	policy := func(name string) runtime.Object {
+		return &admissionv1.ValidatingAdmissionPolicy{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	}
+	cases := map[string][]string{
+		agentPolicyPrefix + "klusterlet": {"klusterlet"},
+		addOnPolicyPrefix + "klusterlet": {"klusterlet"},
+		namespaceLabelPolicyName:         {"klusterlet"}, // only spiffe Klusterlets
+		"someone-elses-policy":           nil,
+	}
+	for name, want := range cases {
+		if got := keys(policy(name)); !equality.Semantic.DeepEqual(got, want) && !(len(got) == 0 && len(want) == 0) {
+			t.Errorf("%s: keys %v, want %v", name, got, want)
+		}
 	}
 }

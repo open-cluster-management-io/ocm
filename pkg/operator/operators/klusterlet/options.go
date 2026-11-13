@@ -18,6 +18,7 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/addonsecretcontroller"
@@ -109,6 +110,18 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		return err
 	}
 
+	// With the spiffe driver, a change to an admission policy or binding must run recovery at
+	// once. Watched only where the API is served (Kubernetes 1.30 or later).
+	var spiffeAdmissionInformers []factory.Informer
+	if served, err := klusterletcontroller.PolicyAPIServed(kubeClient); err != nil {
+		return err
+	} else if served {
+		spiffeAdmissionInformers = []factory.Informer{
+			kubeInformer.Admissionregistration().V1().ValidatingAdmissionPolicies().Informer(),
+			kubeInformer.Admissionregistration().V1().ValidatingAdmissionPolicyBindings().Informer(),
+		}
+	}
+
 	klusterletController := klusterletcontroller.NewKlusterletController(
 		kubeClient,
 		apiExtensionClient,
@@ -122,7 +135,8 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		o.ControlPlaneNodeLabelSelector,
 		o.DeploymentReplicas,
 		o.DisableAddonNamespace,
-		o.EnableSyncLabels)
+		o.EnableSyncLabels,
+		spiffeAdmissionInformers...)
 
 	klusterletCleanupController := klusterletcontroller.NewKlusterletCleanupController(
 		kubeClient,

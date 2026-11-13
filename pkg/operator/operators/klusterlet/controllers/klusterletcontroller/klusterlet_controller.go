@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
@@ -126,7 +127,8 @@ func NewKlusterletController(
 	controlPlaneNodeLabelSelector string,
 	deploymentReplicas int32,
 	disableAddonNamespace bool,
-	enableSyncLabels bool) factory.Controller {
+	enableSyncLabels bool,
+	spiffeAdmissionInformers ...factory.Informer) factory.Controller {
 	controller := &klusterletController{
 		kubeClient: kubeClient,
 		patcher: patcher.NewPatcher[
@@ -151,6 +153,7 @@ func NewKlusterletController(
 		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(
 			controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
+		WithInformersQueueKeysFunc(spiffeAdmissionQueueKeys(controller.klusterletLister), spiffeAdmissionInformers...).
 		ToController("KlusterletController")
 }
 
@@ -877,4 +880,34 @@ func spiffeWorkAgentsFrom(lister operatorlister.KlusterletLister) (map[string]st
 		out[k.Name] = workAgentUser(helpers.KlusterletNamespace(k), serviceAccountName("work-sa", k))
 	}
 	return out, nil
+}
+
+// spiffeAdmissionQueueKeys maps a SPIFFE admission policy or binding to the Klusterlets it
+// belongs to, so that a change to it, for example its deletion, runs recovery at once rather than
+// at the next resync. The shared namespace label policy belongs to every spiffe Klusterlet.
+func spiffeAdmissionQueueKeys(lister operatorlister.KlusterletLister) func(runtime.Object) []string {
+	return func(obj runtime.Object) []string {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return nil
+		}
+		name := accessor.GetName()
+		for _, prefix := range []string{agentPolicyPrefix, addOnPolicyPrefix} {
+			if k, ok := strings.CutPrefix(name, prefix); ok {
+				return []string{k}
+			}
+		}
+		if name != namespaceLabelPolicyName {
+			return nil
+		}
+		agents, err := spiffeWorkAgentsFrom(lister)
+		if err != nil {
+			return nil
+		}
+		keys := make([]string, 0, len(agents))
+		for k := range agents {
+			keys = append(keys, k)
+		}
+		return keys
+	}
 }
