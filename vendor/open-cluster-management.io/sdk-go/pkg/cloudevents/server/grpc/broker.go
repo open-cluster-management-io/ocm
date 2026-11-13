@@ -50,6 +50,8 @@ type GRPCBroker struct {
 	subscribers            map[string]*subscriber // registered subscribers
 	heartbeatCheckInterval time.Duration
 	heartbeatDisabled      bool
+	eventQueueSize         int
+	heartbeatQueueSize     int
 	mu                     sync.RWMutex
 }
 
@@ -60,7 +62,16 @@ func NewGRPCBroker(opts *BrokerOptions) *GRPCBroker {
 		services:               make(map[types.CloudEventsDataType]server.Service),
 		heartbeatCheckInterval: opts.HeartbeatCheckInterval,
 		heartbeatDisabled:      opts.HeartbeatDisabled,
+		eventQueueSize:         opts.EventQueueSize,
+		heartbeatQueueSize:     opts.HeartbeatQueueSize,
 		mu:                     sync.RWMutex{},
+	}
+	// zero (e.g. a struct literal without the queue sizes) keeps the previous fixed sizes
+	if broker.eventQueueSize <= 0 {
+		broker.eventQueueSize = defaultEventQueueSize
+	}
+	if broker.heartbeatQueueSize <= 0 {
+		broker.heartbeatQueueSize = defaultHeartbeatQueueSize
 	}
 	return broker
 }
@@ -196,12 +207,11 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 
 	logger := klog.FromContext(subCtx).WithValues("clusterName", subReq.ClusterName, "subID", subID)
 
-	// TODO make the channel size configurable
-	eventCh := make(chan *pbv1.CloudEvent, 100)
+	eventCh := make(chan *pbv1.CloudEvent, bkr.eventQueueSize)
 
 	var heartbeater *heartbeat.Heartbeater
 	if !bkr.heartbeatDisabled {
-		heartbeater = heartbeat.NewHeartbeater(bkr.heartbeatCheckInterval, 10)
+		heartbeater = heartbeat.NewHeartbeater(bkr.heartbeatCheckInterval, bkr.heartbeatQueueSize)
 	}
 	sendErrCh := make(chan error, 1)
 

@@ -163,10 +163,10 @@ type ManagedClusterAddOnStatus struct {
 
 	// kubeClientDriver specifies the authentication driver used by the ManagedClusterAddOn
 	// for kubeClient registration when the signer name is `kubernetes.io/kube-apiserver-client`.
-	// Supported values are `csr` and `token`.
+	// Supported values are `csr`, `token` and `spiffe`.
 	// The field is set by the agent to declare which authentication driver it is using.
 	// +optional
-	// +kubebuilder:validation:Enum=csr;token
+	// +kubebuilder:validation:Enum=csr;token;spiffe
 	KubeClientDriver string `json:"kubeClientDriver,omitempty"`
 }
 

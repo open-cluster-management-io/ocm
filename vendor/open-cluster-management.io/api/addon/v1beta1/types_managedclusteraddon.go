@@ -78,10 +78,12 @@ type KubeClientConfig struct {
 	// +optional
 	Subject KubeClientSubject `json:"subject,omitempty"`
 
-	// driver is the authentication driver used by managedclusteraddon for kubeClient registration. Possible values are csr and token.
+	// driver is the authentication driver used by managedclusteraddon for kubeClient registration.
+	// Possible values are csr, token and spiffe. With spiffe, the add-on agent authenticates with
+	// its own SPIRE-issued SVID and no add-on credential is created.
 	// This field is set by the agent to declare which driver it is using.
 	// +optional
-	// +kubebuilder:validation:Enum=csr;token
+	// +kubebuilder:validation:Enum=csr;token;spiffe
 	Driver string `json:"driver,omitempty"`
 }
 

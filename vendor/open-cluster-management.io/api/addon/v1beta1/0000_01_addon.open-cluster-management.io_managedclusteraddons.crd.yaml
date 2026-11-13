@@ -286,11 +286,12 @@ spec:
                 description: |-
                   kubeClientDriver specifies the authentication driver used by the ManagedClusterAddOn
                   for kubeClient registration when the signer name is `kubernetes.io/kube-apiserver-client`.
-                  Supported values are `csr` and `token`.
+                  Supported values are `csr`, `token` and `spiffe`.
                   The field is set by the agent to declare which authentication driver it is using.
                 enum:
                 - csr
                 - token
+                - spiffe
                 type: string
               namespace:
                 description: |-
@@ -699,11 +700,14 @@ spec:
                       properties:
                         driver:
                           description: |-
-                            driver is the authentication driver used by managedclusteraddon for kubeClient registration. Possible values are csr and token.
+                            driver is the authentication driver used by managedclusteraddon for kubeClient registration.
+                            Possible values are csr, token and spiffe. With spiffe, the add-on agent authenticates with
+                            its own SPIRE-issued SVID and no add-on credential is created.
                             This field is set by the agent to declare which driver it is using.
                           enum:
                           - csr
                           - token
+                          - spiffe
                           type: string
                         subject:
                           description: subject is the user subject of the addon agent
