@@ -55,7 +55,8 @@ func clusterLister(t *testing.T, clusters ...*clusterv1.ManagedCluster) clusterl
 }
 
 func pinnedCluster(name, td string) *clusterv1.ManagedCluster {
-	c := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	c := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: clusterv1.ManagedClusterSpec{HubAcceptsClient: true}}
 	if td != "" {
 		c.Annotations = map[string]string{clusterv1.SPIFFETrustDomainAnnotationKey: td}
 	}
@@ -80,7 +81,14 @@ func TestClusterGate(t *testing.T) {
 		&addonv1beta1.ManagedClusterAddOn{ObjectMeta: metav1.ObjectMeta{Namespace: "cluster2", Name: "going-addon",
 			DeletionTimestamp: &now, Finalizers: []string{"x"}}},
 	)
+	denied := pinnedCluster("denied", "ocm-hub.example.org")
+	denied.Spec.HubAcceptsClient = false
+	registration := func(cluster, td string, role grpcauthn.AgentRole) context.Context {
+		return context.WithValue(context.Background(), grpcauthn.ContextOCMIdentityKey,
+			grpcauthn.OCMIdentity{ClusterName: cluster, TrustDomain: td, Role: role})
+	}
 	lister := clusterLister(t,
+		denied,
 		pinnedCluster("cluster1", "ocm-hub.example.org"),
 		pinnedCluster("cluster2", "east.example.org"),
 		pinnedCluster("cluster3", "west.example.org"),
@@ -108,6 +116,12 @@ func TestClusterGate(t *testing.T) {
 		{"cluster being deleted", agent("deleting", "ocm-hub.example.org"), several, "cluster deleting is being deleted"},
 		{"add-on not enabled", addonNamed("cluster2", "east.example.org", "other-addon"), several,
 			"add-on other-addon is not enabled on cluster cluster2"},
+		{"denied cluster: work agent", agent("denied", "ocm-hub.example.org"), several, "cluster denied is not accepted by the hub"},
+		{"denied cluster: add-on agent", addon("denied", "ocm-hub.example.org"), several, "is not accepted by the hub"},
+		{"denied cluster: registration agent keeps its pre-acceptance access",
+			registration("denied", "ocm-hub.example.org", grpcauthn.RoleRegistration), several, ""},
+		{"denied cluster: singleton agent too",
+			registration("denied", "ocm-hub.example.org", grpcauthn.RoleKlusterlet), several, ""},
 		{"add-on being deleted", addonNamed("cluster2", "east.example.org", "going-addon"), several,
 			"add-on going-addon on cluster cluster2 is being deleted"},
 	}

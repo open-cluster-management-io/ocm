@@ -27,9 +27,12 @@ type authorizer interface {
 //     domain;
 //   - every agent of a cluster that is being deleted. A closed connection is reopened at once,
 //     and the SVIDs issued before the deletion stay valid until they expire;
-//   - an add-on agent whose ManagedClusterAddOn is gone or being deleted.
-//
-// A denied cluster (hubAcceptsClient false) is left to its RBAC, which the hub removes.
+//   - an add-on agent whose ManagedClusterAddOn is gone or being deleted;
+//   - the work agent and the add-on agents of a cluster that isn't accepted (hubAcceptsClient
+//     false). The hub keeps the cluster's work RoleBinding when it is denied, so RBAC alone
+//     would let them reconnect. The registration agent (and the singleton agent, which is also
+//     the registration agent) is left to its RBAC: it keeps its pre-acceptance access, to learn
+//     when the cluster is accepted again.
 type clusterGate struct {
 	next         authorizer
 	clusters     clusterlisterv1.ManagedClusterLister
@@ -70,6 +73,9 @@ func (a *clusterGate) check(ctx context.Context) error {
 	}
 	if cluster.DeletionTimestamp != nil {
 		return fmt.Errorf("cluster %s is being deleted", id.ClusterName)
+	}
+	if !cluster.Spec.HubAcceptsClient && (id.IsAddOn() || id.Role == grpcauthn.RoleWork) {
+		return fmt.Errorf("cluster %s is not accepted by the hub", id.ClusterName)
 	}
 	if err := a.checkAddOn(id); err != nil {
 		return err
