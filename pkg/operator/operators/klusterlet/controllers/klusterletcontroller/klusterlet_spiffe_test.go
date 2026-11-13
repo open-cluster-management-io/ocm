@@ -6,9 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
@@ -50,6 +54,10 @@ func renderSPIFFEKlusterlet(t *testing.T, name string, mode operatorapiv1.Instal
 			newSecret(helpers.ImagePullSecret, "open-cluster-management"))
 	} else {
 		controller = newTestController(t, klusterlet, syncContext.Recorder(), nil, false, newNamespace(agentNamespace))
+	}
+	servePolicyAPI(controller.kubeClient, "system:serviceaccount:open-cluster-management:klusterlet")
+	if controller.managedKubeClient != nil {
+		servePolicyAPI(controller.managedKubeClient, "system:admin")
 	}
 	if err := controller.controller.sync(context.TODO(), syncContext, name); err != nil {
 		t.Fatalf("sync: %v", err)
@@ -209,4 +217,17 @@ func keys(m map[string]*appsv1.Deployment) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// servePolicyAPI makes a fake client serve the ValidatingAdmissionPolicy API and answer
+// SelfSubjectReviews as user.
+func servePolicyAPI(c *fakekube.Clientset, user string) {
+	c.Resources = append(c.Resources, &metav1.APIResourceList{
+		GroupVersion: admissionv1.SchemeGroupVersion.String(),
+		APIResources: []metav1.APIResource{{Name: "validatingadmissionpolicies"}, {Name: "validatingadmissionpolicybindings"}},
+	})
+	c.PrependReactor("create", "selfsubjectreviews", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, &authenticationv1.SelfSubjectReview{Status: authenticationv1.SelfSubjectReviewStatus{
+			UserInfo: authenticationv1.UserInfo{Username: user}}}, nil
+	})
 }

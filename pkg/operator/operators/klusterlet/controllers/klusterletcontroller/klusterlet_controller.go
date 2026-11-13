@@ -2,6 +2,7 @@ package klusterletcontroller
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
@@ -532,6 +534,13 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			managedClusterClients: managedClusterClients,
 			recorder:              controllerContext.Recorder(),
 			cache:                 n.cache},
+		// Before anything agent-related: with the spiffe driver, no agent runs until the operator
+		// trusts the agent and add-on namespaces.
+		&spiffeAdmissionReconcile{
+			managedClusterClients: managedClusterClients,
+			kubeClient:            n.kubeClient,
+			spiffeWorkAgents:      n.spiffeWorkAgents,
+		},
 		&managedReconcile{
 			managedClusterClients: managedClusterClients,
 			kubeClient:            n.kubeClient,
@@ -561,7 +570,10 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	for _, reconciler := range reconcilers {
 		var state reconcileState
 		klusterlet, state, err = reconciler.reconcile(ctx, klusterlet, config)
-		if err != nil {
+		var rqe commonhelpers.RequeueError
+		if stderrors.As(err, &rqe) {
+			controllerContext.Queue().AddAfter(klusterletName, rqe.RequeueTime)
+		} else if err != nil {
 			errs = append(errs, err)
 		}
 		if state == reconcileStop {
@@ -774,4 +786,22 @@ func fillSPIFFEConfig(config *klusterletConfig, klusterlet *operatorapiv1.Kluste
 		config.SPIFFEWorkloadAPISocket = "unix:///spiffe-workload-api/spire-agent.sock"
 	}
 	return ids, nil
+}
+
+// spiffeWorkAgents maps every Klusterlet that uses the spiffe driver to its work agent's user on
+// the managed cluster, for the add-on namespace label policy.
+func (n *klusterletController) spiffeWorkAgents() (map[string]string, error) {
+	klusterlets, err := n.klusterletLister.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	for _, k := range klusterlets {
+		if k.Spec.RegistrationConfiguration == nil ||
+			k.Spec.RegistrationConfiguration.RegistrationDriver.AuthType != operatorapiv1.SPIFFEAuthType {
+			continue
+		}
+		out[k.Name] = workAgentUser(helpers.KlusterletNamespace(k), serviceAccountName("work-sa", k))
+	}
+	return out, nil
 }

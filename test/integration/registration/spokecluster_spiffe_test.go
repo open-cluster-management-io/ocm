@@ -8,9 +8,9 @@ import (
 	"path"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	corev1 "k8s.io/api/core/v1"
@@ -33,8 +33,8 @@ import (
 	hubspiffe "open-cluster-management.io/ocm/pkg/registration/hub/spiffe"
 	"open-cluster-management.io/ocm/pkg/registration/register/factory"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
-	workspoke "open-cluster-management.io/ocm/pkg/work/spoke"
 	ocmgrpcserver "open-cluster-management.io/ocm/pkg/server/grpc"
+	workspoke "open-cluster-management.io/ocm/pkg/work/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 

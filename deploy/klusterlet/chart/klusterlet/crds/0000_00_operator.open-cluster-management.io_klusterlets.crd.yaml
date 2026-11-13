@@ -49,8 +49,10 @@ spec:
                   such as the bind ports of their health probe and metrics endpoints.
                 properties:
                   bindConfiguration:
-                    description: BindConfiguration represents the server bind configuration
-                      of the klusterlet agents.
+                    description: |-
+                      BindConfiguration represents the server bind configuration of the klusterlet agents.
+                      It applies to the klusterlet-agent in Singleton mode. In Default mode, it applies to
+                      the registration and work agents that do not set their own bindConfiguration.
                     properties:
                       healthProbePort:
                         default: 8443
@@ -74,11 +76,83 @@ spec:
                         maximum: 65535
                         type: integer
                     type: object
+                  registrationAgentConfiguration:
+                    description: |-
+                      RegistrationAgentConfiguration represents the configuration of the registration agent
+                      in Default mode. It is ignored in Singleton mode.
+                    properties:
+                      bindConfiguration:
+                        description: |-
+                          BindConfiguration represents the server bind configuration of the agent.
+                          In Default mode the registration and work agents run as separate pods. When both
+                          use hostNetwork and can be scheduled on the same node, set a different
+                          healthProbePort for each of them.
+                        properties:
+                          healthProbePort:
+                            default: 8443
+                            description: |-
+                              HealthProbePort represents the bind port of the agents' health check endpoint. The default value is 8443.
+                              Agents run as non-root, so privileged ports below 1024 are not allowed.
+                            format: int32
+                            maximum: 65535
+                            minimum: 1024
+                            type: integer
+                          hostNetwork:
+                            description: HostNetwork enables running the agent pods
+                              in host networking mode.
+                            type: boolean
+                          metricsPort:
+                            default: 8080
+                            description: |-
+                              MetricsPort represents the bind port of the agents' metrics endpoint. The default value is 8080.
+                              Metrics may be disabled by setting a value less than or equal to 0.
+                            format: int32
+                            maximum: 65535
+                            type: integer
+                        type: object
+                    type: object
+                  workAgentConfiguration:
+                    description: |-
+                      WorkAgentConfiguration represents the configuration of the work agent in Default mode.
+                      It is ignored in Singleton mode.
+                    properties:
+                      bindConfiguration:
+                        description: |-
+                          BindConfiguration represents the server bind configuration of the agent.
+                          In Default mode the registration and work agents run as separate pods. When both
+                          use hostNetwork and can be scheduled on the same node, set a different
+                          healthProbePort for each of them.
+                        properties:
+                          healthProbePort:
+                            default: 8443
+                            description: |-
+                              HealthProbePort represents the bind port of the agents' health check endpoint. The default value is 8443.
+                              Agents run as non-root, so privileged ports below 1024 are not allowed.
+                            format: int32
+                            maximum: 65535
+                            minimum: 1024
+                            type: integer
+                          hostNetwork:
+                            description: HostNetwork enables running the agent pods
+                              in host networking mode.
+                            type: boolean
+                          metricsPort:
+                            default: 8080
+                            description: |-
+                              MetricsPort represents the bind port of the agents' metrics endpoint. The default value is 8080.
+                              Metrics may be disabled by setting a value less than or equal to 0.
+                            format: int32
+                            maximum: 65535
+                            type: integer
+                        type: object
+                    type: object
                 type: object
               clusterName:
                 description: |-
                   clusterName is the name of the managed cluster to be created on hub.
                   The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.
+                  It is required when registrationConfiguration.registrationDriver.authType is spiffe, because the
+                  agents' SPIFFE IDs contain it.
                 maxLength: 63
                 pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                 type: string
@@ -249,12 +323,14 @@ spec:
                       authType:
                         description: |-
                           AuthType is the authentication driver used for add-on registration.
-                          Possible values are csr and token.
+                          Possible values are csr, token and spiffe. With spiffe, each add-on agent authenticates
+                          with its own SPIRE-issued SVID and no add-on credential is created.
                           Currently, this field only affects kubeClient type add-on registration. The csr type add-on registration always uses csr driver.
                           In the future, this may be extended to customize authentication for csr type add-on registration as well.
                         enum:
                         - csr
                         - token
+                        - spiffe
                         type: string
                       token:
                         description: Token contains the configuration for token-based
@@ -414,13 +490,14 @@ spec:
                     properties:
                       authType:
                         default: csr
-                        description: Type of the authentication used by managedcluster
-                          to register as well as pull work from hub. Possible values
-                          are csr and awsirsa.
+                        description: |-
+                          Type of the authentication used by managedcluster to register as well as pull work from hub.
+                          Possible values are csr, awsirsa, grpc and spiffe.
                         enum:
                         - csr
                         - awsirsa
                         - grpc
+                        - spiffe
                         type: string
                       awsIrsa:
                         description: |-
@@ -458,10 +535,88 @@ spec:
                         - hubClusterArn
                         - managedClusterArn
                         type: object
+                      spiffe:
+                        description: |-
+                          spiffe contains what the agents need to reach the hub with their SPIRE-issued SVIDs.
+                          It is required when authType is spiffe, and nothing in it is secret.
+                          Effective only when the SPIFFERegistration feature gate is enabled.
+                        properties:
+                          addOnAgentIDTemplate:
+                            default: spiffe://{trustDomain}/ocm/cluster/{cluster}/addon/{addon}/agent/{agent}
+                            description: |-
+                              addOnAgentIDTemplate is the layout of add-on agent SPIFFE IDs on this cluster. It must
+                              equal the hub's ClusterManager addOnAgentIDTemplate. {addon} is the add-on name, {agent}
+                              the add-on agent name, and {namespace} the add-on's install namespace.
+                            maxLength: 512
+                            pattern: ^spiffe://\{trustDomain\}(/([A-Za-z0-9._-]+|\{[A-Za-z]+\}))+$
+                            type: string
+                          agentIDTemplate:
+                            default: spiffe://{trustDomain}/ocm/cluster/{cluster}/agent/{role}
+                            description: |-
+                              agentIDTemplate is the layout of this Klusterlet's agent SPIFFE IDs. It must equal the
+                              hub's ClusterManager agentIDTemplate, or the hub refuses the agents. The klusterlet
+                              operator fills it in for each agent and passes the result to the agent: {trustDomain} is
+                              trustDomain, {cluster} is clusterName, {role} is registration, work or klusterlet, and
+                              {namespace} is the namespace the agent runs in. Each placeholder fills a whole path
+                              segment.
+                            maxLength: 512
+                            pattern: ^spiffe://\{trustDomain\}(/([A-Za-z0-9._-]+|\{[A-Za-z]+\}))+$
+                            type: string
+                          hubEndpoint:
+                            description: hubEndpoint is host:port of the hub gRPC
+                              server's grpc-spiffe listener.
+                            maxLength: 512
+                            minLength: 1
+                            type: string
+                          hubSPIFFEID:
+                            description: |-
+                              hubSPIFFEID is the only SPIFFE ID the agents accept from the hub, for example
+                              spiffe://ocm-hub.example.org/ocm/hub/grpc-server. It is in the hub's trust domain.
+                            maxLength: 512
+                            pattern: ^spiffe://[a-z0-9._-]+(/[A-Za-z0-9._-]+)+$
+                            type: string
+                          trustDomain:
+                            description: |-
+                              trustDomain is the agents' own SPIFFE trust domain, for example east.example.org. The
+                              agents build their expected SPIFFE IDs in it, and the hub must list it in the
+                              ClusterManager's agentTrustDomains. If it is not set, the trust domain of hubSPIFFEID is used.
+                            maxLength: 255
+                            pattern: ^[a-z0-9._-]+$
+                            type: string
+                          workloadAPISocket:
+                            default: unix:///spiffe-workload-api/spire-agent.sock
+                            description: |-
+                              workloadAPISocket is the address of the local SPIRE agent's Workload API, as mounted
+                              into the agent pods by the SPIFFE CSI driver.
+                            type: string
+                        required:
+                        - hubEndpoint
+                        - hubSPIFFEID
+                        type: object
+                        x-kubernetes-validations:
+                        - message: agentIDTemplate must contain {cluster} and {role}
+                          rule: '!has(self.agentIDTemplate) || (self.agentIDTemplate.contains(''/{cluster}'')
+                            && self.agentIDTemplate.contains(''/{role}''))'
+                        - message: addOnAgentIDTemplate must contain {cluster}, {addon}
+                            and {agent}
+                          rule: '!has(self.addOnAgentIDTemplate) || (self.addOnAgentIDTemplate.contains(''/{cluster}'')
+                            && self.addOnAgentIDTemplate.contains(''/{addon}'') &&
+                            self.addOnAgentIDTemplate.contains(''/{agent}''))'
                     required:
                     - authType
                     type: object
+                    x-kubernetes-validations:
+                    - message: spiffe is required when authType is spiffe
+                      rule: '!has(self.authType) || self.authType != ''spiffe'' ||
+                        has(self.spiffe)'
                 type: object
+                x-kubernetes-validations:
+                - message: addOnKubeClientRegistrationDriver.authType must be spiffe
+                    when registrationDriver.authType is spiffe
+                  rule: '!has(self.registrationDriver) || !has(self.registrationDriver.authType)
+                    || self.registrationDriver.authType != ''spiffe'' || (has(self.addOnKubeClientRegistrationDriver)
+                    && has(self.addOnKubeClientRegistrationDriver.authType) && self.addOnKubeClientRegistrationDriver.authType
+                    == ''spiffe'')'
               registrationImagePullSpec:
                 description: |-
                   RegistrationImagePullSpec represents the desired image configuration of registration agent.
@@ -622,6 +777,13 @@ spec:
                   quay.io/open-cluster-management.io/work:latest will be used if unspecified.
                 type: string
             type: object
+            x-kubernetes-validations:
+            - message: clusterName is required when registrationDriver.authType is
+                spiffe
+              rule: '!has(self.registrationConfiguration) || !has(self.registrationConfiguration.registrationDriver)
+                || !has(self.registrationConfiguration.registrationDriver.authType)
+                || self.registrationConfiguration.registrationDriver.authType != ''spiffe''
+                || (has(self.clusterName) && size(self.clusterName) > 0)'
           status:
             description: Status represents the current status of Klusterlet agent.
             properties:
@@ -768,6 +930,103 @@ spec:
                   - version
                   type: object
                 type: array
+              spiffe:
+                description: |-
+                  spiffe records the state the klusterlet operator has made trusted when the
+                  registration driver is spiffe. It holds only names, UIDs and generations.
+                properties:
+                  addOnNamespace:
+                    description: |-
+                      addOnNamespace is the add-on namespace the operator created itself, recorded by name and
+                      UID so recovery only cleans that exact namespace.
+                    properties:
+                      name:
+                        description: name is the name of the namespace.
+                        maxLength: 63
+                        minLength: 1
+                        type: string
+                      uid:
+                        description: uid is the UID of the namespace.
+                        type: string
+                    required:
+                    - name
+                    - uid
+                    type: object
+                  admissionPolicies:
+                    description: |-
+                      admissionPolicies are the ValidatingAdmissionPolicies and their bindings the operator
+                      ran recovery for. When a live policy or binding no longer matches its entry, the
+                      operator runs recovery again before any agent runs.
+                    items:
+                      description: SPIFFEAdmissionPolicyStatus records one ValidatingAdmissionPolicy
+                        and its binding.
+                      properties:
+                        bindingGeneration:
+                          description: bindingGeneration is the generation of the
+                            policy binding.
+                          format: int64
+                          type: integer
+                        bindingUID:
+                          description: bindingUID is the UID of the policy binding.
+                          type: string
+                        policyGeneration:
+                          description: policyGeneration is the generation of the policy.
+                          format: int64
+                          type: integer
+                        policyName:
+                          description: policyName is the name of the ValidatingAdmissionPolicy
+                            and of its binding.
+                          maxLength: 253
+                          minLength: 1
+                          type: string
+                        policyUID:
+                          description: policyUID is the UID of the policy.
+                          type: string
+                      required:
+                      - bindingGeneration
+                      - bindingUID
+                      - policyGeneration
+                      - policyName
+                      - policyUID
+                      type: object
+                    maxItems: 16
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - policyName
+                    x-kubernetes-list-type: map
+                  agentIDs:
+                    description: |-
+                      agentIDs are the SPIFFE IDs the operator rendered for this Klusterlet's agents from
+                      agentIDTemplate, one per agent role the install mode runs. The platform's SPIRE
+                      registration entries must issue exactly these IDs.
+                    items:
+                      description: SPIFFEAgentID is the SPIFFE ID of one Klusterlet
+                        agent.
+                      properties:
+                        role:
+                          description: 'role is the agent role: registration, work
+                            or klusterlet.'
+                          enum:
+                          - registration
+                          - work
+                          - klusterlet
+                          type: string
+                        spiffeID:
+                          description: spiffeID is the SPIFFE ID the agent expects
+                            from the Workload API.
+                          maxLength: 2048
+                          minLength: 1
+                          type: string
+                      required:
+                      - role
+                      - spiffeID
+                      type: object
+                    maxItems: 3
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - role
+                    x-kubernetes-list-type: map
+                type: object
             type: object
         type: object
     served: true
