@@ -200,3 +200,5 @@ require (
 replace open-cluster-management.io/api => github.com/ssijbabu/api v1.3.1-0.20261113090800-b805cf6c07e4
 
 replace open-cluster-management.io/sdk-go => ../sdk-go
+
+replace open-cluster-management.io/addon-framework => ../addon-framework
