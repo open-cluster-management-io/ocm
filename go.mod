@@ -199,4 +199,4 @@ require (
 
 replace open-cluster-management.io/api => github.com/ssijbabu/api v1.3.1-0.20261113090800-b805cf6c07e4
 
-replace open-cluster-management.io/sdk-go => github.com/ssijbabu/sdk-go v1.4.1-0.20261113094218-7541964e891f
+replace open-cluster-management.io/sdk-go => ../sdk-go

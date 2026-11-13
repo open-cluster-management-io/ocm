@@ -10,6 +10,7 @@ import (
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"google.golang.org/grpc"
 
+	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	grpcauthz "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authz/kube"
 	sdkgrpc "open-cluster-management.io/sdk-go/pkg/server/grpc"
@@ -66,9 +67,10 @@ func (o *SPIFFEListenerOptions) AddFlags(fs *pflag.FlagSet) {
 
 // spiffeListenerConfig is the checked form of SPIFFEListenerOptions.
 type spiffeListenerConfig struct {
-	port     string
-	serverID spiffeid.ID
-	scheme   *grpcauthn.IDScheme
+	port         string
+	serverID     spiffeid.ID
+	scheme       *grpcauthn.IDScheme
+	trustDomains []string
 }
 
 // complete checks the options and fills the defaults. It fails on anything the listener could
@@ -104,14 +106,15 @@ func (o *SPIFFEListenerOptions) complete() (*spiffeListenerConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("--spiffe-listen-address %q: %w", o.ListenAddress, err)
 	}
-	return &spiffeListenerConfig{port: port, serverID: sid, scheme: scheme}, nil
+	return &spiffeListenerConfig{port: port, serverID: sid, scheme: scheme, trustDomains: trustDomains}, nil
 }
 
 // runSPIFFEListener serves the CloudEvents services on the SPIFFE listener until ctx ends. The
 // SPIFFE authenticator is the only authenticator here: tokens and OCM-signed certificates are
 // never accepted on this port.
 func (o *GRPCServerOptions) runSPIFFEListener(ctx context.Context, cfg *spiffeListenerConfig,
-	base *sdkgrpc.GRPCServerOptions, authorizer *grpcauthz.SARAuthorizer, register func(*grpc.Server)) error {
+	base *sdkgrpc.GRPCServerOptions, sar *grpcauthz.SARAuthorizer, clusters clusterlisterv1.ManagedClusterLister,
+	register func(*grpc.Server)) error {
 	src, err := ocmspiffe.NewX509Source(ctx, o.SPIFFE.WorkloadAPISocket, cfg.serverID)
 	if err != nil {
 		return fmt.Errorf("SPIFFE listener: %w", err)
@@ -121,6 +124,7 @@ func (o *GRPCServerOptions) runSPIFFEListener(ctx context.Context, cfg *spiffeLi
 	// Same limits and keepalive as the grpc listener; the transport credentials replace its TLS.
 	opts := *base
 	opts.ServerBindPort = cfg.port
+	authorizer := &pinningAuthorizer{next: sar, clusters: clusters, trustDomains: cfg.trustDomains}
 	return sdkgrpc.NewGRPCServer(&opts).
 		WithTransportCredentials(spiffeserver.NewServerCredentials(src, cfg.scheme, o.registry)).
 		WithAuthenticator(grpcauthn.NewSPIFFEAuthenticator(cfg.scheme)).

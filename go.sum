@@ -378,8 +378,6 @@ github.com/spiffe/go-spiffe/v2 v2.9.0 h1:g5qTg3qIP1HXV+GzuyEfSJFVxUCpEP5Ui1OINVJ
 github.com/spiffe/go-spiffe/v2 v2.9.0/go.mod h1:w2CLWKLMTX/PPYUEUPv3ltH0RXsw5S8suwNF46w9/Aw=
 github.com/ssijbabu/api v1.3.1-0.20261113090800-b805cf6c07e4 h1:Fs5rIgwCX6Jf6VvxgZfHOMrn43skeA8I8/KZ7ZdP5Z0=
 github.com/ssijbabu/api v1.3.1-0.20261113090800-b805cf6c07e4/go.mod h1:lC7baTvbwwSJDt/XtjS9xoEViQzkrIG69zUUFmyEL80=
-github.com/ssijbabu/sdk-go v1.4.1-0.20261113094218-7541964e891f h1:Du07tZeKjJxhYnmZ0KZVnFQC88ZiJJbHbE5TU7zwl5o=
-github.com/ssijbabu/sdk-go v1.4.1-0.20261113094218-7541964e891f/go.mod h1:wlrUj0Wayr0UHtVdUYv1orxvDk7/0vzdX07SRUcgPpM=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=

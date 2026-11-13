@@ -189,7 +189,13 @@ func (s *SARAuthorizer) AuthorizeStream(ctx context.Context, ss grpc.ServerStrea
 }
 
 func (s *SARAuthorizer) authorize(ctx context.Context, cluster string, eventsType types.CloudEventsType, metaObj metav1.ObjectMeta) (authz.Decision, error) {
-	if eventsType.CloudEventsDataType == csr.CSREventDataType {
+	if id, ok := authn.OCMIdentityFromContext(ctx); ok {
+		// The caller authenticated with a SPIRE-issued SVID: check what the SVID itself allows
+		// before the SubjectAccessReview.
+		if err := authorizeSPIFFE(id, cluster, eventsType, metaObj); err != nil {
+			return authz.DecisionDeny, err
+		}
+	} else if eventsType.CloudEventsDataType == csr.CSREventDataType {
 		if err := authn.ValidateClusterIdentity(ctx, cluster); err != nil {
 			return authz.DecisionDeny, err
 		}
@@ -214,6 +220,28 @@ func (s *SARAuthorizer) authorize(ctx context.Context, cluster string, eventsTyp
 			eventsType, cluster, sar.Spec, created.Status)
 	}
 	return authz.DecisionAllow, nil
+}
+
+// authorizeSPIFFE applies the checks that come from an agent's SVID. An agent may act only on the
+// cluster in its SVID, an add-on agent only on its own add-on, and nobody may request a
+// certificate or a token on the SPIFFE listener: SPIRE is the only identity issuer there.
+func authorizeSPIFFE(id authn.OCMIdentity, cluster string, t types.CloudEventsType, meta metav1.ObjectMeta) error {
+	switch t.CloudEventsDataType {
+	case csr.CSREventDataType, serviceaccount.TokenRequestDataType:
+		return fmt.Errorf("%s is not served on the SPIFFE listener", t.CloudEventsDataType)
+	}
+	if id.ClusterName != cluster {
+		return fmt.Errorf("%s may not act on cluster %q", id.User, cluster)
+	}
+	if id.IsAddOn() {
+		switch t.CloudEventsDataType {
+		case v1alpha1.ManagedClusterAddOnEventDataType, v1beta1.ManagedClusterAddOnEventDataType:
+			if meta.Name != "" && meta.Name != id.AddOnName {
+				return fmt.Errorf("%s may not act on add-on %q", id.User, meta.Name)
+			}
+		}
+	}
+	return nil
 }
 
 func userInfo(ctx context.Context) (user string, groups []string, err error) {

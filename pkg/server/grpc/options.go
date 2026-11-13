@@ -149,7 +149,8 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 	}
 	if o.SPIFFE.Enabled {
 		g.Go(func() error {
-			return o.runSPIFFEListener(ctx, spiffeCfg, serverOptions, authorizer, register)
+			return o.runSPIFFEListener(ctx, spiffeCfg, serverOptions, authorizer,
+				clients.ClusterInformers.Cluster().V1().ManagedClusters().Lister(), register)
 		})
 	}
 	return g.Wait()

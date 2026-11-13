@@ -19,6 +19,7 @@ import (
 	clusterce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
+	grpcauthn "open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 
 	"open-cluster-management.io/ocm/pkg/server/services"
 )
@@ -81,6 +82,7 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 			return fmt.Errorf("unsupported subresource %s for cluster %s", eventType.SubResource, cluster.Name)
 		}
 		delete(cluster.Labels, clusterv1beta2.ClusterSetLabel)
+		pinTrustDomain(ctx, cluster)
 		_, err := c.clusterClient.ClusterV1().ManagedClusters().Create(ctx, cluster, metav1.CreateOptions{})
 		return err
 	case types.UpdateRequestAction:
@@ -101,6 +103,16 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 			cluster.Labels[clusterv1beta2.ClusterSetLabel] = clusterSet
 		} else {
 			delete(cluster.Labels, clusterv1beta2.ClusterSetLabel)
+		}
+		// Agents may not change the trust domain the cluster is pinned to; only hub users with
+		// update access to ManagedClusters can.
+		if pinned, ok := current.Annotations[clusterv1.SPIFFETrustDomainAnnotationKey]; ok {
+			if cluster.Annotations == nil {
+				cluster.Annotations = map[string]string{}
+			}
+			cluster.Annotations[clusterv1.SPIFFETrustDomainAnnotationKey] = pinned
+		} else {
+			delete(cluster.Annotations, clusterv1.SPIFFETrustDomainAnnotationKey)
 		}
 
 		_, err = c.clusterClient.ClusterV1().ManagedClusters().Update(ctx, cluster, metav1.UpdateOptions{})
@@ -165,4 +177,19 @@ func (c *ClusterService) EventHandlerFuncs(ctx context.Context, handler server.E
 			}
 		},
 	}
+}
+
+// pinTrustDomain sets the trust domain annotation of a cluster an agent creates. With a SPIFFE
+// agent, it is the trust domain of the agent's SVID, whatever the request says; any other agent
+// may not set it.
+func pinTrustDomain(ctx context.Context, cluster *clusterv1.ManagedCluster) {
+	delete(cluster.Annotations, clusterv1.SPIFFETrustDomainAnnotationKey)
+	id, ok := grpcauthn.OCMIdentityFromContext(ctx)
+	if !ok {
+		return
+	}
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+	cluster.Annotations[clusterv1.SPIFFETrustDomainAnnotationKey] = id.TrustDomain
 }
