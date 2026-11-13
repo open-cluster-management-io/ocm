@@ -1,0 +1,13 @@
+# The hub gRPC server's SPIFFE ID, on the hub.
+apiVersion: spire.spiffe.io/v1alpha1
+kind: ClusterSPIFFEID
+metadata:
+  name: ocm-hub-grpc-server
+spec:
+  className: spire-server-spire
+  spiffeIDTemplate: "spiffe://{{ .TrustDomain }}/ocm/hub/grpc-server"
+  namespaceSelector:
+    matchLabels: {kubernetes.io/metadata.name: open-cluster-management-hub}
+  podSelector:
+    matchLabels: {app: cluster-manager-grpc-server}
+  workloadSelectorTemplates: ["k8s:sa:grpc-server-sa"]

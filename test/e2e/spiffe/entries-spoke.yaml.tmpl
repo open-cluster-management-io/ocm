@@ -1,0 +1,42 @@
+# The agents of cluster ${CLUSTER} (Default mode), on the managed cluster. Apply only after the
+# Klusterlet reports SPIFFEAdmissionReady: before that, anyone who can create a pod with these
+# labels and ServiceAccounts in the agent namespace could get the agents' SVIDs.
+apiVersion: spire.spiffe.io/v1alpha1
+kind: ClusterSPIFFEID
+metadata:
+  name: ocm-${CLUSTER}-registration
+spec:
+  className: spire-server-spire
+  spiffeIDTemplate: "spiffe://{{ .TrustDomain }}/ocm/cluster/${CLUSTER}/agent/registration"
+  namespaceSelector:
+    matchLabels: {kubernetes.io/metadata.name: ${AGENT_NAMESPACE}}
+  podSelector:
+    matchLabels: {open-cluster-management.io/spiffe-role: registration}
+  workloadSelectorTemplates: ["k8s:sa:${KLUSTERLET}-registration-sa"]
+---
+apiVersion: spire.spiffe.io/v1alpha1
+kind: ClusterSPIFFEID
+metadata:
+  name: ocm-${CLUSTER}-work
+spec:
+  className: spire-server-spire
+  spiffeIDTemplate: "spiffe://{{ .TrustDomain }}/ocm/cluster/${CLUSTER}/agent/work"
+  namespaceSelector:
+    matchLabels: {kubernetes.io/metadata.name: ${AGENT_NAMESPACE}}
+  podSelector:
+    matchLabels: {open-cluster-management.io/spiffe-role: work}
+  workloadSelectorTemplates: ["k8s:sa:${KLUSTERLET}-work-sa"]
+---
+# Singleton modes: one agent with the klusterlet role and the work ServiceAccount.
+apiVersion: spire.spiffe.io/v1alpha1
+kind: ClusterSPIFFEID
+metadata:
+  name: ocm-${CLUSTER}-klusterlet
+spec:
+  className: spire-server-spire
+  spiffeIDTemplate: "spiffe://{{ .TrustDomain }}/ocm/cluster/${CLUSTER}/agent/klusterlet"
+  namespaceSelector:
+    matchLabels: {kubernetes.io/metadata.name: ${AGENT_NAMESPACE}}
+  podSelector:
+    matchLabels: {open-cluster-management.io/spiffe-role: klusterlet}
+  workloadSelectorTemplates: ["k8s:sa:${KLUSTERLET}-work-sa"]

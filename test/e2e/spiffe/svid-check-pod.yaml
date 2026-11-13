@@ -1,0 +1,26 @@
+# A throwaway pod that looks like a work agent of cluster1 to SPIRE: it fetches its X.509-SVIDs
+# from the Workload API and prints them.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: svid-check
+  namespace: open-cluster-management-agent
+  labels:
+    open-cluster-management.io/spiffe-role: work
+spec:
+  serviceAccountName: klusterlet-work-sa
+  restartPolicy: OnFailure  # retry until the entry for this pod exists
+  containers:
+  - name: check
+    image: ghcr.io/spiffe/spire-agent:1.15.5
+    command: ["/opt/spire/bin/spire-agent"]
+    args: ["api", "fetch", "x509", "-socketPath", "/spiffe-workload-api/spire-agent.sock"]
+    volumeMounts:
+    - name: spiffe-workload-api
+      mountPath: /spiffe-workload-api
+      readOnly: true
+  volumes:
+  - name: spiffe-workload-api
+    csi:
+      driver: csi.spiffe.io
+      readOnly: true

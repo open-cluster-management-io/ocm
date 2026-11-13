@@ -1,0 +1,29 @@
+# SPIRE on the e2e hub: the only SPIRE server. Spoke agents attest to it with k8s_psat, the
+# server validates their tokens with the spoke's API (kubeConfigs, set by setup.sh), and an
+# external controller manager per spoke turns the spoke's ClusterSPIFFEIDs into entries here.
+spire-server:
+  service:
+    type: NodePort
+  caKeyType: rsa-2048
+  jwtKeyType: rsa-2048
+  controllerManager:
+    enabled: true
+    className: spire-server-spire
+  externalControllerManagers:
+    enabled: true
+    defaults:
+      className: spire-server-spire
+  nodeAttestor:
+    externalK8sPSAT:
+      enabled: true
+      defaults:
+        serviceAccountAllowList: ["spire-server:spire-agent"]
+  bundlePublisher:
+    externalK8sConfigMap:
+      enabled: true
+      defaults:
+        namespace: spire-server
+        configMapName: spire-bundle
+        configMapKey: bundle.spiffe
+spiffe-oidc-discovery-provider:
+  enabled: false
