@@ -206,7 +206,7 @@ var _ = Describe("Placement", Label("placement", "sanity-check"), func() {
 
 	assertCreatingClusters := func(ctx context.Context, clusterSetName string, num int) {
 		By(fmt.Sprintf("Create %d clusters", num))
-		for i := 0; i < num; i++ {
+		for range num {
 			labels := map[string]string{
 				e2eTestLabel: e2eTestLabelValue,
 			}

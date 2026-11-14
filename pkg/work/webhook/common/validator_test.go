@@ -12,7 +12,7 @@ import (
 
 func newManifest(size int) workv1.Manifest {
 	data := ""
-	for i := 0; i < size; i++ {
+	for range size {
 		data += "a"
 	}
 

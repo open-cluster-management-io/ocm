@@ -12,7 +12,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/utils/ptr"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -132,21 +131,21 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](2),
+							Integer: new(int64(2)),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](3),
+							Integer: new(int64(3)),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](2),
+							Integer: new(int64(2)),
 						},
 					},
 				}
@@ -194,21 +193,21 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](3),
+							Integer: new(int64(3)),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](3),
+							Integer: new(int64(3)),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](3),
+							Integer: new(int64(3)),
 						},
 					},
 				}
@@ -294,7 +293,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 						Name: "Available",
 						Value: workapiv1.FieldValue{
 							Type:   workapiv1.String,
-							String: ptr.To[string]("True"),
+							String: new("True"),
 						},
 					},
 				}
@@ -384,21 +383,21 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](2),
+							Integer: new(int64(2)),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](3),
+							Integer: new(int64(3)),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](2),
+							Integer: new(int64(2)),
 						},
 					},
 				}
@@ -541,7 +540,7 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 						Name: "conditions",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.JsonRaw,
-							JsonRaw: ptr.To[string](`[{"lastTransitionTime":null,"lastUpdateTime":null,"status":"True","type":"Available"}]`),
+							JsonRaw: new(`[{"lastTransitionTime":null,"lastUpdateTime":null,"status":"True","type":"Available"}]`),
 						},
 					},
 				}
@@ -643,21 +642,21 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 						Name: "NumberReady",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](2),
+							Integer: new(int64(2)),
 						},
 					},
 					{
 						Name: "DesiredNumberScheduled",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](3),
+							Integer: new(int64(3)),
 						},
 					},
 					{
 						Name: "NumberAvailable",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](2),
+							Integer: new(int64(2)),
 						},
 					},
 				}
@@ -710,21 +709,21 @@ var _ = Describe("ManifestWork Status Feedback", func() {
 						Name: "NumberReady",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](3),
+							Integer: new(int64(3)),
 						},
 					},
 					{
 						Name: "DesiredNumberScheduled",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](3),
+							Integer: new(int64(3)),
 						},
 					},
 					{
 						Name: "NumberAvailable",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: ptr.To[int64](3),
+							Integer: new(int64(3)),
 						},
 					},
 				}

@@ -323,7 +323,7 @@ func TestStatusReconcileNewGeneration(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			for i := 0; i < tt.oldWorkCount; i++ {
+			for i := range tt.oldWorkCount {
 				mw := buildManifestWork(mwrSet, mwrSet.Name, fmt.Sprintf("old-cls-%d", i), placementName)
 				mw.Spec = helpertest.CreateTestManifestWorkSpecWithSecret("v2", "kindtest", "ns-test", "name-test")
 				if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {

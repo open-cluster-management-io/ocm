@@ -12,7 +12,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	clientcmdapiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
-	"k8s.io/utils/ptr"
 
 	v1 "open-cluster-management.io/api/cluster/v1"
 	sdkhelpers "open-cluster-management.io/sdk-go/pkg/helpers"
@@ -33,7 +32,7 @@ func RenderBootstrapHubKubeConfig(
 			CreateToken(ctx, bootstrapSAName, &authv1.TokenRequest{
 				Spec: authv1.TokenRequestSpec{
 					// token expired in 24 hours
-					ExpirationSeconds: ptr.To[int64](24 * 3600),
+					ExpirationSeconds: new(int64(24 * 3600)),
 				},
 			}, metav1.CreateOptions{})
 		if err != nil {

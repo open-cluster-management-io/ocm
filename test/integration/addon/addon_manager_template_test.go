@@ -56,7 +56,7 @@ var _ = Describe("Template deploy Beta", func() {
 		decoder := serializer.NewCodecFactory(s).UniversalDeserializer()
 
 		// prepare cluster
-		for i := 0; i < numberOfClusters; i++ {
+		for i := range numberOfClusters {
 			managedClusterName := fmt.Sprintf("managedcluster-%s-%d", suffix, i)
 			clusterNames = append(clusterNames, managedClusterName)
 			err = createManagedCluster(ctx, hubClusterClient, managedClusterName)
@@ -166,7 +166,7 @@ var _ = Describe("Template deploy Beta", func() {
 	It("Should deploy agent for addon template", func(ctx SpecContext) {
 		By("check mca created")
 		Eventually(func() error {
-			for i := 0; i < numberOfClusters; i++ {
+			for i := range numberOfClusters {
 				_, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(clusterNames[i]).Get(ctx, addonName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -176,7 +176,7 @@ var _ = Describe("Template deploy Beta", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		By("check no work rendered")
-		for i := 0; i < numberOfClusters; i++ {
+		for i := range numberOfClusters {
 			checkWorkRendered(ctx, clusterNames[i], 0)
 		}
 

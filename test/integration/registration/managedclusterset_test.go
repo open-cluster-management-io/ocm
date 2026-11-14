@@ -17,7 +17,7 @@ import (
 
 var _ = Describe("ManagedClusterSet", func() {
 	It("should create empty cluster set and keep it synced successfully", func(ctx SpecContext) {
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			suffix := rand.String(6)
 			By("Create a ManagedClusterSet")
 			managedClusterSetName := fmt.Sprintf("cs1-%s", suffix)

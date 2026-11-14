@@ -192,7 +192,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"),
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("Create %d clusters", numOfClusters))
-			for i := 0; i < numOfClusters; i++ {
+			for i := range numOfClusters {
 				clsName := fmt.Sprintf("%s-%d", clusterNamePrefix, i)
 				cluster := &clusterapiv1.ManagedCluster{
 					ObjectMeta: metav1.ObjectMeta{

@@ -241,7 +241,7 @@ func getClusterGroups(clusters []string, clsPerDecisionGroup int) [][]string {
 		decisionGroupCount++
 	}
 
-	for i := 0; i < decisionGroupCount; i++ {
+	for i := range decisionGroupCount {
 		idx := i * clsPerDecisionGroup
 		idxLast := idx + clsPerDecisionGroup
 		if idxLast > len(clusters) {
