@@ -193,10 +193,54 @@ func WithSPIFFE(agentAddon AgentAddon) AgentAddon {
 func (a *spiffeAgentAddon) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	objects, err := a.AgentAddon.Manifests(ctx, cluster, addon)
-	if err != nil || !UsesSPIFFE(addon) {
+	if err != nil {
 		return objects, err
 	}
-	return ApplySPIFFE(objects, cluster, addon.Name)
+	if UsesSPIFFE(addon) {
+		return ApplySPIFFE(objects, cluster, addon.Name)
+	}
+	waiting, err := a.awaitingDriver(ctx, cluster, addon)
+	if err != nil {
+		return nil, err
+	}
+	if waiting {
+		return nil, fmt.Errorf("waiting for the registration agent of cluster %s to report the driver of add-on %s",
+			cluster.Name, addon.Name)
+	}
+	return objects, nil
+}
+
+// awaitingDriver reports whether the add-on's manifests must wait. On a cluster whose Klusterlet
+// uses spiffe (its registration agent reports the Klusterlet's name in KlusterletNameAnnotation),
+// an add-on with a kubeClient registration is rendered only once the registration agent has
+// reported that registration's driver. Rendered before, it would mount a hub kubeconfig Secret
+// that is never created, and its namespace would be created without the dedicated add-on label,
+// which the admission policy allows only when a namespace is created.
+func (a *spiffeAgentAddon) awaitingDriver(ctx context.Context, cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1beta1.ManagedClusterAddOn) (bool, error) {
+	if cluster == nil || cluster.Annotations[KlusterletNameAnnotation] == "" {
+		return false, nil
+	}
+	for _, reg := range addon.Status.Registrations {
+		if reg.Type == addonapiv1beta1.KubeClient {
+			return reg.KubeClient == nil || reg.KubeClient.Driver == "", nil
+		}
+	}
+	// No kubeClient registration in the status yet: wait if the add-on will have one.
+	registration := a.GetAgentAddonOptions().Registration
+	if registration == nil || registration.Configurations == nil {
+		return false, nil
+	}
+	configs, err := registration.Configurations(ctx, cluster, addon)
+	if err != nil {
+		return false, err
+	}
+	for _, c := range configs {
+		if c.RegistrationAPI().Type == addonapiv1beta1.KubeClient {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // SubjectCarriedBySVID reports whether the add-on's kubeClient subject is one an add-on agent's
