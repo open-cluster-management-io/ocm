@@ -119,7 +119,16 @@ func TestClusterGate(t *testing.T) {
 		{"unpinned, one trust domain", agent("legacy", "ocm-hub.example.org"), []string{"ocm-hub.example.org"}, ""},
 		{"unpinned, several trust domains", agent("legacy", "ocm-hub.example.org"), several, "is not pinned to a trust domain"},
 		{"no SPIFFE identity", context.Background(), several, "no SPIFFE identity"},
-		{"cluster being deleted", agent("deleting", "ocm-hub.example.org"), several, "cluster deleting is being deleted"},
+		{"cluster being deleted: work agent may clean up", agent("deleting", "ocm-hub.example.org"), several, ""},
+		{"cluster being deleted: singleton agent may clean up",
+			registration("deleting", "ocm-hub.example.org", grpcauthn.RoleKlusterlet), several, ""},
+		{"cluster being deleted: registration agent",
+			registration("deleting", "ocm-hub.example.org", grpcauthn.RoleRegistration), several,
+			"cluster deleting is being deleted"},
+		{"cluster being deleted: add-on agent", addon("deleting", "ocm-hub.example.org"), several,
+			"cluster deleting is being deleted"},
+		{"cluster being deleted: work agent from another trust domain", agent("deleting", "east.example.org"), several,
+			"is pinned to trust domain"},
 		{"add-on not enabled", addonNamed("cluster2", "east.example.org", "other-addon"), several,
 			"add-on other-addon is not enabled on cluster cluster2"},
 		{"denied cluster: work agent", agent("denied", "ocm-hub.example.org"), several, "cluster denied is not accepted by the hub"},
@@ -155,13 +164,20 @@ func TestClusterGate(t *testing.T) {
 	}
 }
 
-// TestClusterGateDataType checks the SAR authorizer's SPIFFE check: a denied cluster may only
-// watch and update its ManagedCluster, lease and events, whatever the role, so a singleton agent
-// gets no work either.
+// TestClusterGateDataType checks the SAR authorizer's SPIFFE check, whatever the role: a denied
+// cluster may only watch and update its ManagedCluster, lease and events, so a singleton agent gets
+// no work either; a cluster being deleted may only use ManifestWorks, to clean up.
 func TestClusterGateDataType(t *testing.T) {
 	denied := pinnedCluster("denied", "ocm-hub.example.org")
 	denied.Spec.HubAcceptsClient = false
-	a := &clusterGate{clusters: clusterLister(t, denied, pinnedCluster("cluster1", "ocm-hub.example.org"))}
+	now := metav1.Now()
+	deleting := pinnedCluster("deleting", "ocm-hub.example.org")
+	deleting.DeletionTimestamp = &now
+	deniedDeleting := pinnedCluster("denied-deleting", "ocm-hub.example.org")
+	deniedDeleting.Spec.HubAcceptsClient = false
+	deniedDeleting.DeletionTimestamp = &now
+	a := &clusterGate{clusters: clusterLister(t, denied, deleting, deniedDeleting,
+		pinnedCluster("cluster1", "ocm-hub.example.org"))}
 	of := func(dt types.CloudEventsDataType) types.CloudEventsType {
 		return types.CloudEventsType{CloudEventsDataType: dt, SubResource: types.SubResourceSpec,
 			Action: types.WatchRequestAction}
@@ -190,6 +206,19 @@ func TestClusterGateDataType(t *testing.T) {
 		{"accepted: singleton agent watches work", grpcauthn.RoleKlusterlet, "cluster1",
 			of(payload.ManifestBundleEventDataType), ""},
 		{"not created yet", grpcauthn.RoleKlusterlet, "cluster9", of(payload.ManifestBundleEventDataType), ""},
+		{"deleting: work agent watches work", grpcauthn.RoleWork, "deleting",
+			of(payload.ManifestBundleEventDataType), ""},
+		{"deleting: singleton agent releases a work finalizer", grpcauthn.RoleKlusterlet, "deleting",
+			types.CloudEventsType{CloudEventsDataType: payload.ManifestBundleEventDataType,
+				SubResource: types.SubResourceStatus, Action: types.UpdateRequestAction}, ""},
+		{"deleting: singleton agent updates its ManagedCluster", grpcauthn.RoleKlusterlet, "deleting",
+			of(cluster.ManagedClusterEventDataType), "cluster deleting is being deleted: only ManifestWork cleanup is allowed"},
+		{"deleting: lease", grpcauthn.RoleKlusterlet, "deleting", of(lease.LeaseEventDataType),
+			"only ManifestWork cleanup is allowed"},
+		{"deleting: add-ons", grpcauthn.RoleKlusterlet, "deleting", of(addonce.ManagedClusterAddOnEventDataType),
+			"only ManifestWork cleanup is allowed"},
+		{"denied and deleting: work agent cleans up", grpcauthn.RoleWork, "denied-deleting",
+			of(payload.ManifestBundleEventDataType), ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
