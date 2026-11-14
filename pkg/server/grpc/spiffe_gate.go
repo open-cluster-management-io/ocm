@@ -10,6 +10,10 @@ import (
 	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	grpcauthn "open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 	"open-cluster-management.io/sdk-go/pkg/server/grpc/authz"
 )
@@ -31,8 +35,12 @@ type authorizer interface {
 //   - the work agent and the add-on agents of a cluster that isn't accepted (hubAcceptsClient
 //     false). The hub keeps the cluster's work RoleBinding when it is denied, so RBAC alone
 //     would let them reconnect. The registration agent (and the singleton agent, which is also
-//     the registration agent) is left to its RBAC: it keeps its pre-acceptance access, to learn
-//     when the cluster is accepted again.
+//     the registration agent) is let in, to learn when the cluster is accepted again.
+//
+// The gate runs before the request is parsed, so it can only decide by the SVID. checkDataType
+// runs inside the SAR authorizer, once the data type is known, and refuses work and add-on
+// requests of a denied cluster whatever the role. That is what keeps work from the singleton
+// agent of a denied cluster, whose one SVID is also the registration agent's.
 type clusterGate struct {
 	next         authorizer
 	clusters     clusterlisterv1.ManagedClusterLister
@@ -91,6 +99,37 @@ func (a *clusterGate) check(ctx context.Context) error {
 	}
 	if pinned != id.TrustDomain {
 		return fmt.Errorf("cluster %q is pinned to trust domain %q, not %q", id.ClusterName, pinned, id.TrustDomain)
+	}
+	return nil
+}
+
+// deniedClusterDataTypes are what an agent of a cluster that isn't accepted may still send or
+// watch: its own ManagedCluster, to learn when it is accepted again, and the lease and events the
+// registration agent keeps sending. Everything else, work and add-ons above all, is refused.
+var deniedClusterDataTypes = map[types.CloudEventsDataType]bool{
+	cluster.ManagedClusterEventDataType: true,
+	lease.LeaseEventDataType:            true,
+	event.EventEventDataType:            true,
+}
+
+// checkDataType is the SAR authorizer's SPIFFE check: it refuses the requests of a denied cluster
+// that are not in deniedClusterDataTypes, for every agent role. The SAR authorizer has already
+// made sure the request is about the cluster in the SVID.
+func (a *clusterGate) checkDataType(id grpcauthn.OCMIdentity, clusterName string, t types.CloudEventsType) error {
+	if deniedClusterDataTypes[t.CloudEventsDataType] {
+		return nil
+	}
+	mc, err := a.clusters.Get(clusterName)
+	if apierrors.IsNotFound(err) {
+		// Not created yet: RBAC allows nothing but creating it.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !mc.Spec.HubAcceptsClient {
+		return fmt.Errorf("cluster %s is not accepted by the hub: %s from %s is refused",
+			clusterName, t.CloudEventsDataType, id.User)
 	}
 	return nil
 }

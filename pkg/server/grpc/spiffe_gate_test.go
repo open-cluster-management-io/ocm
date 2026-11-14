@@ -13,6 +13,12 @@ import (
 	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	grpcauthn "open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 	"open-cluster-management.io/sdk-go/pkg/server/grpc/authz"
 )
@@ -145,6 +151,55 @@ func TestClusterGate(t *testing.T) {
 			require.Equal(t, authz.DecisionAllow, decision)
 			require.Equal(t, authz.DecisionAllow, streamDecision)
 			require.Equal(t, 2, next.calls)
+		})
+	}
+}
+
+// TestClusterGateDataType checks the SAR authorizer's SPIFFE check: a denied cluster may only
+// watch and update its ManagedCluster, lease and events, whatever the role, so a singleton agent
+// gets no work either.
+func TestClusterGateDataType(t *testing.T) {
+	denied := pinnedCluster("denied", "ocm-hub.example.org")
+	denied.Spec.HubAcceptsClient = false
+	a := &clusterGate{clusters: clusterLister(t, denied, pinnedCluster("cluster1", "ocm-hub.example.org"))}
+	of := func(dt types.CloudEventsDataType) types.CloudEventsType {
+		return types.CloudEventsType{CloudEventsDataType: dt, SubResource: types.SubResourceSpec,
+			Action: types.WatchRequestAction}
+	}
+	cases := []struct {
+		name    string
+		role    grpcauthn.AgentRole
+		cluster string
+		t       types.CloudEventsType
+		wantErr string
+	}{
+		{"denied: singleton agent watches work", grpcauthn.RoleKlusterlet, "denied",
+			of(payload.ManifestBundleEventDataType), "cluster denied is not accepted by the hub"},
+		{"denied: singleton agent updates work status", grpcauthn.RoleKlusterlet, "denied",
+			types.CloudEventsType{CloudEventsDataType: payload.ManifestBundleEventDataType,
+				SubResource: types.SubResourceStatus, Action: types.UpdateRequestAction},
+			"is not accepted by the hub"},
+		{"denied: singleton agent watches add-ons", grpcauthn.RoleKlusterlet, "denied",
+			of(addonce.ManagedClusterAddOnEventDataType), "is not accepted by the hub"},
+		{"denied: registration agent watches add-ons", grpcauthn.RoleRegistration, "denied",
+			of(addonce.ManagedClusterAddOnEventDataType), "is not accepted by the hub"},
+		{"denied: singleton agent watches its ManagedCluster", grpcauthn.RoleKlusterlet, "denied",
+			of(cluster.ManagedClusterEventDataType), ""},
+		{"denied: lease", grpcauthn.RoleKlusterlet, "denied", of(lease.LeaseEventDataType), ""},
+		{"denied: events", grpcauthn.RoleRegistration, "denied", of(event.EventEventDataType), ""},
+		{"accepted: singleton agent watches work", grpcauthn.RoleKlusterlet, "cluster1",
+			of(payload.ManifestBundleEventDataType), ""},
+		{"not created yet", grpcauthn.RoleKlusterlet, "cluster9", of(payload.ManifestBundleEventDataType), ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			id := grpcauthn.OCMIdentity{ClusterName: c.cluster, TrustDomain: "ocm-hub.example.org", Role: c.role}
+			err := a.checkDataType(id, c.cluster, c.t)
+			if c.wantErr != "" {
+				require.ErrorContains(t, err, c.wantErr)
+				return
+			}
+			require.NoError(t, err)
 		})
 	}
 }

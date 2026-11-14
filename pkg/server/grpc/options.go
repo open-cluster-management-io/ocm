@@ -151,6 +151,7 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 	// resources on either; the authorizer is shared too.
 	authorizer := grpcauthz.NewSARAuthorizer(clients.KubeClient)
 	if spiffeGate != nil {
+		authorizer.WithSPIFFECheck(spiffeGate.checkDataType)
 		spiffeGate.next = authorizer
 	}
 	register := func(s *grpc.Server) {

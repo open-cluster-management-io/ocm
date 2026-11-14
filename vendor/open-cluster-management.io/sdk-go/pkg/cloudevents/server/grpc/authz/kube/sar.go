@@ -35,8 +35,15 @@ import (
 )
 
 type SARAuthorizer struct {
-	kubeClient kubernetes.Interface
+	kubeClient  kubernetes.Interface
+	spiffeCheck SPIFFECheck
 }
+
+// SPIFFECheck is an extra check for a request from an agent that authenticated with an SVID. It
+// runs after the checks of the SVID itself and before the SubjectAccessReview, and gets the data
+// type of the request, which a gRPC authorizer that runs before this one can't see. An error
+// denies the request.
+type SPIFFECheck func(id authn.OCMIdentity, cluster string, t types.CloudEventsType) error
 
 // validate SARAuthorizer implement StreamAuthorizer and UnaryAuthorizer
 var _ authz.StreamAuthorizer = (*SARAuthorizer)(nil)
@@ -70,6 +77,13 @@ func NewSARAuthorizer(kubeClient kubernetes.Interface) *SARAuthorizer {
 	return &SARAuthorizer{
 		kubeClient: kubeClient,
 	}
+}
+
+// WithSPIFFECheck adds a check for requests from agents with an SVID. Requests without an SVID
+// are not passed to it.
+func (s *SARAuthorizer) WithSPIFFECheck(check SPIFFECheck) *SARAuthorizer {
+	s.spiffeCheck = check
+	return s
 }
 
 func (s *SARAuthorizer) AuthorizeRequest(ctx context.Context, req any) (authz.Decision, context.Context, error) {
@@ -194,6 +208,11 @@ func (s *SARAuthorizer) authorize(ctx context.Context, cluster string, eventsTyp
 		// before the SubjectAccessReview.
 		if err := authorizeSPIFFE(id, cluster, eventsType, metaObj); err != nil {
 			return authz.DecisionDeny, err
+		}
+		if s.spiffeCheck != nil {
+			if err := s.spiffeCheck(id, cluster, eventsType); err != nil {
+				return authz.DecisionDeny, err
+			}
 		}
 	} else if eventsType.CloudEventsDataType == csr.CSREventDataType {
 		if err := authn.ValidateClusterIdentity(ctx, cluster); err != nil {
