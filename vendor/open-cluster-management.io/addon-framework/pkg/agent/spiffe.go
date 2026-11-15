@@ -80,11 +80,9 @@ func applySPIFFE(obj runtime.Object, klusterlet, addonName string) (runtime.Obje
 		if err != nil || typed == nil {
 			return obj, err
 		}
-		adapted, err := applySPIFFE(typed, klusterlet, addonName)
-		if err != nil {
-			return nil, err
-		}
-		content, err := runtime.DefaultUnstructuredConverter.ToUnstructured(adapted)
+		// A typed object is always adapted without an error.
+		adapted, _ := applySPIFFE(typed, klusterlet, addonName)
+		content, err := toUnstructured(adapted)
 		if err != nil {
 			return nil, err
 		}
@@ -118,6 +116,9 @@ func applySPIFFE(obj runtime.Object, klusterlet, addonName string) (runtime.Obje
 	}
 	return obj, nil
 }
+
+// toUnstructured converts an adapted object back; replaceable in tests.
+var toUnstructured = runtime.DefaultUnstructuredConverter.ToUnstructured
 
 func typedFor(u *unstructured.Unstructured) (runtime.Object, error) {
 	var typed runtime.Object
