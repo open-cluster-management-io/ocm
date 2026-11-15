@@ -34,14 +34,6 @@ func renderSPIFFEKlusterlet(t *testing.T, name string, mode operatorapiv1.Instal
 	spiffe *operatorapiv1.KlusterletSPIFFEConfig) spiffeKlusterletRendering {
 	t.Helper()
 	klusterlet := newKlusterlet(name, "open-cluster-management-agent", "cluster1")
-	if helpers.IsHosted(mode) {
-		klusterlet = newKlusterletHosted(name, "open-cluster-management-agent", "cluster4")
-		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-			Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
-			Message: "Klusterlet is ready to apply, the external managed kubeconfig secret was created at: " +
-				hostedKubeconfigCreationTime,
-		})
-	}
 	klusterlet.Spec.DeployOption.Mode = mode
 	klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = operatorapiv1.RegistrationDriver{
 		AuthType: operatorapiv1.SPIFFEAuthType, SPIFFE: spiffe}
@@ -50,13 +42,7 @@ func renderSPIFFEKlusterlet(t *testing.T, name string, mode operatorapiv1.Instal
 
 	agentNamespace := helpers.AgentNamespace(klusterlet)
 	syncContext := testingcommon.NewFakeSyncContext(t, name)
-	var controller *testController
-	if helpers.IsHosted(mode) {
-		controller = newTestControllerHosted(t, klusterlet, nil, newNamespace(agentNamespace),
-			newSecret(helpers.ImagePullSecret, "open-cluster-management"))
-	} else {
-		controller = newTestController(t, klusterlet, syncContext.Recorder(), nil, false, newNamespace(agentNamespace))
-	}
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false, newNamespace(agentNamespace))
 	servePolicyAPI(controller.kubeClient, "system:serviceaccount:open-cluster-management:klusterlet")
 	if controller.managedKubeClient != nil {
 		servePolicyAPI(controller.managedKubeClient, "system:admin")
@@ -125,21 +111,14 @@ func TestSPIFFEKlusterletRendering(t *testing.T) {
 			},
 		},
 		{
-			name: "Hosted, east, namespace template", klusterlet: "cluster4", mode: operatorapiv1.InstallModeHosted,
+			name: "Default, east, namespace template", klusterlet: "klusterlet", mode: operatorapiv1.InstallModeDefault,
 			spiffe: &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "ocm-grpc.hub.internal:443", HubSPIFFEID: testSPIFFEHubID,
 				TrustDomain: "east.example.org", AgentIDTemplate: "spiffe://{trustDomain}/k8s/{cluster}/ns/{namespace}/ocm/{role}"},
 			want: map[string][3]string{
-				"cluster4-registration-agent": {"registration", "cluster4-registration-sa",
-					"spiffe://east.example.org/k8s/cluster4/ns/cluster4/ocm/registration"},
-				"cluster4-work-agent": {"work", "cluster4-work-sa",
-					"spiffe://east.example.org/k8s/cluster4/ns/cluster4/ocm/work"},
-			},
-		},
-		{
-			name: "SingletonHosted", klusterlet: "cluster4", mode: operatorapiv1.InstallModeSingletonHosted, spiffe: spiffe,
-			want: map[string][3]string{
-				"cluster4-agent": {"klusterlet", "cluster4-work-sa",
-					"spiffe://ocm-hub.example.org/ocm/cluster/cluster4/agent/klusterlet"},
+				"klusterlet-registration-agent": {"registration", "klusterlet-registration-sa",
+					"spiffe://east.example.org/k8s/cluster1/ns/open-cluster-management-agent/ocm/registration"},
+				"klusterlet-work-agent": {"work", "klusterlet-work-sa",
+					"spiffe://east.example.org/k8s/cluster1/ns/open-cluster-management-agent/ocm/work"},
 			},
 		},
 	}
@@ -219,6 +198,55 @@ func TestSPIFFEKlusterletInvalidTemplate(t *testing.T) {
 	if cond == nil || cond.Status != metav1.ConditionFalse || cond.Reason != ReasonInvalidSPIFFEConfiguration ||
 		!strings.Contains(cond.Message, "{clutser}") {
 		t.Errorf("Applied condition %+v", cond)
+	}
+}
+
+// The spiffe driver supports only the Default and Singleton modes: a hosted Klusterlet gets no
+// agents, no SPIFFE IDs and a false Applied condition, before its managed kubeconfig is looked for.
+func TestSPIFFEKlusterletHostedModesNotSupported(t *testing.T) {
+	for _, mode := range []operatorapiv1.InstallMode{operatorapiv1.InstallModeHosted,
+		operatorapiv1.InstallModeSingletonHosted} {
+		t.Run(string(mode), func(t *testing.T) {
+			klusterlet := newKlusterletHosted("cluster4", "open-cluster-management-agent", "cluster4")
+			klusterlet.Spec.DeployOption.Mode = mode
+			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = operatorapiv1.RegistrationDriver{
+				AuthType: operatorapiv1.SPIFFEAuthType,
+				SPIFFE:   &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "hub:443", HubSPIFFEID: testSPIFFEHubID}}
+			syncContext := testingcommon.NewFakeSyncContext(t, "cluster4")
+			// No external managed kubeconfig Secret: the refusal must not depend on it.
+			controller := newTestControllerHosted(t, klusterlet, nil, newNamespace(helpers.AgentNamespace(klusterlet)))
+			if err := controller.controller.sync(context.TODO(), syncContext, "cluster4"); err != nil {
+				t.Fatalf("sync: %v", err)
+			}
+			for _, a := range controller.kubeClient.Actions() {
+				if a.GetVerb() == createVerb {
+					t.Errorf("created %s %s", a.GetResource().Resource, a.(clienttesting.CreateActionImpl).Object.(metav1.Object).GetName())
+				}
+			}
+			got, err := controller.operatorClient.OperatorV1().Klusterlets().Get(context.TODO(), "cluster4", metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cond := meta.FindStatusCondition(got.Status.Conditions, operatorapiv1.ConditionKlusterletApplied)
+			if cond == nil || cond.Status != metav1.ConditionFalse || cond.Reason != ReasonSPIFFEInstallModeNotSupported ||
+				!strings.Contains(cond.Message, string(mode)) {
+				t.Errorf("Applied condition %+v", cond)
+			}
+			if got.Status.SPIFFE != nil && len(got.Status.SPIFFE.AgentIDs) != 0 {
+				t.Errorf("agentIDs %v reported for an unsupported mode", got.Status.SPIFFE.AgentIDs)
+			}
+		})
+	}
+}
+
+func TestSPIFFESupportsInstallMode(t *testing.T) {
+	for mode, want := range map[operatorapiv1.InstallMode]bool{
+		"": true, operatorapiv1.InstallModeDefault: true, operatorapiv1.InstallModeSingleton: true,
+		operatorapiv1.InstallModeHosted: false, operatorapiv1.InstallModeSingletonHosted: false,
+	} {
+		if got := SPIFFESupportsInstallMode(mode); got != want {
+			t.Errorf("SPIFFESupportsInstallMode(%q) = %v, want %v", mode, got, want)
+		}
 	}
 }
 

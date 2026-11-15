@@ -325,6 +325,21 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 	klusterlet := originalKlusterlet.DeepCopy()
 
+	// The spiffe driver supports only the Default and Singleton modes. Refuse the hosted modes
+	// before anything is rendered, also when the CRD's validation was skipped (an older CRD).
+	// A deleting Klusterlet is left to the cleanup controller.
+	if klusterlet.DeletionTimestamp.IsZero() && usesSPIFFE(klusterlet) &&
+		!SPIFFESupportsInstallMode(klusterlet.Spec.DeployOption.Mode) {
+		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
+			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse,
+			Reason: ReasonSPIFFEInstallModeNotSupported,
+			Message: fmt.Sprintf("registrationDriver.authType spiffe supports only the Default and Singleton install modes, "+
+				"not %s", klusterlet.Spec.DeployOption.Mode),
+		})
+		_, err := n.patcher.PatchStatus(ctx, klusterlet, klusterlet.Status, originalKlusterlet.Status)
+		return err
+	}
+
 	resourceRequirements, err := helpers.ResourceRequirements(ctx, klusterlet)
 	if err != nil {
 		logger.Error(err, "Failed to parse resource requirements for klusterlet")
@@ -791,11 +806,26 @@ func serviceAccountName(suffix string, klusterlet *operatorapiv1.Klusterlet) str
 // driver's settings can't produce valid agent SPIFFE IDs.
 const ReasonInvalidSPIFFEConfiguration = "InvalidSPIFFEConfiguration"
 
+// ReasonSPIFFEInstallModeNotSupported is the reason of a false Applied condition when a Klusterlet
+// uses the spiffe driver in a hosted mode.
+const ReasonSPIFFEInstallModeNotSupported = "SPIFFEInstallModeNotSupported"
+
+// SPIFFESupportsInstallMode tells whether the spiffe driver supports the install mode: Default
+// (also when unset) and Singleton. Hosted and SingletonHosted are not
+// supported: their agents would need a stored credential for the managed cluster.
+func SPIFFESupportsInstallMode(mode operatorapiv1.InstallMode) bool {
+	return mode == "" || mode == operatorapiv1.InstallModeDefault || mode == operatorapiv1.InstallModeSingleton
+}
+
+func usesSPIFFE(klusterlet *operatorapiv1.Klusterlet) bool {
+	return klusterlet.Spec.RegistrationConfiguration != nil &&
+		klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == operatorapiv1.SPIFFEAuthType
+}
+
 // fillSPIFFEConfig fills the spiffe settings and renders each agent's SPIFFE ID from the
 // Klusterlet's agentIDTemplate. {trustDomain} is the agents' trust domain (spiffe.trustDomain, or
 // the trust domain of hubSPIFFEID), {cluster} the cluster name, {role} the agent's role, and
-// {namespace} the namespace the agent pods run in (the Klusterlet's namespace on the management
-// cluster in hosted modes). It returns the IDs for status.spiffe.agentIDs.
+// {namespace} the namespace the agent pods run in. It returns the IDs for status.spiffe.agentIDs.
 func fillSPIFFEConfig(config *klusterletConfig, klusterlet *operatorapiv1.Klusterlet) ([]operatorapiv1.SPIFFEAgentID, error) {
 	c := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.SPIFFE
 	if c == nil {

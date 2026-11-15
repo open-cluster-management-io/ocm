@@ -30,6 +30,7 @@ type Klusterlet struct {
 
 // KlusterletSpec represents the desired deployment configuration of Klusterlet agent.
 // +kubebuilder:validation:XValidation:rule="!has(self.registrationConfiguration) || !has(self.registrationConfiguration.registrationDriver) || !has(self.registrationConfiguration.registrationDriver.authType) || self.registrationConfiguration.registrationDriver.authType != 'spiffe' || (has(self.clusterName) && size(self.clusterName) > 0)",message="clusterName is required when registrationDriver.authType is spiffe"
+// +kubebuilder:validation:XValidation:rule="!has(self.registrationConfiguration) || !has(self.registrationConfiguration.registrationDriver) || !has(self.registrationConfiguration.registrationDriver.authType) || self.registrationConfiguration.registrationDriver.authType != 'spiffe' || !has(self.deployOption) || !has(self.deployOption.mode) || size(self.deployOption.mode) == 0 || self.deployOption.mode in ['Default', 'Singleton']",message="registrationDriver.authType spiffe supports only the Default and Singleton install modes"
 type KlusterletSpec struct {
 	// namespace is the namespace to deploy the agent on the managed cluster.
 	// The namespace must have a prefix of "open-cluster-management-", and if it is not set,
@@ -285,6 +286,8 @@ type RegistrationDriver struct {
 	// spiffe contains what the agents need to reach the hub with their SPIRE-issued SVIDs.
 	// It is required when authType is spiffe, and nothing in it is secret.
 	// Effective only when the SPIFFERegistration feature gate is enabled.
+	// authType spiffe supports only the Default and Singleton install modes; Hosted and
+	// SingletonHosted are not supported yet.
 	// +optional
 	SPIFFE *KlusterletSPIFFEConfig `json:"spiffe,omitempty"`
 }

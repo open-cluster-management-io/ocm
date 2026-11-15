@@ -540,6 +540,8 @@ spec:
                           spiffe contains what the agents need to reach the hub with their SPIRE-issued SVIDs.
                           It is required when authType is spiffe, and nothing in it is secret.
                           Effective only when the SPIFFERegistration feature gate is enabled.
+                          authType spiffe supports only the Default and Singleton install modes; Hosted and
+                          SingletonHosted are not supported yet.
                         properties:
                           addOnAgentIDTemplate:
                             default: spiffe://{trustDomain}/ocm/cluster/{cluster}/addon/{addon}/agent/{agent}
@@ -784,6 +786,13 @@ spec:
                 || !has(self.registrationConfiguration.registrationDriver.authType)
                 || self.registrationConfiguration.registrationDriver.authType != ''spiffe''
                 || (has(self.clusterName) && size(self.clusterName) > 0)'
+            - message: registrationDriver.authType spiffe supports only the Default
+                and Singleton install modes
+              rule: '!has(self.registrationConfiguration) || !has(self.registrationConfiguration.registrationDriver)
+                || !has(self.registrationConfiguration.registrationDriver.authType)
+                || self.registrationConfiguration.registrationDriver.authType != ''spiffe''
+                || !has(self.deployOption) || !has(self.deployOption.mode) || size(self.deployOption.mode)
+                == 0 || self.deployOption.mode in [''Default'', ''Singleton'']'
           status:
             description: Status represents the current status of Klusterlet agent.
             properties:

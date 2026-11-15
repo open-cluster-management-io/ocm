@@ -495,12 +495,9 @@ func (r *spiffeAdmissionReconcile) render(ctx context.Context, klusterlet *opera
 	if err != nil {
 		return nil, err
 	}
+	// The spiffe driver runs only in Default and Singleton modes, where the agents run on the
+	// managed cluster: the operator is the same user there.
 	managedOperatorUser := operatorUser
-	if helpers.IsHosted(config.InstallMode) {
-		if managedOperatorUser, err = whoAmI(ctx, r.managedClusterClients.kubeClient); err != nil {
-			return nil, err
-		}
-	}
 	workAgents, err := r.spiffeWorkAgents()
 	if err != nil {
 		return nil, err
@@ -533,8 +530,7 @@ func spiffeRolePairs(config klusterletConfig) map[string]string {
 }
 
 // workAgentUser is the work agent's user on the managed cluster: its ServiceAccount in the
-// Klusterlet namespace there (also in hosted modes, where its kubeconfig carries that
-// ServiceAccount's token).
+// Klusterlet namespace there.
 func workAgentUser(klusterletNamespace, workServiceAccount string) string {
 	return "system:serviceaccount:" + klusterletNamespace + ":" + workServiceAccount
 }
