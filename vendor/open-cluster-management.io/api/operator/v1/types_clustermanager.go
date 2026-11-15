@@ -295,6 +295,20 @@ type SPIFFERegistrationConfig struct {
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Pattern="^([0-9]+(s|m|h))+$"
 	MaxClockSkew *metav1.Duration `json:"maxClockSkew,omitempty"`
+
+	// autoApprovedIdentities are the SPIFFE IDs whose clusters are accepted automatically, as
+	// autoApprovedIdentities of the csr and grpc drivers are for their users. It applies only
+	// with the ManagedClusterAutoApproval feature gate, and only to a cluster's first join: the
+	// cluster is accepted if the SPIFFE ID of the agent that created it matches an entry. An
+	// entry is a SPIFFE ID in which "*" matches one whole path segment, for example
+	// spiffe://ocm-hub.example.org/ocm/cluster/*/agent/registration. With no entry, clusters
+	// of the spiffe driver are never accepted automatically.
+	// +optional
+	// +listType=set
+	// +kubebuilder:validation:MaxItems=64
+	// +kubebuilder:validation:items:MaxLength=512
+	// +kubebuilder:validation:items:Pattern=`^spiffe://[a-z0-9._-]+(/([A-Za-z0-9._-]+|\*))+$`
+	AutoApprovedIdentities []string `json:"autoApprovedIdentities,omitempty"`
 }
 
 type ServerConfiguration struct {

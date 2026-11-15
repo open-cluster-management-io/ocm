@@ -52,6 +52,7 @@ import (
 	awsirsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 	"open-cluster-management.io/ocm/pkg/registration/register/grpc"
+	spiffedriver "open-cluster-management.io/ocm/pkg/registration/register/spiffe"
 )
 
 // HubManagerOptions holds configuration for hub manager controller
@@ -75,7 +76,9 @@ type HubManagerOptions struct {
 	// SPIFFEMaxSVIDLifetime and SPIFFEMaxClockSkew size the delete guard of the spiffe driver:
 	// a deleted cluster is held until deletionTimestamp + both.
 	SPIFFEMaxSVIDLifetime time.Duration
-	SPIFFEMaxClockSkew    time.Duration
+	// SPIFFEAutoApprovedIdentities are the SPIFFE IDs whose clusters are accepted automatically.
+	SPIFFEAutoApprovedIdentities []string
+	SPIFFEMaxClockSkew           time.Duration
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -129,6 +132,8 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&m.GRPCSigningDuration, "grpc-signing-duration", m.GRPCSigningDuration, "The max length of duration signed certificates will be given.")
 	fs.DurationVar(&m.SPIFFEMaxSVIDLifetime, "spiffe-max-svid-lifetime", m.SPIFFEMaxSVIDLifetime,
 		"At least the longest SVID TTL SPIRE issues to OCM agents. A deleted cluster of the spiffe driver is held this long plus --spiffe-max-clock-skew.")
+	fs.StringSliceVar(&m.SPIFFEAutoApprovedIdentities, "spiffe-auto-approved-identities", m.SPIFFEAutoApprovedIdentities,
+		"SPIFFE IDs, with * for a whole path segment, whose clusters are accepted automatically with the ManagedClusterAutoApproval feature gate.")
 	fs.DurationVar(&m.SPIFFEMaxClockSkew, "spiffe-max-clock-skew", m.SPIFFEMaxClockSkew,
 		"The allowed clock difference between the hub and SPIRE.")
 	m.ImportOption.AddFlags(fs)
@@ -251,6 +256,12 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 				return err
 			}
 			drivers = append(drivers, grpcHubDriver)
+		case operatorv1.SPIFFEAuthType:
+			spiffeHubDriver, err := spiffedriver.NewHubDriver(m.SPIFFEAutoApprovedIdentities)
+			if err != nil {
+				return err
+			}
+			drivers = append(drivers, spiffeHubDriver)
 		}
 	}
 	hubDriver := register.NewAggregatedHubDriver(drivers...)

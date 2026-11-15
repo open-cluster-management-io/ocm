@@ -292,6 +292,12 @@ const (
 	// with SVIDs from that trust domain. The hub sets it when the cluster is created and keeps it
 	// on agent updates; an admin confirms or sets it when accepting the cluster.
 	SPIFFETrustDomainAnnotationKey = "open-cluster-management.io/spiffe-trust-domain"
+
+	// SPIFFERegisteredByAnnotationKey records the SPIFFE ID of the agent that created a
+	// ManagedCluster with the spiffe driver. The hub sets it when the cluster is created and
+	// keeps it on agent updates. With the ManagedClusterAutoApproval feature gate, the cluster is
+	// accepted automatically only if this ID matches the spiffe driver's autoApprovedIdentities.
+	SPIFFERegisteredByAnnotationKey = "open-cluster-management.io/spiffe-registered-by"
 )
 
 const (

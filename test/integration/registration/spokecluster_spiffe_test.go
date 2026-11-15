@@ -82,6 +82,9 @@ func looksLikeKeyOrCert(b []byte) bool {
 	return bytes.Contains(b, []byte("PRIVATE KEY")) || bytes.Contains(b, []byte("BEGIN CERTIFICATE"))
 }
 
+// autoApprovedCluster is the one cluster whose agent the SPIFFE hub auto-approves.
+const autoApprovedCluster = "spiffe-auto-approved"
+
 var _ = Describe("Registration using SPIFFE", Ordered, Label("spiffe-test"), func() {
 	var spiffeCA *fakespire.CA
 	var hubAddr string
@@ -149,6 +152,8 @@ var _ = Describe("Registration using SPIFFE", Ordered, Label("spiffe-test"), fun
 		opts.EnabledRegistrationDrivers = []string{operatorv1.CSRAuthType, operatorv1.SPIFFEAuthType}
 		opts.SPIFFEMaxSVIDLifetime = 10 * time.Second
 		opts.SPIFFEMaxClockSkew = time.Second
+		// The suite turns ManagedClusterAutoApproval on: only this cluster's agent is auto-approved.
+		opts.SPIFFEAutoApprovedIdentities = []string{registrationID(autoApprovedCluster)}
 		startHub(opts)
 
 		spiffeCA = fakespire.NewCA(GinkgoTB(), spiffeTD)
@@ -169,6 +174,38 @@ var _ = Describe("Registration using SPIFFE", Ordered, Label("spiffe-test"), fun
 		// Stop the SPIFFE hub before restarting the default one: startHub replaces stopHub.
 		stopHub()
 		startHub(hubOption)
+	})
+
+	It("auto-approves only the clusters of the auto-approved SPIFFE IDs", func() {
+		ctx := context.Background()
+		By("a cluster registered by an auto-approved SPIFFE ID is accepted")
+		agent, _ := newAgent(autoApprovedCluster, registrationID(autoApprovedCluster), time.Hour)
+		Expect(agent.CreateCluster(ctx, autoApprovedCluster, nil)).To(Succeed())
+		Eventually(func() bool {
+			mc, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, autoApprovedCluster, metav1.GetOptions{})
+			return err == nil && mc.Spec.HubAcceptsClient &&
+				mc.Annotations[clusterv1.SPIFFERegisteredByAnnotationKey] == registrationID(autoApprovedCluster)
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
+
+		By("any other spiffe cluster waits for the admin, although the feature gate is on")
+		other := fmt.Sprintf("spiffe-%s", rand.String(5))
+		otherAgent, _ := newAgent(other, registrationID(other), time.Hour)
+		Expect(otherAgent.CreateCluster(ctx, other, nil)).To(Succeed())
+		Consistently(func() bool {
+			mc, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, other, metav1.GetOptions{})
+			return err == nil && !mc.Spec.HubAcceptsClient
+		}, 5*time.Second, eventuallyInterval).Should(BeTrue())
+	})
+
+	It("a hub with an invalid auto-approved identity doesn't start", func() {
+		opts := hub.NewHubManagerOptions()
+		opts.EnabledRegistrationDrivers = []string{operatorv1.SPIFFEAuthType}
+		opts.SPIFFEAutoApprovedIdentities = []string{"spiffe://ocm-hub.example.org/ocm/[cluster"}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		err := opts.RunControllerManager(ctx, &controllercmd.ControllerContext{
+			KubeConfig: hubCfg, EventRecorder: util.NewIntegrationTestEventRecorder("invalid-hub")})
+		Expect(err).To(MatchError(ContainSubstring("auto-approved SPIFFE ID")))
 	})
 
 	It("registers, is pinned, acts only for its own cluster and survives SVID rotation", func() {

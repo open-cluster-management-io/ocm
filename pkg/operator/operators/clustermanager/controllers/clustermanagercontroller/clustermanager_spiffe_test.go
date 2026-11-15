@@ -125,9 +125,10 @@ func contains(list []string, s string) bool {
 
 func TestSPIFFEHubRendering(t *testing.T) {
 	td := &operatorapiv1.SPIFFERegistrationConfig{
-		TrustDomain:       "ocm-hub.example.org",
-		AgentTrustDomains: []string{"east.example.org"},
-		MaxSVIDLifetime:   &metav1.Duration{Duration: time.Hour},
+		TrustDomain:            "ocm-hub.example.org",
+		AgentTrustDomains:      []string{"east.example.org"},
+		AutoApprovedIdentities: []string{"spiffe://ocm-hub.example.org/ocm/cluster/*/agent/registration"},
+		MaxSVIDLifetime:        &metav1.Duration{Duration: time.Hour},
 	}
 
 	t.Run("spiffe only", func(t *testing.T) {
@@ -183,7 +184,8 @@ func TestSPIFFEHubRendering(t *testing.T) {
 			t.Errorf("secrets %v include the grpc serving certificate", r.secrets)
 		}
 		reg := args(r.deployments["testhub-registration-controller"])
-		for _, want := range []string{"--spiffe-max-svid-lifetime=1h0m0s", "--spiffe-max-clock-skew=5m0s", "spiffe"} {
+		for _, want := range []string{"--spiffe-max-svid-lifetime=1h0m0s", "--spiffe-max-clock-skew=5m0s", "spiffe",
+			"--spiffe-auto-approved-identities=spiffe://ocm-hub.example.org/ocm/cluster/*/agent/registration"} {
 			if !strings.Contains(reg, want) {
 				t.Errorf("registration controller args %q miss %q", reg, want)
 			}

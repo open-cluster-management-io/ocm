@@ -8,7 +8,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -113,5 +115,30 @@ func TestCleanupLegacyHubCredentialsClusterCreatedLater(t *testing.T) {
 	}
 	if _, err := kubeClient.CoreV1().Secrets(ns).Get(context.TODO(), "hub-kubeconfig-secret", metav1.GetOptions{}); err == nil {
 		t.Error("the old credential is still there")
+	}
+}
+
+// A Secret that can't be deleted is logged, and the others are still deleted.
+func TestCleanupLegacyHubCredentialsDeleteError(t *testing.T) {
+	legacyCredentialsPollInterval = 10 * time.Millisecond
+	const ns = "open-cluster-management-agent"
+	kubeClient := kubefake.NewSimpleClientset(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "bootstrap-hub-kubeconfig", Namespace: ns}})
+	kubeClient.PrependReactor("delete", "secrets", func(a clienttesting.Action) (bool, runtime.Object, error) {
+		if a.(clienttesting.DeleteAction).GetName() == "hub-kubeconfig-secret" {
+			return true, nil, errors.NewForbidden(corev1.Resource("secrets"), "hub-kubeconfig-secret", nil)
+		}
+		return false, nil, nil
+	})
+	cluster := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1"}, Spec: clusterv1.ManagedClusterSpec{HubAcceptsClient: true}}
+	informers := clusterinformers.NewSharedInformerFactory(clusterfake.NewSimpleClientset(cluster), 0)
+	clusterInformer := informers.Cluster().V1().ManagedClusters()
+	clusterInformer.Informer()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informers.Start(ctx.Done())
+	CleanupLegacyHubCredentials(ctx, "cluster1", clusterInformer, kubeClient.CoreV1().Secrets(ns),
+		"hub-kubeconfig-secret", "bootstrap-hub-kubeconfig")
+	if _, err := kubeClient.CoreV1().Secrets(ns).Get(context.TODO(), "bootstrap-hub-kubeconfig", metav1.GetOptions{}); err == nil {
+		t.Error("the second Secret wasn't deleted after the first failed")
 	}
 }

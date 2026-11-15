@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -104,15 +105,17 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 		} else {
 			delete(cluster.Labels, clusterv1beta2.ClusterSetLabel)
 		}
-		// Agents may not change the trust domain the cluster is pinned to; only hub users with
-		// update access to ManagedClusters can.
-		if pinned, ok := current.Annotations[clusterv1.SPIFFETrustDomainAnnotationKey]; ok {
-			if cluster.Annotations == nil {
-				cluster.Annotations = map[string]string{}
+		// Agents may not change the trust domain the cluster is pinned to, or who registered it;
+		// only hub users with update access to ManagedClusters can.
+		for _, key := range hubSetAnnotations {
+			if value, ok := current.Annotations[key]; ok {
+				if cluster.Annotations == nil {
+					cluster.Annotations = map[string]string{}
+				}
+				cluster.Annotations[key] = value
+			} else {
+				delete(cluster.Annotations, key)
 			}
-			cluster.Annotations[clusterv1.SPIFFETrustDomainAnnotationKey] = pinned
-		} else {
-			delete(cluster.Annotations, clusterv1.SPIFFETrustDomainAnnotationKey)
 		}
 
 		_, err = c.clusterClient.ClusterV1().ManagedClusters().Update(ctx, cluster, metav1.UpdateOptions{})
@@ -179,11 +182,17 @@ func (c *ClusterService) EventHandlerFuncs(ctx context.Context, handler server.E
 	}
 }
 
-// pinTrustDomain sets the trust domain annotation of a cluster an agent creates. With a SPIFFE
-// agent, it is the trust domain of the agent's SVID, whatever the request says; any other agent
-// may not set it.
+// hubSetAnnotations are set by the hub from the creating agent's SVID; agents can't set or
+// change them.
+var hubSetAnnotations = []string{clusterv1.SPIFFETrustDomainAnnotationKey, clusterv1.SPIFFERegisteredByAnnotationKey}
+
+// pinTrustDomain sets the annotations of a cluster an agent creates from the agent's SVID,
+// whatever the request says: the trust domain the cluster is pinned to, and the SPIFFE ID that
+// registered it, which auto-approval matches. Any other agent may not set them.
 func pinTrustDomain(ctx context.Context, cluster *clusterv1.ManagedCluster) {
-	delete(cluster.Annotations, clusterv1.SPIFFETrustDomainAnnotationKey)
+	for _, key := range hubSetAnnotations {
+		delete(cluster.Annotations, key)
+	}
 	id, ok := grpcauthn.OCMIdentityFromContext(ctx)
 	if !ok {
 		return
@@ -192,4 +201,7 @@ func pinTrustDomain(ctx context.Context, cluster *clusterv1.ManagedCluster) {
 		cluster.Annotations = map[string]string{}
 	}
 	cluster.Annotations[clusterv1.SPIFFETrustDomainAnnotationKey] = id.TrustDomain
+	if sid, ok := ctx.Value(grpcauthn.ContextSPIFFEIDKey).(spiffeid.ID); ok {
+		cluster.Annotations[clusterv1.SPIFFERegisteredByAnnotationKey] = sid.String()
+	}
 }

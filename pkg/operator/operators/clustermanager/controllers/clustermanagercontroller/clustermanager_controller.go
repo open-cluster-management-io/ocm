@@ -641,5 +641,6 @@ func fillSPIFFEConfig(config *manifests.HubConfig, cm *operatorapiv1.ClusterMana
 		config.SPIFFEMaxClockSkew = c.MaxClockSkew.Duration.String()
 	}
 	config.SPIFFEEndpointType = helpers.SPIFFEServerEndpointType(cm)
+	config.SPIFFEAutoApprovedIdentities = strings.Join(c.AutoApprovedIdentities, ",")
 	return nil
 }

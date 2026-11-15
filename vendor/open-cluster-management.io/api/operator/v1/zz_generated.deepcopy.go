@@ -1327,6 +1327,11 @@ func (in *SPIFFERegistrationConfig) DeepCopyInto(out *SPIFFERegistrationConfig) 
 		*out = new(metav1.Duration)
 		**out = **in
 	}
+	if in.AutoApprovedIdentities != nil {
+		in, out := &in.AutoApprovedIdentities, &out.AutoApprovedIdentities
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

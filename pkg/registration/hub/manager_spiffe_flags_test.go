@@ -22,3 +22,15 @@ func TestHubManagerSPIFFEFlags(t *testing.T) {
 		t.Errorf("drivers %v", m.EnabledRegistrationDrivers)
 	}
 }
+
+func TestHubManagerSPIFFEAutoApprovedIdentitiesFlag(t *testing.T) {
+	m := NewHubManagerOptions()
+	fs := pflag.NewFlagSet("hub", pflag.ContinueOnError)
+	m.AddFlags(fs)
+	if err := fs.Parse([]string{"--spiffe-auto-approved-identities=spiffe://td/ocm/cluster/*/agent/registration,spiffe://td/x"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.SPIFFEAutoApprovedIdentities) != 2 {
+		t.Errorf("identities %v", m.SPIFFEAutoApprovedIdentities)
+	}
+}

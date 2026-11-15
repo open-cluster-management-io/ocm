@@ -69,7 +69,9 @@ type HubConfig struct {
 	SPIFFEAddOnAgentIDTemplate string
 	SPIFFEMaxSVIDLifetime      string
 	SPIFFEMaxClockSkew         string
-	SPIFFEEndpointType         string
+	// SPIFFEAutoApprovedIdentities is a comma-separated list of SPIFFE ID patterns.
+	SPIFFEAutoApprovedIdentities string
+	SPIFFEEndpointType           string
 	// TLS configuration injected into all managed hub component deployments
 	TLSMinVersion   string
 	TLSCipherSuites string

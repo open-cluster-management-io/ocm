@@ -113,6 +113,9 @@ spec:
           {{ if .SPIFFEAuthEnabled }}
           - "--spiffe-max-svid-lifetime={{ .SPIFFEMaxSVIDLifetime }}"
           - "--spiffe-max-clock-skew={{ .SPIFFEMaxClockSkew }}"
+          {{ if .SPIFFEAutoApprovedIdentities }}
+          - "--spiffe-auto-approved-identities={{ .SPIFFEAutoApprovedIdentities }}"
+          {{ end }}
           {{ end }}
           {{- if .TLSMinVersion }}
           - "--tls-min-version={{ .TLSMinVersion }}"
