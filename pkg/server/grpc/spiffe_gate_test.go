@@ -2,6 +2,8 @@ package grpc
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -230,5 +232,50 @@ func TestClusterGateDataType(t *testing.T) {
 			}
 			require.NoError(t, err)
 		})
+	}
+}
+
+// failingClusters and failingAddOns are listers whose reads fail with something other than
+// NotFound, for example while the cache isn't synced.
+type failingClusters struct {
+	clusterlisterv1.ManagedClusterLister
+}
+
+func (failingClusters) Get(string) (*clusterv1.ManagedCluster, error) {
+	return nil, errors.New("lister broken")
+}
+
+type failingAddOns struct {
+	addonlisterv1beta1.ManagedClusterAddOnLister
+}
+
+func (failingAddOns) ManagedClusterAddOns(string) addonlisterv1beta1.ManagedClusterAddOnNamespaceLister {
+	return failingAddOnsNS{}
+}
+
+type failingAddOnsNS struct {
+	addonlisterv1beta1.ManagedClusterAddOnNamespaceLister
+}
+
+func (failingAddOnsNS) Get(string) (*addonv1beta1.ManagedClusterAddOn, error) {
+	return nil, errors.New("lister broken")
+}
+
+// A lister error refuses the request rather than letting it through.
+func TestClusterGateListerErrors(t *testing.T) {
+	work := grpcauthn.OCMIdentity{ClusterName: "cluster1", Role: grpcauthn.RoleWork, TrustDomain: "ocm-hub.example.org"}
+	gate := &clusterGate{clusters: failingClusters{}, trustDomains: []string{"ocm-hub.example.org"}}
+	ctx := context.WithValue(context.Background(), grpcauthn.ContextOCMIdentityKey, work)
+	if err := gate.check(ctx); err == nil || !strings.Contains(err.Error(), "lister broken") {
+		t.Errorf("check: %v", err)
+	}
+	if err := gate.checkDataType(work, "cluster1", types.CloudEventsType{}); err == nil {
+		t.Error("checkDataType let a request through with a broken lister")
+	}
+
+	addOn := grpcauthn.OCMIdentity{ClusterName: "cluster1", AddOnName: "my-addon", AgentName: "agent"}
+	gate = &clusterGate{addOns: failingAddOns{}}
+	if err := gate.checkAddOn(addOn); err == nil || !strings.Contains(err.Error(), "lister broken") {
+		t.Errorf("checkAddOn: %v", err)
 	}
 }

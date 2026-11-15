@@ -2,6 +2,7 @@ package spiffe
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	sdkevents "open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -159,4 +161,19 @@ func TestDeleteGuardGone(t *testing.T) {
 	require.NoError(t, g.sync(context.Background(), syncContext{queue: &recordingQueue{}}, "c1"))
 	require.Empty(t, client.Actions())
 	var _ runtime.Object = &clusterv1.ManagedCluster{}
+}
+
+type failingClusterLister struct {
+	clusterlisterv1.ManagedClusterLister
+}
+
+func (failingClusterLister) Get(string) (*clusterv1.ManagedCluster, error) {
+	return nil, errors.New("lister broken")
+}
+
+// A lister error is returned, so the cluster is synced again.
+func TestDeleteGuardListerError(t *testing.T) {
+	g := &deleteGuard{lister: failingClusterLister{}, now: time.Now}
+	err := g.sync(context.Background(), syncContext{queue: &recordingQueue{}}, "cluster1")
+	require.ErrorContains(t, err, "lister broken")
 }

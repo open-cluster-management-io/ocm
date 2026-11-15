@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/pflag"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 
 	v1alpha1addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
@@ -131,12 +132,9 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 	if o.SPIFFE.Enabled {
 		clusterInformer := clients.ClusterInformers.Cluster().V1().ManagedClusters()
 		addOnInformer := clients.AddOnInformers.Addon().V1beta1().ManagedClusterAddOns()
-		if _, err := clusterInformer.Informer().AddEventHandler(clusterRevocationHandler(o.registry)); err != nil {
-			return err
-		}
-		if _, err := addOnInformer.Informer().AddEventHandler(addOnRevocationHandler(o.registry)); err != nil {
-			return err
-		}
+		// The informers were just created and aren't started, so they accept handlers; an error
+		// here is a bug.
+		utilruntime.Must(registerRevocationHandlers(clusterInformer.Informer(), addOnInformer.Informer(), o.registry))
 		spiffeGate = &clusterGate{
 			clusters:     clusterInformer.Lister(),
 			addOns:       addOnInformer.Lister(),

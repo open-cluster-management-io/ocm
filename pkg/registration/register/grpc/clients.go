@@ -21,13 +21,21 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
+// The client constructors, replaceable in tests: an error from any of them must be returned.
+var (
+	newClusterClientHolder = cloudeventscluster.NewClientHolder
+	newLeaseClient         = cloudeventslease.NewLeaseClient
+	newEventClientHolder   = cloudeventsevent.NewClientHolder
+	newAddOnClient         = cloudeventsaddon.ManagedClusterAddOnInterface
+)
+
 // NewCloudEventsClients builds the registration agent's hub clients over CloudEvents from
 // config (*grpc.GRPCOptions). With clusterOnly, only the ManagedCluster client and informer are
 // built, as the bootstrap phase needs; the other clients need permissions an agent gets only
 // once its cluster is accepted. The grpc and spiffe drivers share it.
 func NewCloudEventsClients(ctx context.Context, config any, clusterName string, clusterOnly bool) (*register.Clients, error) {
 	clusterWatchStore := cloudeventsstore.NewAgentInformerWatcherStore[*clusterv1.ManagedCluster]()
-	clusterClientHolder, err := cloudeventscluster.NewClientHolder(
+	clusterClientHolder, err := newClusterClientHolder(
 		ctx,
 		cloudeventsoptions.NewGenericClientOptions(
 			config,
@@ -51,7 +59,7 @@ func NewCloudEventsClients(ctx context.Context, config any, clusterName string, 
 	}
 
 	leaseWatchStore := cloudeventsstore.NewSimpleStore[*coordv1.Lease]()
-	leaseClient, err := cloudeventslease.NewLeaseClient(
+	leaseClient, err := newLeaseClient(
 		ctx,
 		cloudeventsoptions.NewGenericClientOptions(
 			config,
@@ -64,7 +72,7 @@ func NewCloudEventsClients(ctx context.Context, config any, clusterName string, 
 		return nil, err
 	}
 
-	eventClient, err := cloudeventsevent.NewClientHolder(
+	eventClient, err := newEventClientHolder(
 		ctx,
 		cloudeventsoptions.NewGenericClientOptions(
 			config,
@@ -77,7 +85,7 @@ func NewCloudEventsClients(ctx context.Context, config any, clusterName string, 
 	}
 
 	addonWatchStore := cloudeventsstore.NewAgentInformerWatcherStore[*addonv1beta1.ManagedClusterAddOn]()
-	addonClient, err := cloudeventsaddon.ManagedClusterAddOnInterface(
+	addonClient, err := newAddOnClient(
 		ctx,
 		cloudeventsoptions.NewGenericClientOptions(
 			config,

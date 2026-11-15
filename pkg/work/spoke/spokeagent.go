@@ -220,7 +220,7 @@ func (o *WorkAgentConfig) newWorkClientAndInformer(
 	if o.workOptions.SPIFFE.Enabled() {
 		// The agent's own SVID is its hub credential; nothing is read from a file or Secret.
 		watcherStore = store.NewAgentInformerWatcherStore()
-		grpcOptions, closer, err := grpcoptions.NewSPIFFEGRPCOptions(ctx, grpcoptions.SPIFFEConfig{
+		grpcOptions, src, err := grpcoptions.NewSPIFFEGRPCOptions(ctx, grpcoptions.SPIFFEConfig{
 			URL:               o.workOptions.SPIFFE.HubEndpoint,
 			HubSPIFFEID:       o.workOptions.SPIFFE.HubSPIFFEID,
 			AgentSPIFFEID:     o.workOptions.SPIFFE.AgentSPIFFEID,
@@ -229,18 +229,16 @@ func (o *WorkAgentConfig) newWorkClientAndInformer(
 		if err != nil {
 			return "", nil, nil, err
 		}
-		if src, ok := closer.(*ocmspiffe.X509Source); ok {
-			o.spiffeSource.Store(src)
-		}
+		o.spiffeSource.Store(src)
 		go func() {
 			<-ctx.Done()
-			_ = closer.Close()
+			_ = src.Close()
 		}()
 		clientID := o.workOptions.CloudEventsClientID
 		if clientID == "" {
 			clientID = o.agentOptions.SpokeClusterName + "-work-agent"
 		}
-		clientHolder, err := cloudeventswork.NewAgentClientHolder(ctx, cloudeventsoptions.NewGenericClientOptions(
+		clientHolder, err := newWorkAgentClientHolder(ctx, cloudeventsoptions.NewGenericClientOptions(
 			grpcOptions, codec.NewManifestBundleCodec(), clientID).
 			WithClusterName(o.agentOptions.SpokeClusterName).
 			WithClientWatcherStore(watcherStore))
@@ -317,3 +315,6 @@ func (o *WorkAgentConfig) HealthCheckers() []healthz.HealthChecker {
 		return src.Ready()
 	})}
 }
+
+// newWorkAgentClientHolder builds the SPIFFE work agent's hub client; replaceable in tests.
+var newWorkAgentClientHolder = cloudeventswork.NewAgentClientHolder

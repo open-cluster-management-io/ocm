@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -101,4 +103,30 @@ func TestAddOnRevocationHandler(t *testing.T) {
 	h.OnDelete(cache.DeletedFinalStateUnknown{Key: "cluster1/my-addon", Obj: addon(true)})
 	require.Equal(t, []string{"cluster1/my-addon", "cluster1/my-addon"}, closer.addOns)
 	require.Empty(t, closer.clusters)
+}
+
+// A stopped informer refuses new handlers: the error is returned.
+func TestRegisterRevocationHandlers(t *testing.T) {
+	newInformer := func(stopped bool) cache.SharedIndexInformer {
+		lw := &cache.ListWatch{
+			ListFunc:  func(metav1.ListOptions) (runtime.Object, error) { return &clusterv1.ManagedClusterList{}, nil },
+			WatchFunc: func(metav1.ListOptions) (watch.Interface, error) { return watch.NewFake(), nil },
+		}
+		i := cache.NewSharedIndexInformer(lw, &clusterv1.ManagedCluster{}, 0, cache.Indexers{})
+		if stopped {
+			stop := make(chan struct{})
+			close(stop)
+			i.Run(stop)
+		}
+		return i
+	}
+	if err := registerRevocationHandlers(newInformer(false), newInformer(false), &fakeCloser{}); err != nil {
+		t.Errorf("running informers: %v", err)
+	}
+	if err := registerRevocationHandlers(newInformer(true), newInformer(false), &fakeCloser{}); err == nil {
+		t.Error("no error from a stopped cluster informer")
+	}
+	if err := registerRevocationHandlers(newInformer(false), newInformer(true), &fakeCloser{}); err == nil {
+		t.Error("no error from a stopped add-on informer")
+	}
 }

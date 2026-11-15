@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
@@ -27,12 +26,12 @@ type SPIFFEConfig struct {
 
 // NewSPIFFEGRPCOptions builds client options whose TLS config comes from the Workload API. It
 // blocks until the agent's SVID arrives, and fails with *spiffe.ErrSVIDNotFound if the Workload
-// API has no SVID with AgentSPIFFEID. The returned closer closes the Workload API source; call it
-// when the agent stops.
+// API has no SVID with AgentSPIFFEID. The returned source is the agent's SVID: close it when the
+// agent stops, and use its Ready method to report whether the SVID is still there.
 //
 // The TLS config reads the SVID and the trust bundles on every handshake, so a reconnect after
 // rotation presents the new SVID without further code.
-func NewSPIFFEGRPCOptions(ctx context.Context, c SPIFFEConfig) (*GRPCOptions, io.Closer, error) {
+func NewSPIFFEGRPCOptions(ctx context.Context, c SPIFFEConfig) (*GRPCOptions, *ocmspiffe.X509Source, error) {
 	if c.URL == "" {
 		return nil, nil, fmt.Errorf("the hub URL is required")
 	}

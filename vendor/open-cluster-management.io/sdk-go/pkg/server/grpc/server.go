@@ -194,11 +194,7 @@ func (b *GRPCServer) certFileCredentials(ctx context.Context) (credentials.Trans
 	certWatcher.WithWatchInterval(b.options.CertWatchInterval)
 
 	// This uses fsnotify for immediate detection + polling fallback
-	go func() {
-		if err := certWatcher.Start(ctx); err != nil {
-			klog.FromContext(ctx).Error(err, "Certificate watcher stopped")
-		}
-	}()
+	go runCertWatcher(ctx, certWatcher)
 
 	tlsConfig := &tls.Config{
 		// Use GetCertificate callback from certwatcher
@@ -363,5 +359,12 @@ func newAuthzStreamInterceptor(authorizers []authz.StreamAuthorizer) grpc.Stream
 		}
 
 		return status.Error(codes.Unauthenticated, fmt.Sprintf("no authorizer found for %s", info.FullMethod))
+	}
+}
+
+// runCertWatcher runs the certificate watcher until ctx ends, and logs why it stopped early.
+func runCertWatcher(ctx context.Context, w interface{ Start(context.Context) error }) {
+	if err := w.Start(ctx); err != nil {
+		klog.FromContext(ctx).Error(err, "Certificate watcher stopped")
 	}
 }

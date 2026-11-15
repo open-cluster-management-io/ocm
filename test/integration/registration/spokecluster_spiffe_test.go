@@ -299,6 +299,51 @@ var _ = Describe("Registration using SPIFFE", Ordered, Label("spiffe-test"), fun
 		Expect(err).To(HaveOccurred())
 	})
 
+	It("an agent started before its SPIRE entry waits for its SVID", func() {
+		ctx := context.Background()
+		cluster := fmt.Sprintf("spiffe-wait-%s", rand.String(5))
+		api := fakespire.Start(GinkgoTB(), spiffeCA) // no SVID for the agent yet
+
+		newAgentOptions := func() (*spoke.SpokeAgentOptions, *commonoptions.AgentOptions) {
+			driverOption := factory.NewOptions()
+			driverOption.RegistrationAuth = operatorv1.SPIFFEAuthType
+			driverOption.AddonKubeClientRegistrationAuth = operatorv1.SPIFFEAuthType
+			driverOption.SPIFFEOption.HubEndpoint = hubAddr
+			driverOption.SPIFFEOption.HubSPIFFEID = spiffeHubID
+			driverOption.SPIFFEOption.AgentSPIFFEID = registrationID(cluster)
+			driverOption.SPIFFEOption.WorkloadAPISocket = api.Addr
+			commOptions := commonoptions.NewAgentOptions()
+			commOptions.HubKubeconfigDir = path.Join(util.TestDir, cluster, "hub-kubeconfig")
+			commOptions.SpokeClusterName = cluster
+			return &spoke.SpokeAgentOptions{
+				HubKubeconfigSecret:      fmt.Sprintf("%s-hub-kubeconfig-secret", cluster),
+				ClusterHealthCheckPeriod: time.Minute,
+				RegisterDriverOption:     driverOption,
+			}, commOptions
+		}
+
+		By("an agent stopped while it waits exits without creating anything")
+		agentOptions, commOptions := newAgentOptions()
+		stopAgent := runAgent(cluster, agentOptions, commOptions, spokeCfg)
+		time.Sleep(2 * time.Second)
+		stopAgent()
+		Consistently(func() bool {
+			_, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, cluster, metav1.GetOptions{})
+			return apierrors.IsNotFound(err)
+		}, 3*time.Second, eventuallyInterval).Should(BeTrue())
+
+		By("an agent that gets its SVID later joins")
+		agentOptions, commOptions = newAgentOptions()
+		stopAgent = runAgent(cluster, agentOptions, commOptions, spokeCfg)
+		defer stopAgent()
+		time.Sleep(2 * time.Second)
+		api.SetSVIDs(spiffeCA.Issue(GinkgoTB(), registrationID(cluster), time.Hour))
+		Eventually(func() error {
+			_, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx, cluster, metav1.GetOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+	})
+
 	It("the registration agent joins with its SVID only", func() {
 		ctx := context.Background()
 		cluster := fmt.Sprintf("spiffe-agent-%s", rand.String(5))

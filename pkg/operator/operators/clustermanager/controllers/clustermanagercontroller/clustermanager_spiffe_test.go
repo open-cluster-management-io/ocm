@@ -1,6 +1,7 @@
 package clustermanagercontroller
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -11,9 +12,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
@@ -296,5 +300,62 @@ func TestSPIFFEHubRemovingGRPC(t *testing.T) {
 	}
 	if !kept {
 		t.Error("the gRPC server Deployment isn't rendered")
+	}
+}
+
+// The gRPC server, which serves the SPIFFE listener, uses the server image when one is set.
+func TestSPIFFEHubServerImage(t *testing.T) {
+	td := &operatorapiv1.SPIFFERegistrationConfig{TrustDomain: "ocm-hub.example.org",
+		MaxClockSkew: &metav1.Duration{Duration: 2 * time.Minute}}
+	cm := spiffeClusterManager([]string{operatorapiv1.SPIFFEAuthType}, td, true)
+	cm.Spec.ServerConfiguration = &operatorapiv1.ServerConfiguration{ImagePullSpec: "example.com/server:v1"}
+	r := renderSPIFFEHub(t, cm)
+	server := r.deployments["testhub-grpc-server"]
+	if server == nil {
+		t.Fatal("the gRPC server Deployment is not rendered")
+	}
+	if img := server.Spec.Template.Spec.Containers[0].Image; img != "example.com/server:v1" {
+		t.Errorf("image %s, want the server image", img)
+	}
+	reg := r.deployments["testhub-registration-controller"]
+	if reg == nil || !strings.Contains(args(reg), "--spiffe-max-clock-skew=2m0s") {
+		t.Errorf("the clock skew isn't passed to the registration controller")
+	}
+}
+
+// A hosted ClusterManager with only the spiffe driver still gets the gRPC server's kubeconfig.
+func TestSPIFFEHubHostedServerKubeconfig(t *testing.T) {
+	ctx := t.Context()
+	cm := spiffeClusterManager([]string{operatorapiv1.SPIFFEAuthType},
+		&operatorapiv1.SPIFFERegistrationConfig{TrustDomain: "ocm-hub.example.org"}, true)
+	cm.Spec.DeployOption.Mode = operatorapiv1.InstallModeHosted
+	cm.Spec.DeployOption.Hosted = &operatorapiv1.HostedClusterManagerConfiguration{
+		RegistrationWebhookConfiguration: operatorapiv1.HostedWebhookConfiguration{Address: "localhost", Port: 443},
+		WorkWebhookConfiguration:         operatorapiv1.HostedWebhookConfiguration{Address: "localhost", Port: 443},
+	}
+	tc := newTestController(t, cm)
+	ns := helpers.ClusterManagerNamespace(cm.Name, cm.Spec.DeployOption.Mode)
+	setup(t, tc, setDeployment(cm.Name, ns))
+	// The hub clients are stubbed; the operator only needs a kubeconfig it can parse.
+	if _, err := tc.managementKubeClient.CoreV1().Secrets(ns).Create(ctx, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: helpers.ExternalHubKubeConfig, Namespace: ns},
+		Data: map[string][]byte{"kubeconfig": []byte(`apiVersion: v1
+kind: Config
+clusters: [{name: hub, cluster: {server: "https://hub.example.com"}}]
+contexts: [{name: hub, context: {cluster: hub, user: admin}}]
+current-context: hub
+users: [{name: admin, user: {token: test}}]
+`)}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	var grpcServer bool
+	tc.clusterManagerController.ensureSAKubeconfigs = func(_ context.Context, _, _ string, _ *rest.Config,
+		_, _ kubernetes.Interface, _ events.Recorder, _, _, grpc bool) error {
+		grpcServer = grpc
+		return nil
+	}
+	_ = tc.clusterManagerController.sync(ctx, testingcommon.NewFakeSyncContext(t, cm.Name), cm.Name)
+	if !grpcServer {
+		t.Error("the gRPC server's kubeconfig wasn't requested for a spiffe-only hosted hub")
 	}
 }

@@ -2,7 +2,6 @@ package spiffe
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -45,20 +44,7 @@ var (
 
 // NewSPIFFEDriver returns the spiffe driver.
 func NewSPIFFEDriver(opt *Option) *SPIFFEDriver {
-	return &SPIFFEDriver{opt: opt, newOptions: openWorkloadAPI}
-}
-
-func openWorkloadAPI(ctx context.Context, c grpcoptions.SPIFFEConfig) (*grpcoptions.GRPCOptions, *ocmspiffe.X509Source, error) {
-	opts, closer, err := grpcoptions.NewSPIFFEGRPCOptions(ctx, c)
-	if err != nil {
-		return nil, nil, err
-	}
-	src, ok := closer.(*ocmspiffe.X509Source)
-	if !ok {
-		_ = closer.Close()
-		return nil, nil, errors.New("unexpected Workload API source type")
-	}
-	return opts, src, nil
+	return &SPIFFEDriver{opt: opt, newOptions: grpcoptions.NewSPIFFEGRPCOptions}
 }
 
 // Secretless implements register.SecretlessDriver: the agent skips the bootstrap phase and the

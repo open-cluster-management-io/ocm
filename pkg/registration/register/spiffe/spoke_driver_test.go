@@ -2,6 +2,7 @@ package spiffe
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -119,4 +120,12 @@ func TestSecretless(t *testing.T) {
 	require.Same(t, tmpl, d.BuildKubeConfigFromTemplate(tmpl))
 	c := &clusterv1.ManagedCluster{}
 	require.Same(t, c, d.ManagedClusterDecorator(c))
+}
+
+// The spiffe driver never creates add-on credentials: each add-on agent has its own SVID.
+func TestSPIFFEDriverForkRefuses(t *testing.T) {
+	d := NewSPIFFEDriver(NewOption())
+	if _, err := d.Fork("my-addon", nil, register.SecretOption{}); err == nil || !strings.Contains(err.Error(), "my-addon") {
+		t.Errorf("Fork: %v", err)
+	}
 }

@@ -251,3 +251,14 @@ func TestSPIFFEListenerNoServerSVID(t *testing.T) {
 		t.Fatal("Run did not fail")
 	}
 }
+
+// Invalid SPIFFE settings stop the server before it connects to anything.
+func TestRunWithInvalidSPIFFESettings(t *testing.T) {
+	opts := NewGRPCServerOptions()
+	opts.GRPCEnabled = false
+	opts.SPIFFE.Enabled = true
+	opts.SPIFFE.TrustDomain = "Not A Trust Domain"
+	err := opts.Run(context.Background(), &controllercmd.ControllerContext{KubeConfig: &rest.Config{Host: "https://example.com"}})
+	require.Error(t, err)
+	require.NotContains(t, err.Error(), "no listener enabled")
+}

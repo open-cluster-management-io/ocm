@@ -79,3 +79,13 @@ func tombstone[T any](obj any) (T, bool) {
 	t, ok := obj.(T)
 	return t, ok
 }
+
+// registerRevocationHandlers makes the cluster and add-on informers close the connections the
+// hub no longer allows.
+func registerRevocationHandlers(clusters, addOns cache.SharedIndexInformer, reg connectionCloser) error {
+	if _, err := clusters.AddEventHandler(clusterRevocationHandler(reg)); err != nil {
+		return err
+	}
+	_, err := addOns.AddEventHandler(addOnRevocationHandler(reg))
+	return err
+}

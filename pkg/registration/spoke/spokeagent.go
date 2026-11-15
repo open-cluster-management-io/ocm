@@ -3,6 +3,7 @@ package spoke
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -288,11 +289,8 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		// Wait for the agent's identity, for example until the platform creates its SPIRE
 		// registration entry. The cluster is created with the hub clients below.
 		logger.Info("Waiting for the agent's identity")
-		if err := wait.PollUntilContextCancel(ctx, 5*time.Second, true, o.internalHubConfigValidFunc); err != nil {
-			if err != context.Canceled {
-				return fmt.Errorf("failed to wait for the agent's identity: %w", err)
-			}
-			return nil
+		if stop, err := waitForIdentity(ctx, o.internalHubConfigValidFunc); stop {
+			return err
 		}
 	} else if !ok {
 		// create a ClientCertForHubController for spoke agent bootstrap
@@ -591,4 +589,22 @@ func (o *SpokeAgentConfig) getHubHash() (string, error) {
 		return "", fmt.Errorf("unable to load bootstrap kubeconfig: %w", err)
 	}
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(kubeConfig.Host))), nil
+}
+
+// identityPollInterval is how often a secretless agent checks for its identity.
+var identityPollInterval = 5 * time.Second
+
+// waitForIdentity waits until valid reports the agent's identity, for example until the platform
+// creates its SPIRE registration entry. stop is true when the agent must stop instead: with no
+// error when ctx ended, or with the error valid returned.
+func waitForIdentity(ctx context.Context, valid wait.ConditionWithContextFunc) (stop bool, err error) {
+	err = wait.PollUntilContextCancel(ctx, identityPollInterval, true, valid)
+	switch {
+	case err == nil:
+		return false, nil
+	case errors.Is(err, context.Canceled):
+		return true, nil
+	default:
+		return true, fmt.Errorf("failed to wait for the agent's identity: %w", err)
+	}
 }
