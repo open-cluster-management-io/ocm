@@ -7,6 +7,10 @@ export SPOKE_CLUSTER="${SPOKE_CLUSTER:-ocm-e2e-spoke}"
 export KUBECONFIG="${SPIFFE_E2E_KUBECONFIG:-${SPIFFE_E2E_DIR}/../../../_output/spiffe-e2e.kubeconfig}"
 export HUB_CTX="kind-${HUB_CLUSTER}"
 export SPOKE_CTX="kind-${SPOKE_CLUSTER}"
+# The federated cluster: its own SPIRE, in another trust domain (setup-federation.sh).
+export EAST_CLUSTER="${EAST_CLUSTER:-ocm-e2e-east}"
+export EAST_TRUST_DOMAIN="${EAST_TRUST_DOMAIN:-east.example.org}"
+export EAST_CTX="kind-${EAST_CLUSTER}"
 SPIRE_REPO="https://spiffe.github.io/helm-charts-hardened/"
 SPIRE_CRDS_VERSION=0.6.1
 SPIRE_VERSION=0.30.4

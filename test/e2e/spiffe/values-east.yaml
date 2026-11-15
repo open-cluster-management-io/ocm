@@ -1,0 +1,14 @@
+# SPIRE on the federated e2e cluster: its own server and agent, in trust domain
+# $EAST_TRUST_DOMAIN, with a bundle endpoint the hub's server federates with.
+spire-server:
+  service:
+    type: NodePort
+  caKeyType: rsa-2048
+  jwtKeyType: rsa-2048
+  controllerManager:
+    enabled: true
+    className: spire-server-spire
+  federation:
+    enabled: true
+spiffe-oidc-discovery-provider:
+  enabled: false

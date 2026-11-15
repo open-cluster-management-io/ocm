@@ -25,5 +25,9 @@ spire-server:
         namespace: spire-server
         configMapName: spire-bundle
         configMapKey: bundle.spiffe
+  # The bundle endpoint the federated trust domains read the hub's bundle from
+  # (setup-federation.sh).
+  federation:
+    enabled: true
 spiffe-oidc-discovery-provider:
   enabled: false
