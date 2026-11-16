@@ -119,7 +119,7 @@ var _ = Describe("Addon upgrade Alpha", func() {
 		assertClusterManagementAddOnAnnotationsAlpha(ctx, testAddOnConfigsImpl.name)
 
 		// prepare cluster
-		for i := 0; i < 4; i++ {
+		for i := range 4 {
 			managedClusterName := fmt.Sprintf("managedcluster-%s-%d", suffix, i)
 			clusterNames = append(clusterNames, managedClusterName)
 			err = createManagedCluster(ctx, hubClusterClient, managedClusterName)
@@ -127,7 +127,7 @@ var _ = Describe("Addon upgrade Alpha", func() {
 		}
 
 		// prepare manifestwork obj
-		for i := 0; i < 4; i++ {
+		for i := range 4 {
 			obj := &unstructured.Unstructured{}
 			err := obj.UnmarshalJSON([]byte(upgradeDeploymentJson))
 			Expect(err).ToNot(HaveOccurred())
@@ -181,7 +181,7 @@ var _ = Describe("Addon upgrade Alpha", func() {
 			By("fresh install")
 			By("check work")
 			Eventually(func() error {
-				for i := 0; i < 4; i++ {
+				for i := range 4 {
 					work, err := hubWorkClient.WorkV1().ManifestWorks(clusterNames[i]).Get(
 						ctx, manifestWorkName, metav1.GetOptions{})
 					if err != nil {
@@ -197,12 +197,12 @@ var _ = Describe("Addon upgrade Alpha", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			By("update work status to trigger addon status")
-			for i := 0; i < 4; i++ {
+			for i := range 4 {
 				updateManifestWorkStatus(ctx, hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionTrue)
 			}
 
 			By("check mca status")
-			for i := 0; i < 4; i++ {
+			for i := range 4 {
 				assertManagedClusterAddOnConfigReferencesAlpha(ctx, testAddOnConfigsImpl.name, clusterNames[i], addonapiv1alpha1.ConfigReference{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    addOnDeploymentConfigGVR.Group,
@@ -287,7 +287,7 @@ var _ = Describe("Addon upgrade Alpha", func() {
 			updateAddOnDeploymentConfigSpecAlpha(ctx, hubAddonClient, configDefaultNamespace, configDefaultName, addOnTest1ConfigSpecAlpha)
 
 			By("check mca status")
-			for i := 0; i < 4; i++ {
+			for i := range 4 {
 				assertManagedClusterAddOnConfigReferencesAlpha(ctx, testAddOnConfigsImpl.name, clusterNames[i], addonapiv1alpha1.ConfigReference{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    addOnDeploymentConfigGVR.Group,
@@ -374,7 +374,7 @@ var _ = Describe("Addon upgrade Alpha", func() {
 			// for ProgressDeadline timeout calculation. If we capture start after the work update,
 			// the controller's timeout can fire before our expected 5s duration from start.
 			start := metav1.Now()
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				updateManifestWorkStatus(ctx, hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionFalse)
 			}
 
@@ -395,7 +395,7 @@ var _ = Describe("Addon upgrade Alpha", func() {
 			patchClusterManagementAddOnAlpha(ctx, cma)
 
 			By("check mca status")
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				assertManagedClusterAddOnConfigReferencesAlpha(ctx, testAddOnConfigsImpl.name, clusterNames[i], addonapiv1alpha1.ConfigReference{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    addOnDeploymentConfigGVR.Group,
@@ -508,7 +508,7 @@ var _ = Describe("Addon upgrade Alpha", func() {
 			})
 
 			By("update timeouted work status to continue rollout since within MaxFailures 1")
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				updateManifestWorkStatus(ctx, hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionTrue)
 			}
 			for i := 3; i < 4; i++ {
@@ -516,7 +516,7 @@ var _ = Describe("Addon upgrade Alpha", func() {
 			}
 
 			By("check mca status")
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				assertManagedClusterAddOnConfigReferencesAlpha(ctx, testAddOnConfigsImpl.name, clusterNames[i], addonapiv1alpha1.ConfigReference{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    addOnDeploymentConfigGVR.Group,
@@ -650,7 +650,7 @@ var _ = Describe("Addon upgrade Alpha", func() {
 			})
 
 			By("update work status to avoid addon status update")
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				updateManifestWorkStatus(ctx, hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionFalse)
 			}
 
@@ -673,7 +673,7 @@ var _ = Describe("Addon upgrade Alpha", func() {
 			updateAddOnDeploymentConfigSpecAlpha(ctx, hubAddonClient, configDefaultNamespace, configUpdateName, addOnTest3ConfigSpecAlpha)
 
 			By("check mca status")
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				assertManagedClusterAddOnConfigReferencesAlpha(ctx, testAddOnConfigsImpl.name, clusterNames[i], addonapiv1alpha1.ConfigReference{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    addOnDeploymentConfigGVR.Group,
@@ -794,7 +794,7 @@ var _ = Describe("Addon upgrade Alpha", func() {
 
 			By("update 2 work status to trigger addon status")
 			start = metav1.Now()
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				updateManifestWorkStatus(ctx, hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionTrue)
 			}
 			for i := 2; i < 4; i++ {
@@ -814,7 +814,7 @@ var _ = Describe("Addon upgrade Alpha", func() {
 			})
 
 			By("check mca status")
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				assertManagedClusterAddOnConfigReferencesAlpha(ctx, testAddOnConfigsImpl.name, clusterNames[i], addonapiv1alpha1.ConfigReference{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    addOnDeploymentConfigGVR.Group,

@@ -151,7 +151,7 @@ func collectEvents(recorder *kevents.FakeRecorder, expectedCount int, timeout ti
 	var events []string
 	deadline := time.After(timeout)
 
-	for i := 0; i < expectedCount; i++ {
+	for range expectedCount {
 		select {
 		case event := <-recorder.Events:
 			events = append(events, event)

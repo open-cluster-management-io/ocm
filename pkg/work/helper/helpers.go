@@ -406,7 +406,7 @@ func FindManifestConfiguration(resourceMeta workapiv1.ManifestResourceMeta,
 		},
 	}
 
-	for i := 0; i < len(manifestOptions); i++ {
+	for i := range len(manifestOptions) {
 		option := manifestOptions[i]
 		if !resourceMatch(resourceMeta, option.ResourceIdentifier) {
 			continue

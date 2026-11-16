@@ -240,7 +240,7 @@ func TestAvailableReconcileFailureReset(t *testing.T) {
 	}
 
 	// The failure just started, so even with many rapid calls it should not flip to False
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		updatedCluster, _, _ = reconciler.reconcile(t.Context(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy())
 	}
 	condition = meta.FindStatusCondition(updatedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
@@ -269,7 +269,7 @@ func TestAvailableReconcileBurstEvents(t *testing.T) {
 
 	// Simulate a burst of watch events (node + cluster + namespace) firing together.
 	// All calls happen instantly, well within failureThreshold, so condition must stay True.
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		if _, _, err := reconciler.reconcile(t.Context(), testingcommon.NewFakeSyncContext(t, ""), cluster.DeepCopy()); err != nil {
 			t.Fatal(err)
 		}

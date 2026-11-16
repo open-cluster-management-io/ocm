@@ -27,7 +27,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
-func newExecutorCacheController(t *testing.T, ctx context.Context, clusterName string,
+func newExecutorCacheController(ctx context.Context, clusterName string,
 	kubeClient kubernetes.Interface, initialized chan struct{}, manifestWorkObjects ...runtime.Object) *CacheController {
 
 	workClient := fakeworkclient.NewSimpleClientset(manifestWorkObjects...)
@@ -197,7 +197,7 @@ func TestCacheController(t *testing.T) {
 	}
 
 	initialized := make(chan struct{})
-	cacheController := newExecutorCacheController(t, ctx, clusterName, kubeClient, initialized, work)
+	cacheController := newExecutorCacheController(ctx, clusterName, kubeClient, initialized, work)
 	<-initialized
 
 	// the RBAC resources that already exist when the informers start all enqueue the same
@@ -424,7 +424,7 @@ func TestCacheControllerClusterRoleWithRoleBindingOnly(t *testing.T) {
 	}
 
 	initialized := make(chan struct{})
-	cacheController := newExecutorCacheController(t, ctx, clusterName, kubeClient, initialized, work)
+	cacheController := newExecutorCacheController(ctx, clusterName, kubeClient, initialized, work)
 	<-initialized
 
 	baseline := waitForInitialSync(t, kubeClient, cacheController.bindingExecutorsMapper, 1)

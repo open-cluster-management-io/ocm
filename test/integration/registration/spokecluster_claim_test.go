@@ -514,7 +514,7 @@ var _ = Describe("Cluster Claim", func() {
 		BeforeEach(func() {
 			maxCustomClusterClaims = 5
 			claims = []*clusterv1alpha1.ClusterClaim{}
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				claims = append(claims, &clusterv1alpha1.ClusterClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fmt.Sprintf("claim-%d", i),
@@ -555,7 +555,7 @@ var _ = Describe("Cluster Claim", func() {
 					},
 				},
 			}
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				claims = append(claims, &clusterv1alpha1.ClusterClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fmt.Sprintf("claim-%d", i),

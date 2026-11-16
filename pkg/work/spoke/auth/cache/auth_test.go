@@ -219,7 +219,7 @@ func TestCacheWorks(t *testing.T) {
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
 			// call validate 10 times
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				err := cacheValidator.Validate(t.Context(), test.executor, gvr, test.namespace, test.name, true, nil)
 				if test.expect == nil {
 					if err != nil {

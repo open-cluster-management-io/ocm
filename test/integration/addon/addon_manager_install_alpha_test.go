@@ -38,7 +38,7 @@ var _ = Describe("Addon install Alpha", func() {
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		for i := 0; i < 4; i++ {
+		for i := range 4 {
 			managedClusterName := fmt.Sprintf("managedcluster-%s-%d", suffix, i)
 			clusterNames = append(clusterNames, managedClusterName)
 			managedCluster := &clusterv1.ManagedCluster{

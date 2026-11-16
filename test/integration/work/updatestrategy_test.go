@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/utils/ptr"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -193,7 +192,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 						Name: "test",
 						Value: workapiv1.FieldValue{
 							Type:   workapiv1.String,
-							String: ptr.To[string]("testdata"),
+							String: new("testdata"),
 						},
 					},
 				}
@@ -235,7 +234,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 						Name: "test",
 						Value: workapiv1.FieldValue{
 							Type:   workapiv1.String,
-							String: ptr.To[string]("testdata-updated"),
+							String: new("testdata-updated"),
 						},
 					},
 				}
@@ -340,7 +339,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 			patch, err := object.MarshalJSON()
 			Expect(err).ToNot(HaveOccurred())
 			_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Patch(
-				ctx, "deploy1", types.ApplyPatchType, patch, metav1.PatchOptions{Force: ptr.To[bool](true), FieldManager: "test-integration"})
+				ctx, "deploy1", types.ApplyPatchType, patch, metav1.PatchOptions{Force: new(true), FieldManager: "test-integration"})
 			Expect(err).ToNot(HaveOccurred())
 
 			// Update deployment by work
@@ -1370,7 +1369,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 						Name: "test1",
 						Value: workapiv1.FieldValue{
 							Type:   workapiv1.String,
-							String: ptr.To[string]("testdata"),
+							String: new("testdata"),
 						},
 					},
 				}
@@ -1418,7 +1417,7 @@ var _ = Describe("ManifestWork Update Strategy", func() {
 						Name: "test1",
 						Value: workapiv1.FieldValue{
 							Type:   workapiv1.String,
-							String: ptr.To[string]("testdata-updated"),
+							String: new("testdata-updated"),
 						},
 					},
 				}

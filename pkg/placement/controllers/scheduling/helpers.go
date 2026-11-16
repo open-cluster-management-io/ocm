@@ -60,7 +60,7 @@ func GetEligibleClusterSets(
 	// get intersection of clustersets bound to placement namespace and clustersets specified
 	// in placement spec
 	if len(placement.Spec.ClusterSets) != 0 {
-		clusterSetNames = clusterSetNames.Intersection(sets.New[string](placement.Spec.ClusterSets...))
+		clusterSetNames = clusterSetNames.Intersection(sets.New(placement.Spec.ClusterSets...))
 	}
 
 	return sets.List(clusterSetNames)

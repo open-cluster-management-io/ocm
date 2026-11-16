@@ -459,7 +459,7 @@ func isIPFormat(address string) bool {
 	}
 
 	runes := []rune(address)
-	for i := 0; i < len(runes); i++ {
+	for i := range len(runes) {
 		if (runes[i] < '0' || runes[i] > '9') && runes[i] != '.' {
 			return false
 		}

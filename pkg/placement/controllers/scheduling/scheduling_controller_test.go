@@ -1435,7 +1435,7 @@ func assertClustersSelected(t *testing.T, decisons []clusterapiv1beta1.ClusterDe
 }
 
 func newClusters(num int) (clusters []*clusterapiv1.ManagedCluster) {
-	for i := 0; i < num; i++ {
+	for i := range num {
 		ClusterName := fmt.Sprintf("cluster%d", i+1)
 		c := testinghelpers.NewManagedCluster(ClusterName).Build()
 		clusters = append(clusters, c)
@@ -1444,7 +1444,7 @@ func newClusters(num int) (clusters []*clusterapiv1.ManagedCluster) {
 }
 
 func newSelectedClusters(num int) (clusters []string) {
-	for i := 0; i < num; i++ {
+	for i := range num {
 		clusters = append(clusters, fmt.Sprintf("cluster%d", i+1))
 	}
 

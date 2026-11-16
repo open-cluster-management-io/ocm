@@ -711,7 +711,7 @@ func TestDeployWithRolloutStrategyReconcileAsExpected(t *testing.T) {
 	assert.Equal(t, rollOutCondition.Reason, workapiv1alpha1.ReasonProgressing)
 
 	// Now mark all ManifestWorks as Succeeded to achieve ReasonComplete
-	for i := 0; i < len(clusters); i++ {
+	for i := range len(clusters) {
 		mw := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, "place-test", clusters[i])
 		apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
 			Type:               workapiv1.WorkApplied,
@@ -876,7 +876,7 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	mwrSet.Generation = 1
 
 	var objs []runtime.Object
-	for i := 0; i < clsPerGroup; i++ {
+	for i := range clsPerGroup {
 		mw := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, placement.Name, clusters[i])
 		objs = append(objs, mw)
 	}
@@ -885,7 +885,7 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	fWorkClient := fakeworkclient.NewSimpleClientset(objs...)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 	// create manifestWorks
-	for i := 0; i < clsPerGroup; i++ {
+	for i := range clsPerGroup {
 		mw := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, placement.Name, clusters[i])
 		err = workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw)
 		if err != nil {
@@ -949,7 +949,7 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	assert.Equal(t, rollOutCondition.Reason, workapiv1alpha1.ReasonProgressing)
 
 	// Mark all ManifestWorks as Succeeded
-	for i := 0; i < int(placement.Status.NumberOfSelectedClusters); i++ {
+	for i := range int(placement.Status.NumberOfSelectedClusters) {
 		mw := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, placement.Name, clusters[i])
 		apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
 			Type:               workapiv1.WorkApplied,

@@ -98,7 +98,7 @@ func (a *CRDTemplateAgentAddon) getValues(
 	}
 	overrideValues = addonfactory.MergeValues(defaultValues, overrideValues)
 
-	for i := 0; i < len(a.getValuesFuncs); i++ {
+	for i := range len(a.getValuesFuncs) {
 		if a.getValuesFuncs[i] != nil {
 			userValues, err := a.getValuesFuncs[i](cluster, addon)
 			if err != nil {

@@ -1128,7 +1128,7 @@ func BenchmarkClusterToQueueKeys(b *testing.B) {
 	clusterSets := make([]runtime.Object, 10)
 	bindings := make([]runtime.Object, 100)
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		clusterSets[i] = &v1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("set%d", i)},
 			Spec: v1beta2.ManagedClusterSetSpec{
@@ -1139,7 +1139,7 @@ func BenchmarkClusterToQueueKeys(b *testing.B) {
 		}
 	}
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		bindings[i] = &v1beta2.ManagedClusterSetBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("set%d", i%10),
@@ -1190,7 +1190,7 @@ func BenchmarkClusterToQueueKeys(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		ctrl.clusterToQueueKeys(cluster)
 	}
 }

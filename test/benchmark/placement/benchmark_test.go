@@ -180,7 +180,7 @@ func createClusters(ctx context.Context, namespace, name string, num int) {
 	}
 
 	// Create ManagedCluster
-	for i := 0; i < num; i++ {
+	for i := range num {
 		clusterName := fmt.Sprintf("cluster%d", i)
 		cluster := &clusterapiv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -208,7 +208,7 @@ func createClusters(ctx context.Context, namespace, name string, num int) {
 }
 
 func createPlacements(ctx context.Context, num int) {
-	for i := 0; i < num; i++ {
+	for i := range num {
 		benchmarkPlacement.Name = fmt.Sprintf("%s-%d", name, i)
 		_, err := clusterClient.ClusterV1beta1().Placements(namespace).Create(ctx, &benchmarkPlacement, metav1.CreateOptions{})
 		if err != nil {
@@ -232,7 +232,7 @@ func assertPlacementDecisions(ctx context.Context, num int, cancel context.Cance
 
 func createAddOnPlacementScores(ctx context.Context, name string, num int) {
 	// Create AddOnPlacementScore
-	for i := 0; i < num; i++ {
+	for i := range num {
 		clusterName := fmt.Sprintf("cluster%d", i)
 		addOn := &clusterapiv1alpha1.AddOnPlacementScore{
 			ObjectMeta: metav1.ObjectMeta{

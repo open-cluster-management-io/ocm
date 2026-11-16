@@ -100,7 +100,7 @@ var _ = Describe("ManifestWorkReplicaSet", func() {
 				return nil, clusterNames, err
 			}
 
-			for i := 0; i < numberOfClusters; i++ {
+			for range numberOfClusters {
 				clusterName := "cluster-" + utilrand.String(5)
 				ns := &corev1.Namespace{}
 				ns.Name = clusterName
@@ -325,7 +325,7 @@ var _ = Describe("ManifestWorkReplicaSet", func() {
 
 			// Create clusters for first placement
 			cluster1Names := sets.New[string]()
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				clusterName := "cluster-placement1-" + utilrand.String(5)
 				ns := &corev1.Namespace{}
 				ns.Name = clusterName
@@ -410,7 +410,7 @@ var _ = Describe("ManifestWorkReplicaSet", func() {
 
 			// Create clusters for second placement
 			cluster2Names := sets.New[string]()
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				clusterName := "cluster-placement2-" + utilrand.String(5)
 				ns := &corev1.Namespace{}
 				ns.Name = clusterName

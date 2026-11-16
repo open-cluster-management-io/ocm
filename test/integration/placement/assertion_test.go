@@ -334,7 +334,7 @@ func assertCreatingClusters(ctx context.Context, clusterSetName string, num int,
 	By(fmt.Sprintf("Create %d clusters", num))
 
 	var names []string
-	for i := 0; i < num; i++ {
+	for range num {
 		cluster := &clusterapiv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "cluster-",
