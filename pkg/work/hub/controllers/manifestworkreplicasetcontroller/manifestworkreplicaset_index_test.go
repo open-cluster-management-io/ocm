@@ -65,7 +65,7 @@ func TestPlaceMWControllerIndex(t *testing.T) {
 			&finalizeReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 				workClient: fWorkClient, manifestWorkLister: mwLister},
 			&addFinalizerReconciler{workClient: fWorkClient},
-			&deployReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+			&deployReconciler{workClient: fWorkClient, workApplier: workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 				manifestWorkLister: mwLister, placementLister: placementLister, placeDecisionLister: placementDecisionLister},
 			&statusReconciler{manifestWorkLister: mwLister},
 		},
