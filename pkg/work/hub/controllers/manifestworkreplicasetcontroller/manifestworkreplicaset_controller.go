@@ -126,7 +126,7 @@ func getManifestWorkInReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet,
 
 // compareWorksByAge orders works by creation time, then by name.
 func compareWorksByAge(a, b *workapiv1.ManifestWork) int {
-	return cmp.Or(a.CreationTimestamp.Time.Compare(b.CreationTimestamp.Time), cmp.Compare(a.Name, b.Name))
+	return cmp.Or(a.CreationTimestamp.Compare(b.CreationTimestamp.Time), cmp.Compare(a.Name, b.Name))
 }
 
 // ManifestWorkReplicaSetReconcile is a interface for reconcile logic. It returns an updated manifestWorkReplicaSet and whether further
