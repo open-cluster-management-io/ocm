@@ -7,7 +7,7 @@
 [![Artifact HUB Cluster Manager](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/cluster-manager)](https://artifacthub.io/packages/olm/community-operators/cluster-manager)
 [![Artifact HUB Klusterlet](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/klusterlet)](https://artifacthub.io/packages/olm/community-operators/klusterlet)
 
-Open Cluster Management (OCM) is a [Cloud Native Computing Foundation (CNCF) sandbox project](https://www.cncf.io/projects/open-cluster-management) focused on multicluster and multicloud scenarios for Kubernetes applications. At its core, OCM exists to make running, managing, and utilizing heterogeneous, multicluster environments simpler.
+Open Cluster Management (OCM) is a [Cloud Native Computing Foundation (CNCF) incubating project](https://www.cncf.io/projects/open-cluster-management) focused on multicluster and multicloud scenarios for Kubernetes applications. At its core, OCM exists to make running, managing, and utilizing heterogeneous, multicluster environments simpler.
 
 ![CNCF logo](assets/cncf.png)
 
