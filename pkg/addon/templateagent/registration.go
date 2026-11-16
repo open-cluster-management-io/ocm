@@ -343,7 +343,7 @@ func (a *CRDTemplateAgentAddon) TemplatePermissionConfigFunc() agent.PermissionC
 					continue
 				}
 
-				err := a.createKubeClientPermissions(kcrc, cluster, addon)
+				err := a.createKubeClientPermissions(ctx, kcrc, cluster, addon)
 				if err != nil {
 					return err
 				}
@@ -363,6 +363,7 @@ func (a *CRDTemplateAgentAddon) TemplatePermissionConfigFunc() agent.PermissionC
 }
 
 func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
+	ctx context.Context,
 	kcrc *addonapiv1alpha1.KubeClientRegistrationConfig,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1beta1.ManagedClusterAddOn,
@@ -395,7 +396,7 @@ func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
 				APIGroup: rbacv1.GroupName,
 				Name:     pc.CurrentCluster.ClusterRoleName,
 			}
-			err := a.createPermissionBinding(cluster.Name, addon.Name, cluster.Name, roleRef, &owner)
+			err := a.createPermissionBinding(ctx, cluster.Name, addon.Name, cluster.Name, roleRef, &owner)
 			if err != nil {
 				return err
 			}
@@ -406,7 +407,7 @@ func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
 
 			// set owner reference nil since the rolebinding has different namespace with the ManagedClusterAddon
 			// TODO: cleanup the rolebinding when the addon is deleted
-			err := a.createPermissionBinding(cluster.Name, addon.Name,
+			err := a.createPermissionBinding(ctx, cluster.Name, addon.Name,
 				pc.SingleNamespace.Namespace, pc.SingleNamespace.RoleRef, nil)
 			if err != nil {
 				return err
@@ -416,7 +417,7 @@ func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
 	return nil
 }
 
-func (a *CRDTemplateAgentAddon) createPermissionBinding(clusterName, addonName, namespace string,
+func (a *CRDTemplateAgentAddon) createPermissionBinding(ctx context.Context, clusterName, addonName, namespace string,
 	roleRef rbacv1.RoleRef, owner *metav1.OwnerReference) error {
 
 	// Get the ManagedClusterAddOn to extract dynamic subjects from Status.Registrations
@@ -452,13 +453,12 @@ func (a *CRDTemplateAgentAddon) createPermissionBinding(clusterName, addonName, 
 		binding.OwnerReferences = []metav1.OwnerReference{*owner}
 	}
 
-	// TODO(qiujian16) this should have ctx passed to build the wrapper
 	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(
-		context.Background(),
+		ctx,
 		events.NewContextualLoggingEventRecorder(fmt.Sprintf("addontemplate-%s-%s", clusterName, addonName)),
 	)
 
-	_, modified, err := resourceapply.ApplyRoleBinding(context.TODO(),
+	_, modified, err := resourceapply.ApplyRoleBinding(ctx,
 		a.hubKubeClient.RbacV1(), recorderWrapper, binding)
 	if err == nil && modified {
 		a.logger.Info("Rolebinding for addon updated", "namespace", binding.Namespace, "name", binding.Name,
