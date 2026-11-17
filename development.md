@@ -16,7 +16,7 @@ This document provides comprehensive guidelines for new contributors developing 
 
 ## Project Overview
 
-Open Cluster Management (OCM) is a CNCF sandbox project that provides multicluster and multicloud management capabilities for Kubernetes. The project consists of five core components:
+Open Cluster Management (OCM) is a CNCF incubating project that provides multicluster and multicloud management capabilities for Kubernetes. The project consists of five core components:
 
 - **registration**: Manages cluster registration and certificate lifecycle
 - **placement**: Handles content placement decisions across clusters
