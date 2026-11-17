@@ -1421,6 +1421,121 @@ func TestBind(t *testing.T) {
 	}
 }
 
+func TestBindOrder(t *testing.T) {
+	newDecision := func(index int, clusterNames ...string) *clusterapiv1beta1.PlacementDecision {
+		return testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, index)).
+			WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+			WithDecisions(clusterNames...).Build()
+	}
+
+	cases := []struct {
+		name      string
+		existing  []*clusterapiv1beta1.PlacementDecision
+		desired   []*clusterapiv1beta1.PlacementDecision
+		patchErrs sets.Set[string]
+		// expectedPatches are the indexes of the patched placementdecisions in order
+		expectedPatches []int
+		expectedErr     string
+	}{
+		{
+			name:            "no cluster moves",
+			existing:        []*clusterapiv1beta1.PlacementDecision{newDecision(1, "c1", "c2"), newDecision(2, "c3", "c4")},
+			desired:         []*clusterapiv1beta1.PlacementDecision{newDecision(1, "c1"), newDecision(2, "c3", "c4", "c5")},
+			expectedPatches: []int{1, 2},
+		},
+		{
+			// c2 must be added to decision 2 before it is removed from decision 1
+			name:            "cluster moves to a later placementdecision",
+			existing:        []*clusterapiv1beta1.PlacementDecision{newDecision(1, "c1", "c2"), newDecision(2, "c3")},
+			desired:         []*clusterapiv1beta1.PlacementDecision{newDecision(1, "c0", "c1"), newDecision(2, "c2", "c3")},
+			expectedPatches: []int{2, 1},
+		},
+		{
+			name:            "cluster moves to an earlier placementdecision",
+			existing:        []*clusterapiv1beta1.PlacementDecision{newDecision(1, "c1", "c2"), newDecision(2, "c3", "c4")},
+			desired:         []*clusterapiv1beta1.PlacementDecision{newDecision(1, "c2", "c3"), newDecision(2, "c4")},
+			expectedPatches: []int{1, 2},
+		},
+		{
+			name: "clusters move along a chain of placementdecisions",
+			existing: []*clusterapiv1beta1.PlacementDecision{
+				newDecision(1, "c1", "c2"), newDecision(2, "c3", "c4"), newDecision(3, "c5")},
+			desired: []*clusterapiv1beta1.PlacementDecision{
+				newDecision(1, "c0", "c1"), newDecision(2, "c2", "c3"), newDecision(3, "c4", "c5")},
+			expectedPatches: []int{3, 2, 1},
+		},
+		{
+			// decisions 1 and 2 exchange clusters, so one of them goes first. Decision 3 gives c5 to
+			// decision 1 and is still updated after it.
+			name: "placementdecisions exchange clusters",
+			existing: []*clusterapiv1beta1.PlacementDecision{
+				newDecision(3, "c5", "c6"), newDecision(1, "c1", "c2"), newDecision(2, "c3", "c4")},
+			desired: []*clusterapiv1beta1.PlacementDecision{
+				newDecision(3, "c6"), newDecision(1, "c1", "c3", "c5"), newDecision(2, "c2", "c4")},
+			expectedPatches: []int{1, 3, 2},
+		},
+		{
+			// decision 2 is not updated, so c2 stays in decision 1 and c3 stays in decision 3
+			name: "placementdecision that takes over a cluster fails to update",
+			existing: []*clusterapiv1beta1.PlacementDecision{
+				newDecision(1, "c1", "c2"), newDecision(2, "c3"), newDecision(3, "c4")},
+			desired: []*clusterapiv1beta1.PlacementDecision{
+				newDecision(1, "c0", "c1"), newDecision(2, "c2"), newDecision(3, "c3", "c5")},
+			patchErrs:       sets.New(testinghelpers.PlacementDecisionName(placementName, 2)),
+			expectedPatches: []int{3, 2},
+			expectedErr:     "inject patch error",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var objs []runtime.Object
+			for _, pd := range c.existing {
+				objs = append(objs, pd)
+			}
+			ctrl, clusterClient, _ := newTestSchedulingController(t, objs)
+			clusterClient.PrependReactor(
+				"patch",
+				"placementdecisions",
+				func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					if c.patchErrs.Has(action.(clienttesting.PatchActionImpl).Name) {
+						return true, nil, fmt.Errorf("inject patch error")
+					}
+					return false, nil, nil
+				},
+			)
+
+			err := ctrl.bind(
+				t.Context(),
+				testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
+				c.desired,
+				nil,
+				nil,
+			)
+			switch {
+			case c.expectedErr != "" && (err == nil || !strings.Contains(err.Error(), c.expectedErr)):
+				t.Errorf("expected err containing %q, but got %v", c.expectedErr, err)
+			case c.expectedErr == "" && err != nil:
+				t.Errorf("unexpected err: %v", err)
+			}
+
+			var patched []string
+			for _, action := range clusterClient.Actions() {
+				if patchAction, ok := action.(clienttesting.PatchActionImpl); ok {
+					patched = append(patched, patchAction.Name)
+				}
+			}
+			var expected []string
+			for _, index := range c.expectedPatches {
+				expected = append(expected, testinghelpers.PlacementDecisionName(placementName, index))
+			}
+			if !reflect.DeepEqual(patched, expected) {
+				t.Errorf("expected placementdecisions patched in order %v, but got %v", expected, patched)
+			}
+		})
+	}
+}
+
 func assertClustersSelected(t *testing.T, decisons []clusterapiv1beta1.ClusterDecision, clusterNames ...string) {
 	names := sets.NewString(clusterNames...)
 	for _, decision := range decisons {

@@ -535,12 +535,26 @@ func (c *schedulingController) bind(
 ) error {
 	var errs []error
 	placementDecisionNames := sets.NewString()
-
-	// create/update placement decisions
 	for _, pd := range placementdecisions {
 		placementDecisionNames.Insert(pd.Name)
-		err := c.createOrUpdatePlacementDecision(ctx, placement, pd, clusterScores, status)
-		if err != nil {
+	}
+
+	// create/update placement decisions
+	ordered, err := c.orderPlacementDecisions(placement.Namespace, placementdecisions)
+	if err != nil {
+		return err
+	}
+	// blocked holds the placementdecisions that were not updated in this sync
+	blocked := sets.New[string]()
+	for _, pd := range ordered {
+		// A placementdecision that takes over a cluster from this one was not updated. Keep the cluster
+		// here until the next sync, otherwise it would be in no placementdecision.
+		if pd.waitsFor.HasAny(blocked.UnsortedList()...) {
+			blocked.Insert(pd.placementDecision.Name)
+			continue
+		}
+		if err := c.createOrUpdatePlacementDecision(ctx, placement, pd.placementDecision, clusterScores, status); err != nil {
+			blocked.Insert(pd.placementDecision.Name)
 			errs = append(errs, err)
 		}
 	}
@@ -575,6 +589,95 @@ func (c *schedulingController) bind(
 			"Decision %s is deleted with placement %s in namespace %s", pd.Name, placement.Name, placement.Namespace)
 	}
 	return errorhelpers.NewMultiLineAggregate(errs)
+}
+
+// orderedPlacementDecision is a placementdecision together with the placementdecisions that
+// must be updated before it.
+type orderedPlacementDecision struct {
+	placementDecision *clusterapiv1beta1.PlacementDecision
+	// waitsFor are the names of the placementdecisions that take over clusters from this one
+	waitsFor sets.Set[string]
+}
+
+// orderPlacementDecisions returns the placementdecisions in the order they should be updated.
+// The placementdecisions are updated one by one, and consumers such as the addon manager treat a
+// cluster that is in none of them as no longer selected. So a placementdecision that takes over a
+// cluster is updated before the placementdecision that gives it up: the cluster is listed twice
+// for a moment instead of not at all.
+func (c *schedulingController) orderPlacementDecisions(
+	namespace string,
+	placementdecisions []*clusterapiv1beta1.PlacementDecision,
+) ([]orderedPlacementDecision, error) {
+	// the placementdecision each cluster belongs to after the update
+	target := map[string]string{}
+	for _, pd := range placementdecisions {
+		for _, decision := range pd.Status.Decisions {
+			target[decision.ClusterName] = pd.Name
+		}
+	}
+
+	pending := make([]orderedPlacementDecision, 0, len(placementdecisions))
+	for _, pd := range placementdecisions {
+		waitsFor := sets.New[string]()
+		existing, err := c.placementDecisionLister.PlacementDecisions(namespace).Get(pd.Name)
+		switch {
+		case errors.IsNotFound(err):
+		case err != nil:
+			return nil, err
+		default:
+			for _, decision := range existing.Status.Decisions {
+				if name, ok := target[decision.ClusterName]; ok && name != pd.Name {
+					waitsFor.Insert(name)
+				}
+			}
+		}
+		pending = append(pending, orderedPlacementDecision{placementDecision: pd, waitsFor: waitsFor})
+	}
+
+	ordered := make([]orderedPlacementDecision, 0, len(pending))
+	placed := sets.New[string]()
+	for len(pending) > 0 {
+		next := -1
+		for i := range pending {
+			if placed.IsSuperset(pending[i].waitsFor) {
+				next = i
+				break
+			}
+		}
+		if next < 0 {
+			// The placementdecisions that are left exchange clusters with each other, and one of them
+			// cannot hold both sets of clusters at once without exceeding maxNumOfClusterDecisions.
+			// Update one that is part of the exchange first, so the ones that only wait for it keep
+			// their order.
+			next = cycleMember(pending, placed)
+		}
+		placed.Insert(pending[next].placementDecision.Name)
+		ordered = append(ordered, pending[next])
+		pending = append(pending[:next], pending[next+1:]...)
+	}
+	return ordered, nil
+}
+
+// cycleMember returns the index of a pending placementdecision that waits, directly or through
+// others, for itself. Every pending placementdecision must wait for another pending one.
+func cycleMember(pending []orderedPlacementDecision, placed sets.Set[string]) int {
+	index := map[string]int{}
+	for i := range pending {
+		index[pending[i].placementDecision.Name] = i
+	}
+	visited := sets.New[string]()
+	current := 0
+	for !visited.Has(pending[current].placementDecision.Name) {
+		visited.Insert(pending[current].placementDecision.Name)
+		// sorted to keep the update order stable across syncs
+		for _, name := range sets.List(pending[current].waitsFor) {
+			if !placed.Has(name) {
+				current = index[name]
+				break
+			}
+		}
+	}
+	return current
 }
 
 // createOrUpdatePlacementDecision creates a new PlacementDecision if it does not exist and
