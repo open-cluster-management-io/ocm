@@ -306,7 +306,7 @@ type KlusterletSPIFFEConfig struct {
 	// spiffe://ocm-hub.example.org/ocm/hub/grpc-server. It is in the hub's trust domain.
 	// +required
 	// +kubebuilder:validation:MaxLength=512
-	// +kubebuilder:validation:Pattern=`^spiffe://[a-z0-9._-]+(/[A-Za-z0-9._-]+)+$`
+	// +kubebuilder:validation:Pattern=`^spiffe://[a-z0-9._-]+(/([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,}))+$`
 	HubSPIFFEID string `json:"hubSPIFFEID"`
 
 	// trustDomain is the agents' own SPIFFE trust domain, for example east.example.org. The
@@ -332,7 +332,7 @@ type KlusterletSPIFFEConfig struct {
 	// +optional
 	// +kubebuilder:default:="spiffe://{trustDomain}/ocm/cluster/{cluster}/agent/{role}"
 	// +kubebuilder:validation:MaxLength=512
-	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/([A-Za-z0-9._-]+|\{[A-Za-z]+\}))+$`
+	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$`
 	AgentIDTemplate string `json:"agentIDTemplate,omitempty"`
 
 	// addOnAgentIDTemplate is the layout of add-on agent SPIFFE IDs on this cluster. It must
@@ -341,7 +341,7 @@ type KlusterletSPIFFEConfig struct {
 	// +optional
 	// +kubebuilder:default:="spiffe://{trustDomain}/ocm/cluster/{cluster}/addon/{addon}/agent/{agent}"
 	// +kubebuilder:validation:MaxLength=512
-	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/([A-Za-z0-9._-]+|\{[A-Za-z]+\}))+$`
+	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$`
 	AddOnAgentIDTemplate string `json:"addOnAgentIDTemplate,omitempty"`
 
 	// admissionEnforcement is how the klusterlet operator enforces the admission rules that keep

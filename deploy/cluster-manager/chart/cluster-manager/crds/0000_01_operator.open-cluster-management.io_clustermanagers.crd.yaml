@@ -589,7 +589,7 @@ spec:
                                 namespace, never used for authorization). The rules of agentIDTemplate apply, and no
                                 SPIFFE ID may match both templates. The Klusterlets must use the same template.
                               maxLength: 512
-                              pattern: ^spiffe://\{trustDomain\}(/([A-Za-z0-9._-]+|\{[A-Za-z]+\}))+$
+                              pattern: ^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$
                               type: string
                             agentIDTemplate:
                               default: spiffe://{trustDomain}/ocm/cluster/{cluster}/agent/{role}
@@ -603,7 +603,7 @@ spec:
                                 at least one segment is fixed text. The Klusterlets must use the same template. The
                                 cluster-manager operator checks these rules and reports a Degraded condition otherwise.
                               maxLength: 512
-                              pattern: ^spiffe://\{trustDomain\}(/([A-Za-z0-9._-]+|\{[A-Za-z]+\}))+$
+                              pattern: ^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$
                               type: string
                             agentTrustDomains:
                               description: |-
@@ -632,7 +632,7 @@ spec:
                                 of the spiffe driver are never accepted automatically.
                               items:
                                 maxLength: 512
-                                pattern: ^spiffe://[a-z0-9._-]+(/([A-Za-z0-9._-]+|\*))+$
+                                pattern: ^spiffe://[a-z0-9._-]+(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\*))+$
                                 type: string
                               maxItems: 64
                               type: array
@@ -643,7 +643,8 @@ spec:
                                 maxClockSkew is the allowed clock difference between the hub and the SPIRE servers of
                                 every trust domain. It is used by the SVID validity check and added to the delete
                                 guard's wait.
-                              pattern: ^([0-9]+(s|m|h))+$
+                              maxLength: 24
+                              pattern: ^([0-9]{1,5}(s|m|h))+$
                               type: string
                             maxSVIDLifetime:
                               default: 24h
@@ -651,7 +652,8 @@ spec:
                                 maxSVIDLifetime must be at least the longest SVID TTL SPIRE issues to OCM agents, in any
                                 of agentTrustDomains. When a ManagedCluster is deleted, the hub keeps it terminating for
                                 this long plus maxClockSkew, so no SVID issued before the deletion can recreate it.
-                              pattern: ^([0-9]+(s|m|h))+$
+                              maxLength: 24
+                              pattern: ^([0-9]{1,5}(s|m|h))+$
                               type: string
                             serverSPIFFEID:
                               description: |-
@@ -659,7 +661,7 @@ spec:
                                 trustDomain; the cluster-manager operator reports a Degraded condition otherwise.
                                 If it is not set, spiffe://<trustDomain>/ocm/hub/grpc-server is used.
                               maxLength: 512
-                              pattern: ^spiffe://[a-z0-9._-]+(/[A-Za-z0-9._-]+)+$
+                              pattern: ^spiffe://[a-z0-9._-]+(/([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,}))+$
                               type: string
                             trustDomain:
                               description: |-

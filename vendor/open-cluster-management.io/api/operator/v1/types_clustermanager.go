@@ -251,7 +251,7 @@ type SPIFFERegistrationConfig struct {
 	// +optional
 	// +kubebuilder:default:="spiffe://{trustDomain}/ocm/cluster/{cluster}/agent/{role}"
 	// +kubebuilder:validation:MaxLength=512
-	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/([A-Za-z0-9._-]+|\{[A-Za-z]+\}))+$`
+	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$`
 	AgentIDTemplate string `json:"agentIDTemplate,omitempty"`
 
 	// addOnAgentIDTemplate is the layout of add-on agent SPIFFE IDs. Path placeholders:
@@ -261,7 +261,7 @@ type SPIFFERegistrationConfig struct {
 	// +optional
 	// +kubebuilder:default:="spiffe://{trustDomain}/ocm/cluster/{cluster}/addon/{addon}/agent/{agent}"
 	// +kubebuilder:validation:MaxLength=512
-	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/([A-Za-z0-9._-]+|\{[A-Za-z]+\}))+$`
+	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$`
 	AddOnAgentIDTemplate string `json:"addOnAgentIDTemplate,omitempty"`
 
 	// serverSPIFFEID is the SPIFFE ID the hub gRPC server presents to agents. It must be in
@@ -269,7 +269,7 @@ type SPIFFERegistrationConfig struct {
 	// If it is not set, spiffe://<trustDomain>/ocm/hub/grpc-server is used.
 	// +optional
 	// +kubebuilder:validation:MaxLength=512
-	// +kubebuilder:validation:Pattern=`^spiffe://[a-z0-9._-]+(/[A-Za-z0-9._-]+)+$`
+	// +kubebuilder:validation:Pattern=`^spiffe://[a-z0-9._-]+(/([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,}))+$`
 	ServerSPIFFEID string `json:"serverSPIFFEID,omitempty"`
 
 	// workloadAPISocket is the address of the local SPIRE agent's Workload API, as mounted
@@ -284,7 +284,8 @@ type SPIFFERegistrationConfig struct {
 	// +optional
 	// +kubebuilder:default:="24h"
 	// +kubebuilder:validation:Type=string
-	// +kubebuilder:validation:Pattern="^([0-9]+(s|m|h))+$"
+	// +kubebuilder:validation:MaxLength=24
+	// +kubebuilder:validation:Pattern="^([0-9]{1,5}(s|m|h))+$"
 	MaxSVIDLifetime *metav1.Duration `json:"maxSVIDLifetime,omitempty"`
 
 	// maxClockSkew is the allowed clock difference between the hub and the SPIRE servers of
@@ -293,7 +294,8 @@ type SPIFFERegistrationConfig struct {
 	// +optional
 	// +kubebuilder:default:="5m"
 	// +kubebuilder:validation:Type=string
-	// +kubebuilder:validation:Pattern="^([0-9]+(s|m|h))+$"
+	// +kubebuilder:validation:MaxLength=24
+	// +kubebuilder:validation:Pattern="^([0-9]{1,5}(s|m|h))+$"
 	MaxClockSkew *metav1.Duration `json:"maxClockSkew,omitempty"`
 
 	// autoApprovedIdentities are the SPIFFE IDs whose clusters are accepted automatically, as
@@ -307,7 +309,7 @@ type SPIFFERegistrationConfig struct {
 	// +listType=set
 	// +kubebuilder:validation:MaxItems=64
 	// +kubebuilder:validation:items:MaxLength=512
-	// +kubebuilder:validation:items:Pattern=`^spiffe://[a-z0-9._-]+(/([A-Za-z0-9._-]+|\*))+$`
+	// +kubebuilder:validation:items:Pattern=`^spiffe://[a-z0-9._-]+(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\*))+$`
 	AutoApprovedIdentities []string `json:"autoApprovedIdentities,omitempty"`
 }
 

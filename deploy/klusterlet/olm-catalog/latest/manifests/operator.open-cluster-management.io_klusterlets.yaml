@@ -550,7 +550,7 @@ spec:
                               equal the hub's ClusterManager addOnAgentIDTemplate. {addon} is the add-on name, {agent}
                               the add-on agent name, and {namespace} the add-on's install namespace.
                             maxLength: 512
-                            pattern: ^spiffe://\{trustDomain\}(/([A-Za-z0-9._-]+|\{[A-Za-z]+\}))+$
+                            pattern: ^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$
                             type: string
                           admissionEnforcement:
                             description: |-
@@ -575,7 +575,7 @@ spec:
                               {namespace} is the namespace the agent runs in. Each placeholder fills a whole path
                               segment.
                             maxLength: 512
-                            pattern: ^spiffe://\{trustDomain\}(/([A-Za-z0-9._-]+|\{[A-Za-z]+\}))+$
+                            pattern: ^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$
                             type: string
                           hubEndpoint:
                             description: hubEndpoint is host:port of the hub gRPC
@@ -588,7 +588,7 @@ spec:
                               hubSPIFFEID is the only SPIFFE ID the agents accept from the hub, for example
                               spiffe://ocm-hub.example.org/ocm/hub/grpc-server. It is in the hub's trust domain.
                             maxLength: 512
-                            pattern: ^spiffe://[a-z0-9._-]+(/[A-Za-z0-9._-]+)+$
+                            pattern: ^spiffe://[a-z0-9._-]+(/([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,}))+$
                             type: string
                           trustDomain:
                             description: |-
