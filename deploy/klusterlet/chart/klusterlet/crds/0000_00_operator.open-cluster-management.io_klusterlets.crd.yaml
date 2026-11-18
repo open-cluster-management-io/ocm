@@ -552,6 +552,19 @@ spec:
                             maxLength: 512
                             pattern: ^spiffe://\{trustDomain\}(/([A-Za-z0-9._-]+|\{[A-Za-z]+\}))+$
                             type: string
+                          admissionEnforcement:
+                            description: |-
+                              admissionEnforcement is how the klusterlet operator enforces the admission rules that keep
+                              other workloads from getting the agents' SVIDs. ValidatingAdmissionPolicy needs Kubernetes
+                              1.30 or later; the API server evaluates the rules itself, and on an older cluster the
+                              Klusterlet is refused as an unsupported Kubernetes version. ValidatingWebhook works on every
+                              version; the operator serves the webhook, with an SVID from SPIRE that carries the webhook
+                              Service's DNS name. Both enforce the same rules. When it changes, the operator puts the new
+                              enforcement in place before it removes the old one.
+                            enum:
+                            - ValidatingAdmissionPolicy
+                            - ValidatingWebhook
+                            type: string
                           agentIDTemplate:
                             default: spiffe://{trustDomain}/ocm/cluster/{cluster}/agent/{role}
                             description: |-
@@ -592,6 +605,7 @@ spec:
                               into the agent pods by the SPIFFE CSI driver.
                             type: string
                         required:
+                        - admissionEnforcement
                         - hubEndpoint
                         - hubSPIFFEID
                         type: object
@@ -961,6 +975,15 @@ spec:
                     - name
                     - uid
                     type: object
+                  admissionEnforcement:
+                    description: |-
+                      admissionEnforcement is the enforcement the operator has put in place and recorded:
+                      ValidatingAdmissionPolicy, with admissionPolicies, or ValidatingWebhook, with
+                      admissionWebhooks.
+                    enum:
+                    - ValidatingAdmissionPolicy
+                    - ValidatingWebhook
+                    type: string
                   admissionPolicies:
                     description: |-
                       admissionPolicies are the ValidatingAdmissionPolicies and their bindings the operator
@@ -1003,6 +1026,36 @@ spec:
                     x-kubernetes-list-map-keys:
                     - policyName
                     x-kubernetes-list-type: map
+                  admissionWebhooks:
+                    description: |-
+                      admissionWebhooks are the ValidatingWebhookConfigurations the operator ran recovery for,
+                      with ValidatingWebhook enforcement. When a live configuration no longer matches its entry,
+                      the operator runs recovery again before any agent runs.
+                    items:
+                      description: SPIFFEAdmissionWebhookStatus records one ValidatingWebhookConfiguration.
+                      properties:
+                        generation:
+                          description: generation is the generation of the configuration.
+                          format: int64
+                          type: integer
+                        name:
+                          description: name is the name of the ValidatingWebhookConfiguration.
+                          maxLength: 253
+                          minLength: 1
+                          type: string
+                        uid:
+                          description: uid is the UID of the configuration.
+                          type: string
+                      required:
+                      - generation
+                      - name
+                      - uid
+                      type: object
+                    maxItems: 16
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                   agentIDs:
                     description: |-
                       agentIDs are the SPIFFE IDs the operator rendered for this Klusterlet's agents from
@@ -1035,6 +1088,20 @@ spec:
                     x-kubernetes-list-map-keys:
                     - role
                     x-kubernetes-list-type: map
+                  webhookDNSName:
+                    description: |-
+                      webhookDNSName is the DNS name the operator's webhook serves on, with ValidatingWebhook
+                      enforcement. The operator's SVID must carry it, so the platform's SPIRE registration entry
+                      for the operator sets it.
+                    maxLength: 253
+                    type: string
+                  webhookSPIFFEID:
+                    description: |-
+                      webhookSPIFFEID is the SPIFFE ID the operator's webhook SVID must have, with
+                      ValidatingWebhook enforcement: agentIDTemplate rendered with the role operator. The hub
+                      accepts no agent with that role, so the SVID is good only for serving the webhook.
+                    maxLength: 2048
+                    type: string
                 type: object
             type: object
         type: object

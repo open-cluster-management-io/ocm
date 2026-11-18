@@ -31,13 +31,15 @@ func spiffeKlusterlet() *operatorapiv1.Klusterlet {
 	k := newKlusterlet("klusterlet", "open-cluster-management-agent", "cluster1")
 	k.Spec.RegistrationConfiguration.RegistrationDriver = operatorapiv1.RegistrationDriver{
 		AuthType: operatorapiv1.SPIFFEAuthType,
-		SPIFFE:   &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "hub:443", HubSPIFFEID: testSPIFFEHubID},
+		SPIFFE: &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "hub:443", HubSPIFFEID: testSPIFFEHubID,
+			AdmissionEnforcement: operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy,
+		},
 	}
 	return k
 }
 
 func spiffeConfig(k *operatorapiv1.Klusterlet) klusterletConfig {
-	return klusterletConfig{
+	c := klusterletConfig{
 		KlusterletName:             k.Name,
 		KlusterletNamespace:        helpers.KlusterletNamespace(k),
 		AgentNamespace:             helpers.AgentNamespace(k),
@@ -46,6 +48,10 @@ func spiffeConfig(k *operatorapiv1.Klusterlet) klusterletConfig {
 		WorkServiceAccount:         serviceAccountName("work-sa", k),
 		RegistrationDriver:         RegistrationDriver{AuthType: operatorapiv1.SPIFFEAuthType},
 	}
+	if s := k.Spec.RegistrationConfiguration.RegistrationDriver.SPIFFE; s != nil {
+		c.SPIFFEAdmissionEnforcement = s.AdmissionEnforcement
+	}
+	return c
 }
 
 func newAdmissionReconcile(kube *fakekube.Clientset, amws ...runtime.Object) *spiffeAdmissionReconcile {
@@ -60,7 +66,14 @@ func newAdmissionReconcile(kube *fakekube.Clientset, amws ...runtime.Object) *sp
 		spiffeWorkAgents: func() (map[string]string, error) {
 			return map[string]string{"klusterlet": "system:serviceaccount:open-cluster-management-agent:klusterlet-work-sa"}, nil
 		},
+		watch: startedWatch(),
 	}
+}
+
+// startedWatch is a watch that already runs, so a reconcile neither checks the operator's
+// permissions nor starts informers.
+func startedWatch() *spiffeAdmissionWatch {
+	return &spiffeAdmissionWatch{webhooks: true, policies: true}
 }
 
 func deleteCollections(kube *fakekube.Clientset) map[string]bool {
@@ -77,6 +90,8 @@ func readyCondition(k *operatorapiv1.Klusterlet) *metav1.Condition {
 	return meta.FindStatusCondition(k.Status.Conditions, operatorapiv1.ConditionSPIFFEAdmissionReady)
 }
 
+// ValidatingAdmissionPolicy enforcement on a cluster that doesn't serve the API is refused as an
+// unsupported Kubernetes version.
 func TestSPIFFEAdmissionPolicyAPIMissing(t *testing.T) {
 	k := spiffeKlusterlet()
 	kube := fakekube.NewSimpleClientset()
@@ -86,8 +101,19 @@ func TestSPIFFEAdmissionPolicyAPIMissing(t *testing.T) {
 		t.Fatalf("got state %v, err %v; want stop with an error", state, err)
 	}
 	cond := meta.FindStatusCondition(k.Status.Conditions, operatorapiv1.ConditionKlusterletApplied)
-	if cond == nil || cond.Reason != ReasonSPIFFEPolicyAPIAbsent {
-		t.Errorf("Applied condition %+v, want reason %s", cond, ReasonSPIFFEPolicyAPIAbsent)
+	if cond == nil || cond.Reason != ReasonSPIFFEUnsupportedKubernetesVersion ||
+		!strings.HasPrefix(cond.Message, "unsupported Kubernetes version v") || !strings.Contains(cond.Message, "ValidatingWebhook") {
+		t.Errorf("Applied condition %+v, want reason %s naming the version", cond, ReasonSPIFFEUnsupportedKubernetesVersion)
+	}
+
+	// The version can't be read: the refusal says so.
+	kube.PrependReactor("get", "version", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("injected")
+	})
+	k, _, _ = r.reconcile(context.TODO(), k, spiffeConfig(k))
+	if cond := meta.FindStatusCondition(k.Status.Conditions, operatorapiv1.ConditionKlusterletApplied); cond == nil ||
+		!strings.HasPrefix(cond.Message, "unsupported Kubernetes version unknown") {
+		t.Errorf("Applied condition %+v", cond)
 	}
 }
 
@@ -250,12 +276,13 @@ func TestSPIFFEAdmissionDowngrade(t *testing.T) {
 		kube := fakekube.NewSimpleClientset()
 		r := newAdmissionReconcile(kube)
 		k = activate(t, r, k, spiffeConfig(k))
-		// The Klusterlet moves back to grpc; spiffeWorkAgents no longer lists it.
-		r.spiffeWorkAgents = func() (map[string]string, error) {
+		// The Klusterlet moves back to grpc; another one may still use the policies.
+		r.spiffeEnforcements = func() (map[string]operatorapiv1.SPIFFEAdmissionEnforcement, error) {
 			if otherSPIFFE {
-				return map[string]string{"other": "system:serviceaccount:other:work-sa"}, nil
+				return map[string]operatorapiv1.SPIFFEAdmissionEnforcement{
+					"other": operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy}, nil
 			}
-			return map[string]string{}, nil
+			return map[string]operatorapiv1.SPIFFEAdmissionEnforcement{}, nil
 		}
 		config := spiffeConfig(k)
 		config.RegistrationDriver = RegistrationDriver{AuthType: operatorapiv1.GRPCAuthType}

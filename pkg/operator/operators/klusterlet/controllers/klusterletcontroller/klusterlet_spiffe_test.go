@@ -9,6 +9,7 @@ import (
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,7 +86,8 @@ func renderSPIFFEKlusterlet(t *testing.T, name string, mode operatorapiv1.Instal
 }
 
 func TestSPIFFEKlusterletRendering(t *testing.T) {
-	spiffe := &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "ocm-grpc.hub.internal:443", HubSPIFFEID: testSPIFFEHubID}
+	spiffe := &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "ocm-grpc.hub.internal:443", HubSPIFFEID: testSPIFFEHubID,
+		AdmissionEnforcement: operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy}
 	cases := []struct {
 		name       string
 		klusterlet string
@@ -113,7 +115,8 @@ func TestSPIFFEKlusterletRendering(t *testing.T) {
 		{
 			name: "Default, east, namespace template", klusterlet: "klusterlet", mode: operatorapiv1.InstallModeDefault,
 			spiffe: &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "ocm-grpc.hub.internal:443", HubSPIFFEID: testSPIFFEHubID,
-				TrustDomain: "east.example.org", AgentIDTemplate: "spiffe://{trustDomain}/k8s/{cluster}/ns/{namespace}/ocm/{role}"},
+				AdmissionEnforcement: operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy,
+				TrustDomain:          "east.example.org", AgentIDTemplate: "spiffe://{trustDomain}/k8s/{cluster}/ns/{namespace}/ocm/{role}"},
 			want: map[string][3]string{
 				"klusterlet-registration-agent": {"registration", "klusterlet-registration-sa",
 					"spiffe://east.example.org/k8s/cluster1/ns/open-cluster-management-agent/ocm/registration"},
@@ -190,7 +193,8 @@ func TestSPIFFEKlusterletRendering(t *testing.T) {
 
 func TestSPIFFEKlusterletInvalidTemplate(t *testing.T) {
 	r := renderSPIFFEKlusterlet(t, "klusterlet", operatorapiv1.InstallModeDefault, &operatorapiv1.KlusterletSPIFFEConfig{
-		HubEndpoint: "hub:443", HubSPIFFEID: testSPIFFEHubID, AgentIDTemplate: "spiffe://{trustDomain}/ocm/{clutser}/{role}"})
+		HubEndpoint: "hub:443", HubSPIFFEID: testSPIFFEHubID, AgentIDTemplate: "spiffe://{trustDomain}/ocm/{clutser}/{role}",
+		AdmissionEnforcement: operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy})
 	if len(r.deployments) != 0 {
 		t.Errorf("rendered %v with an invalid template", keys(r.deployments))
 	}
@@ -211,7 +215,9 @@ func TestSPIFFEKlusterletHostedModesNotSupported(t *testing.T) {
 			klusterlet.Spec.DeployOption.Mode = mode
 			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = operatorapiv1.RegistrationDriver{
 				AuthType: operatorapiv1.SPIFFEAuthType,
-				SPIFFE:   &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "hub:443", HubSPIFFEID: testSPIFFEHubID}}
+				SPIFFE: &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "hub:443", HubSPIFFEID: testSPIFFEHubID,
+					AdmissionEnforcement: operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy,
+				}}
 			syncContext := testingcommon.NewFakeSyncContext(t, "cluster4")
 			// No external managed kubeconfig Secret: the refusal must not depend on it.
 			controller := newTestControllerHosted(t, klusterlet, nil, newNamespace(helpers.AgentNamespace(klusterlet)))
@@ -269,6 +275,10 @@ func servePolicyAPI(c *fakekube.Clientset, user string) {
 		return true, &authenticationv1.SelfSubjectReview{Status: authenticationv1.SelfSubjectReviewStatus{
 			UserInfo: authenticationv1.UserInfo{Username: user}}}, nil
 	})
+	// The operator has the klusterlet-spiffe ClusterRole.
+	c.PrependReactor("create", "selfsubjectaccessreviews", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, &authorizationv1.SelfSubjectAccessReview{Status: authorizationv1.SubjectAccessReviewStatus{Allowed: true}}, nil
+	})
 }
 
 // Another controller writes the status during the first sync: the admission record and the
@@ -277,7 +287,9 @@ func TestSPIFFEStatusStoredDespiteConflict(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "open-cluster-management-agent", "cluster1")
 	klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = operatorapiv1.RegistrationDriver{
 		AuthType: operatorapiv1.SPIFFEAuthType,
-		SPIFFE:   &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "hub:443", HubSPIFFEID: testSPIFFEHubID}}
+		SPIFFE: &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "hub:443", HubSPIFFEID: testSPIFFEHubID,
+			AdmissionEnforcement: operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy,
+		}}
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		newNamespace("open-cluster-management-agent"))

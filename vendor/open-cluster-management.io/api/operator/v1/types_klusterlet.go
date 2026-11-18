@@ -343,7 +343,29 @@ type KlusterletSPIFFEConfig struct {
 	// +kubebuilder:validation:MaxLength=512
 	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/([A-Za-z0-9._-]+|\{[A-Za-z]+\}))+$`
 	AddOnAgentIDTemplate string `json:"addOnAgentIDTemplate,omitempty"`
+
+	// admissionEnforcement is how the klusterlet operator enforces the admission rules that keep
+	// other workloads from getting the agents' SVIDs. ValidatingAdmissionPolicy needs Kubernetes
+	// 1.30 or later; the API server evaluates the rules itself, and on an older cluster the
+	// Klusterlet is refused as an unsupported Kubernetes version. ValidatingWebhook works on every
+	// version; the operator serves the webhook, with an SVID from SPIRE that carries the webhook
+	// Service's DNS name. Both enforce the same rules. When it changes, the operator puts the new
+	// enforcement in place before it removes the old one.
+	// +required
+	// +kubebuilder:validation:Enum=ValidatingAdmissionPolicy;ValidatingWebhook
+	AdmissionEnforcement SPIFFEAdmissionEnforcement `json:"admissionEnforcement"`
 }
+
+// SPIFFEAdmissionEnforcement is how the spiffe driver's admission rules are enforced.
+type SPIFFEAdmissionEnforcement string
+
+const (
+	// SPIFFEAdmissionValidatingAdmissionPolicy enforces the rules with ValidatingAdmissionPolicies.
+	SPIFFEAdmissionValidatingAdmissionPolicy SPIFFEAdmissionEnforcement = "ValidatingAdmissionPolicy"
+	// SPIFFEAdmissionValidatingWebhook enforces the rules with a validating webhook the klusterlet
+	// operator serves.
+	SPIFFEAdmissionValidatingWebhook SPIFFEAdmissionEnforcement = "ValidatingWebhook"
+)
 
 type AwsIrsa struct {
 	// The arn of the hub cluster (ie: an EKS cluster). This will be required to pass information to hub, which hub will use to create IAM identities for this klusterlet.
@@ -577,7 +599,7 @@ type KlusterletStatus struct {
 
 const (
 	// ConditionSPIFFEAdmissionReady is True once the klusterlet operator has finished its first
-	// recovery of the agent and add-on namespaces and recorded the admission policies it trusts.
+	// recovery of the agent and add-on namespaces and recorded the admission enforcement it trusts.
 	// The platform should create the cluster's SPIRE registration entries only after that.
 	ConditionSPIFFEAdmissionReady = "SPIFFEAdmissionReady"
 )
@@ -592,6 +614,36 @@ type KlusterletSPIFFEStatus struct {
 	// +listMapKey=policyName
 	// +kubebuilder:validation:MaxItems=16
 	AdmissionPolicies []SPIFFEAdmissionPolicyStatus `json:"admissionPolicies,omitempty"`
+
+	// admissionEnforcement is the enforcement the operator has put in place and recorded:
+	// ValidatingAdmissionPolicy, with admissionPolicies, or ValidatingWebhook, with
+	// admissionWebhooks.
+	// +optional
+	// +kubebuilder:validation:Enum=ValidatingAdmissionPolicy;ValidatingWebhook
+	AdmissionEnforcement SPIFFEAdmissionEnforcement `json:"admissionEnforcement,omitempty"`
+
+	// admissionWebhooks are the ValidatingWebhookConfigurations the operator ran recovery for,
+	// with ValidatingWebhook enforcement. When a live configuration no longer matches its entry,
+	// the operator runs recovery again before any agent runs.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=16
+	AdmissionWebhooks []SPIFFEAdmissionWebhookStatus `json:"admissionWebhooks,omitempty"`
+
+	// webhookDNSName is the DNS name the operator's webhook serves on, with ValidatingWebhook
+	// enforcement. The operator's SVID must carry it, so the platform's SPIRE registration entry
+	// for the operator sets it.
+	// +optional
+	// +kubebuilder:validation:MaxLength=253
+	WebhookDNSName string `json:"webhookDNSName,omitempty"`
+
+	// webhookSPIFFEID is the SPIFFE ID the operator's webhook SVID must have, with
+	// ValidatingWebhook enforcement: agentIDTemplate rendered with the role operator. The hub
+	// accepts no agent with that role, so the SVID is good only for serving the webhook.
+	// +optional
+	// +kubebuilder:validation:MaxLength=2048
+	WebhookSPIFFEID string `json:"webhookSPIFFEID,omitempty"`
 
 	// addOnNamespace is the add-on namespace the operator created itself, recorded by name and
 	// UID so recovery only cleans that exact namespace.
@@ -645,6 +697,23 @@ type SPIFFEAdmissionPolicyStatus struct {
 	// bindingGeneration is the generation of the policy binding.
 	// +required
 	BindingGeneration int64 `json:"bindingGeneration"`
+}
+
+// SPIFFEAdmissionWebhookStatus records one ValidatingWebhookConfiguration.
+type SPIFFEAdmissionWebhookStatus struct {
+	// name is the name of the ValidatingWebhookConfiguration.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	Name string `json:"name"`
+
+	// uid is the UID of the configuration.
+	// +required
+	UID types.UID `json:"uid"`
+
+	// generation is the generation of the configuration.
+	// +required
+	Generation int64 `json:"generation"`
 }
 
 // SPIFFENamespaceRef identifies a namespace by name and UID.

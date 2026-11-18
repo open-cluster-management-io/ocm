@@ -99,6 +99,10 @@ type klusterletController struct {
 	deploymentReplicas            int32
 	disableAddonNamespace         bool
 	enableSyncLabels              bool
+	// spiffeWatch watches the spiffe driver's admission objects once a Klusterlet uses them.
+	spiffeWatch *spiffeAdmissionWatch
+	// spiffeWebhook serves the ValidatingWebhook enforcement once a Klusterlet uses it.
+	spiffeWebhook *spiffeWebhookServer
 }
 
 type klusterletReconcile interface {
@@ -127,8 +131,7 @@ func NewKlusterletController(
 	controlPlaneNodeLabelSelector string,
 	deploymentReplicas int32,
 	disableAddonNamespace bool,
-	enableSyncLabels bool,
-	spiffeAdmissionInformers ...factory.Informer) factory.Controller {
+	enableSyncLabels bool) factory.Controller {
 	controller := &klusterletController{
 		kubeClient: kubeClient,
 		patcher: patcher.NewPatcher[
@@ -144,6 +147,8 @@ func NewKlusterletController(
 		disableAddonNamespace:         disableAddonNamespace,
 		enableSyncLabels:              enableSyncLabels,
 	}
+	controller.spiffeWatch = newSPIFFEAdmissionWatch(kubeClient, controller.klusterletLister)
+	controller.spiffeWebhook = newSPIFFEWebhookServer(operatorNamespace)
 
 	return factory.New().WithSync(controller.sync).
 		WithInformersQueueKeysFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
@@ -153,7 +158,6 @@ func NewKlusterletController(
 		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(
 			controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
-		WithInformersQueueKeysFunc(spiffeAdmissionQueueKeys(controller.klusterletLister), spiffeAdmissionInformers...).
 		ToController("KlusterletController")
 }
 
@@ -285,6 +289,11 @@ type klusterletConfig struct {
 	SPIFFERegistrationAgentID string
 	SPIFFEWorkAgentID         string
 	SPIFFEKlusterletAgentID   string
+	// SPIFFEWebhookID is the SPIFFE ID the operator's webhook serves with.
+	SPIFFEWebhookID string
+	// SPIFFEAdmissionEnforcement is the Klusterlet's admissionEnforcement; empty lets the operator
+	// choose by what the cluster serves.
+	SPIFFEAdmissionEnforcement operatorapiv1.SPIFFEAdmissionEnforcement
 	// The registration agent renders add-on agents' IDs from these.
 	SPIFFETrustDomain          string
 	SPIFFEAddOnAgentIDTemplate string
@@ -581,6 +590,10 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			managedClusterClients: managedClusterClients,
 			kubeClient:            n.kubeClient,
 			spiffeWorkAgents:      n.spiffeWorkAgents,
+			spiffeEnforcements:    spiffeEnforcementsFrom(n.klusterletLister),
+			watch:                 n.spiffeWatch,
+			queue:                 controllerContext.Queue(),
+			webhook:               n.spiffeWebhook,
 		},
 		&managedReconcile{
 			managedClusterClients: managedClusterClients,
@@ -834,6 +847,13 @@ func fillSPIFFEConfig(config *klusterletConfig, klusterlet *operatorapiv1.Kluste
 	if klusterlet.Spec.ClusterName == "" {
 		return nil, fmt.Errorf("clusterName is required when authType is spiffe")
 	}
+	switch c.AdmissionEnforcement {
+	case operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy, operatorapiv1.SPIFFEAdmissionValidatingWebhook:
+	default:
+		// The CRD requires it; a Klusterlet created under an older CRD may lack it.
+		return nil, fmt.Errorf("admissionEnforcement %q: use ValidatingAdmissionPolicy (Kubernetes 1.30 or later) "+
+			"or ValidatingWebhook", c.AdmissionEnforcement)
+	}
 	hubID, err := spiffeid.FromString(c.HubSPIFFEID)
 	if err != nil {
 		return nil, fmt.Errorf("hubSPIFFEID %q: %w", c.HubSPIFFEID, err)
@@ -879,6 +899,19 @@ func fillSPIFFEConfig(config *klusterletConfig, klusterlet *operatorapiv1.Kluste
 		}
 	}
 
+	// The webhook of the ValidatingWebhook enforcement serves with the operator's SVID. The hub
+	// accepts no agent with the role operator, so that SVID can't act on the hub.
+	webhookID, err := agentTmpl.Render(trustDomain, map[string]string{
+		idtemplate.Cluster:   klusterlet.Spec.ClusterName,
+		idtemplate.Role:      spiffeWebhookRole,
+		idtemplate.Namespace: config.OperatorNamespace,
+	})
+	if err != nil {
+		return nil, err
+	}
+	config.SPIFFEWebhookID = webhookID.String()
+	config.SPIFFEAdmissionEnforcement = c.AdmissionEnforcement
+
 	config.SPIFFETrustDomain = trustDomain
 	config.SPIFFEAddOnAgentIDTemplate = addOnTmpl.String()
 	config.SPIFFEHubEndpoint = c.HubEndpoint
@@ -910,6 +943,24 @@ func spiffeWorkAgentsFrom(lister operatorlister.KlusterletLister) (map[string]st
 		out[k.Name] = workAgentUser(helpers.KlusterletNamespace(k), serviceAccountName("work-sa", k))
 	}
 	return out, nil
+}
+
+// spiffeEnforcementsFrom maps every Klusterlet that uses the spiffe driver to the enforcement it
+// has on record, so a Klusterlet's removal keeps the shared namespace label object another one uses.
+func spiffeEnforcementsFrom(lister operatorlister.KlusterletLister) func() (map[string]operatorapiv1.SPIFFEAdmissionEnforcement, error) {
+	return func() (map[string]operatorapiv1.SPIFFEAdmissionEnforcement, error) {
+		klusterlets, err := lister.List(labels.Everything())
+		if err != nil {
+			return nil, err
+		}
+		out := map[string]operatorapiv1.SPIFFEAdmissionEnforcement{}
+		for _, k := range klusterlets {
+			if mode, _ := recordedEnforcement(k); mode != "" {
+				out[k.Name] = mode
+			}
+		}
+		return out, nil
+	}
 }
 
 // spiffeAdmissionQueueKeys maps a SPIFFE admission policy or binding to the Klusterlets it

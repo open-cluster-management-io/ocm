@@ -179,6 +179,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 					spiffeWorkAgents: func() (map[string]string, error) {
 						return spiffeWorkAgentsFrom(n.klusterletLister)
 					},
+					spiffeEnforcements: spiffeEnforcementsFrom(n.klusterletLister),
 				},
 				&crdReconcile{
 					managedClusterClients: managedClusterClients,

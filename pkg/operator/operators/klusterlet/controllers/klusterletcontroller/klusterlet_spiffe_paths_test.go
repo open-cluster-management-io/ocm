@@ -23,14 +23,13 @@ import (
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
-// The constructor wires the SPIFFE admission informers into the controller.
-func TestNewKlusterletControllerWithSPIFFEInformers(t *testing.T) {
+// The constructor builds the controller, with the SPIFFE admission watch not yet started.
+func TestNewKlusterletControllerWithSPIFFEWatch(t *testing.T) {
 	kube := fakekube.NewSimpleClientset()
 	operator := fakeoperatorclient.NewSimpleClientset()
 	kubeInformers := kubeinformers.NewSharedInformerFactory(kube, time.Minute)
@@ -44,11 +43,7 @@ func TestNewKlusterletControllerWithSPIFFEInformers(t *testing.T) {
 	c := NewKlusterletController(kube, nil, operator.OperatorV1().Klusterlets(),
 		operatorInformers.Operator().V1().Klusterlets(), secretInformers,
 		kubeInformers.Apps().V1().Deployments(), fakeworkclient.NewSimpleClientset().WorkV1().AppliedManifestWorks(),
-		kubeVersion, "open-cluster-management", "", 1, false, false,
-		[]factory.Informer{
-			kubeInformers.Admissionregistration().V1().ValidatingAdmissionPolicies().Informer(),
-			kubeInformers.Admissionregistration().V1().ValidatingAdmissionPolicyBindings().Informer(),
-		}...)
+		kubeVersion, "open-cluster-management", "", 1, false, false)
 	if c == nil {
 		t.Fatal("no controller")
 	}
@@ -78,6 +73,9 @@ func TestFillSPIFFEConfigErrors(t *testing.T) {
 		{"a cluster name that is no SPIFFE ID segment", func(k *operatorapiv1.Klusterlet) {
 			k.Spec.ClusterName = "bad name"
 		}, "path segment"},
+		{"no admission enforcement, under an older CRD", func(k *operatorapiv1.Klusterlet) {
+			k.Spec.RegistrationConfiguration.RegistrationDriver.SPIFFE.AdmissionEnforcement = ""
+		}, "use ValidatingAdmissionPolicy (Kubernetes 1.30 or later) or ValidatingWebhook"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -89,6 +87,23 @@ func TestFillSPIFFEConfigErrors(t *testing.T) {
 				t.Errorf("error %v, want %q", err, c.want)
 			}
 		})
+	}
+}
+
+// The operator's webhook ID is rendered from the agent template with the operator's namespace;
+// a namespace that is no SPIFFE ID segment is an error.
+func TestFillSPIFFEConfigWebhookID(t *testing.T) {
+	k := spiffeKlusterlet()
+	k.Spec.RegistrationConfiguration.RegistrationDriver.SPIFFE.AgentIDTemplate = "spiffe://{trustDomain}/ns/{namespace}/{cluster}/{role}"
+	config := spiffeConfig(k)
+	config.OperatorNamespace = "open-cluster-management"
+	if _, err := fillSPIFFEConfig(&config, k); err != nil ||
+		config.SPIFFEWebhookID != "spiffe://ocm-hub.example.org/ns/open-cluster-management/cluster1/operator" {
+		t.Errorf("webhook ID %q, %v", config.SPIFFEWebhookID, err)
+	}
+	config.OperatorNamespace = "bad name"
+	if _, err := fillSPIFFEConfig(&config, k); err == nil {
+		t.Error("no error for an operator namespace that is no path segment")
 	}
 }
 
@@ -122,8 +137,8 @@ func TestStoreSPIFFEStatusGetError(t *testing.T) {
 	}
 }
 
-// A reconciler that fails with an ordinary error (here: no ValidatingAdmissionPolicy API) makes
-// the sync fail and leaves Applied false, rather than requeueing.
+// A reconciler that fails with an ordinary error (here: ValidatingAdmissionPolicy enforcement
+// without the API) makes the sync fail and leaves Applied false, rather than requeueing.
 func TestSPIFFESyncReconcilerError(t *testing.T) {
 	k := spiffeKlusterlet()
 	syncContext := testingcommon.NewFakeSyncContext(t, k.Name)
@@ -134,7 +149,7 @@ func TestSPIFFESyncReconcilerError(t *testing.T) {
 	}
 	got, _ := controller.operatorClient.OperatorV1().Klusterlets().Get(context.TODO(), k.Name, metav1.GetOptions{})
 	cond := meta.FindStatusCondition(got.Status.Conditions, operatorapiv1.ConditionKlusterletApplied)
-	if cond == nil || cond.Status != metav1.ConditionFalse || cond.Reason != ReasonSPIFFEPolicyAPIAbsent {
+	if cond == nil || cond.Status != metav1.ConditionFalse || cond.Reason != ReasonSPIFFEUnsupportedKubernetesVersion {
 		t.Errorf("Applied %+v", cond)
 	}
 }
@@ -173,6 +188,7 @@ func TestSPIFFECleanupRemovesPolicies(t *testing.T) {
 		managedClusterClients: &managedClusterClients{kubeClient: controller.kubeClient,
 			appliedManifestWorkClient: controller.workClient.WorkV1().AppliedManifestWorks()},
 		spiffeWorkAgents: func() (map[string]string, error) { return map[string]string{k.Name: "x"}, nil },
+		watch:            startedWatch(),
 	}
 	k = activate(t, r, k, spiffeConfig(k))
 	now := metav1.Now()

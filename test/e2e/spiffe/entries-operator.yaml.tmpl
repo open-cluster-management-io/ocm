@@ -1,0 +1,18 @@
+# The klusterlet operator of cluster ${CLUSTER}, on the managed cluster: the SVID its admission
+# webhook serves with (ValidatingWebhook enforcement). It must carry the webhook Service's DNS
+# name. Apply it before join: only the operator's own pods get it, and the operator's
+# ServiceAccount can already do everything this SVID allows. The hub accepts no agent with the role
+# operator, so the SVID can't act on the hub.
+apiVersion: spire.spiffe.io/v1alpha1
+kind: ClusterSPIFFEID
+metadata:
+  name: ocm-klusterlet-operator
+spec:
+  className: spire-server-spire
+  spiffeIDTemplate: "spiffe://{{ .TrustDomain }}/ocm/cluster/${CLUSTER}/agent/operator"
+  dnsNameTemplates: ["klusterlet-spiffe-webhook.open-cluster-management.svc"]
+  namespaceSelector:
+    matchLabels: {kubernetes.io/metadata.name: open-cluster-management}
+  podSelector:
+    matchLabels: {app: klusterlet}
+  workloadSelectorTemplates: ["k8s:sa:klusterlet"]

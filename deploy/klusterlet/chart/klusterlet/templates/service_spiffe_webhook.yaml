@@ -1,0 +1,18 @@
+{{- if or ( eq .Values.klusterlet.mode "Singleton") (eq .Values.klusterlet.mode "Default") }}
+{{- if and (not .Values.noOperator) (include "spiffeEnabled" .) }}
+# The webhook of the spiffe driver's ValidatingWebhook enforcement, served by the operator with its
+# SVID, which carries the DNS name klusterlet-spiffe-webhook.<namespace>.svc.
+apiVersion: v1
+kind: Service
+metadata:
+  name: klusterlet-spiffe-webhook
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: klusterlet
+  ports:
+  - name: webhook
+    port: 443
+    targetPort: 9443
+{{- end }}
+{{- end }}

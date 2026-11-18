@@ -6,9 +6,12 @@ set -euo pipefail
 source "$(dirname "$0")/env.sh"
 mkdir -p "$(dirname "$KUBECONFIG")"
 
-for c in "$HUB_CLUSTER" "$SPOKE_CLUSTER"; do
-  if ! kind get clusters | grep -qx "$c"; then
-    kind create cluster --name "$c" --kubeconfig "$KUBECONFIG" --wait 120s
+# HUB_NODE_IMAGE and SPOKE_NODE_IMAGE pick the Kubernetes version, for example
+# kindest/node:v1.29.14 for a managed cluster without the ValidatingAdmissionPolicy API.
+for c in "$HUB_CLUSTER:${HUB_NODE_IMAGE:-}" "$SPOKE_CLUSTER:${SPOKE_NODE_IMAGE:-}"; do
+  name=${c%%:*} image=${c#*:}
+  if ! kind get clusters | grep -qx "$name"; then
+    kind create cluster --name "$name" --kubeconfig "$KUBECONFIG" --wait 120s ${image:+--image "$image"}
   fi
 done
 

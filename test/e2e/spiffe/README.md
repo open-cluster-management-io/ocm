@@ -28,7 +28,11 @@ endpoint (`https_spiffe`, a NodePort on the kind network), and each has a
 | `setup.sh` | creates the clusters, installs SPIRE, runs `smoke.sh` |
 | `smoke.sh` | a pod that looks like cluster1's work agent gets its SVID |
 | `images.sh` | builds the OCM images from this checkout and loads them into both clusters |
-| `install-ocm.sh` | hub with the spiffe driver, join with no token, entries after `SPIFFEAdmissionReady`, accept |
+| `install-ocm.sh` | hub with the spiffe driver, join with no token, entries after `SPIFFEAdmissionReady`, accept; `SPIFFE_ADMISSION_ENFORCEMENT` is `ValidatingAdmissionPolicy` (default here) or `ValidatingWebhook`, whose operator SPIRE entry (`entries-operator.yaml.tmpl`) it applies first |
+| `install-ocm-policy-first.sh` | on a cluster older than 1.30: join with `ValidatingAdmissionPolicy` is refused, a Klusterlet created with it anyway is refused with `UnsupportedKubernetesVersion` and deploys nothing, then `ValidatingWebhook` finishes the join |
+| `check-enforcement.sh [<enforcement>]` | the enforcement in place: on record, its objects there and the other's gone, a Job in the agent namespace refused, the cluster available; with an argument, migrates to it first and checks no agent restarted and no recovery ran |
+| `check-admission.sh` | the enforcement join set, then on 1.30 or later a switch to the other one and back; on older clusters, `ValidatingAdmissionPolicy` refused |
+| `check-unsupported.sh` | on a cluster older than 1.30 with the webhook: `ValidatingAdmissionPolicy` refused by join and by the operator (logged), with nothing changed |
 | `check-deny.sh` | a denied cluster gets no work and its lease stops; accepting again resumes both |
 | `check-rotation.sh` | `ManifestWork` changes keep arriving across SVID rotations |
 | `check-delete.sh` | deleting a cluster: its work is cleaned up, then the cluster is held until every SVID has expired |

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -18,6 +19,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
 const (
@@ -33,6 +36,16 @@ const (
 // and checks each rule by impersonating the operator, the built-in controllers, the work agent and
 // a random user. Everyone is cluster-admin by RBAC, so only the policies decide.
 func TestSPIFFEAdmissionPoliciesInAPIServer(t *testing.T) {
+	checkAdmissionRules(t, operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy)
+}
+
+// TestSPIFFEAdmissionWebhookInAPIServer checks the same rules enforced by the operator's webhook,
+// which the API server calls over TLS with the webhook's SVID. It runs on every version.
+func TestSPIFFEAdmissionWebhookInAPIServer(t *testing.T) {
+	checkAdmissionRules(t, operatorapiv1.SPIFFEAdmissionValidatingWebhook)
+}
+
+func checkAdmissionRules(t *testing.T, mode operatorapiv1.SPIFFEAdmissionEnforcement) {
 	if os.Getenv("KUBEBUILDER_ASSETS") == "" {
 		t.Skip("needs envtest: set KUBEBUILDER_ASSETS")
 	}
@@ -44,6 +57,9 @@ func TestSPIFFEAdmissionPoliciesInAPIServer(t *testing.T) {
 	defer func() { _ = env.Stop() }()
 	ctx := context.Background()
 	admin := kubernetes.NewForConfigOrDie(cfg)
+	if served, err := policyAPIServed(admin); mode == operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy && (err != nil || !served) {
+		t.Skipf("the API server doesn't serve ValidatingAdmissionPolicy (Kubernetes older than 1.30): %v", err)
+	}
 	as := func(user string) kubernetes.Interface {
 		c := rest.CopyConfig(cfg)
 		c.Impersonate = rest.ImpersonationConfig{UserName: user}
@@ -82,11 +98,22 @@ func TestSPIFFEAdmissionPoliciesInAPIServer(t *testing.T) {
 		workAgentUser: envWorkAgent,
 		workAgents:    map[string]string{"klusterlet": envWorkAgent},
 	}
+	var objects []admissionObjects
 	for _, render := range []func(spiffeAdmissionInput) (*admissionv1.ValidatingAdmissionPolicy, *admissionv1.ValidatingAdmissionPolicyBinding){
 		agentAdmissionPolicy, addOnAdmissionPolicy, namespaceLabelPolicy} {
 		p, b := render(in)
-		must(apply(ctx, admissionObjects{client: admin, policy: p, binding: b}))
+		objects = append(objects, admissionObjects{client: admin, policy: p, binding: b})
 	}
+	var enf enforcement = policyEnforcement{objects}
+	if mode == operatorapiv1.SPIFFEAdmissionValidatingWebhook {
+		webhook := testWebhookServer(t, newFakeSource(t, testWebhookID, "klusterlet-spiffe-webhook.open-cluster-management.svc"))
+		_, caBundle, err := webhook.ensure(ctx, "unix:///unused", spiffeid.RequireFromString(testWebhookID))
+		must(err)
+		must(webhook.setPolicies(objects))
+		r := &spiffeAdmissionReconcile{webhook: webhook}
+		enf = r.webhookEnforcement(objects, caBundle)
+	}
+	must(enf.apply(ctx))
 
 	deployment := func(ns, name string) *appsv1.Deployment {
 		return &appsv1.Deployment{

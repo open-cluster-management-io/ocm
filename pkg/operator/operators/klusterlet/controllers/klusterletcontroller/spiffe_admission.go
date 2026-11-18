@@ -3,6 +3,7 @@ package klusterletcontroller
 import (
 	"context"
 	"fmt"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"sort"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
@@ -32,15 +34,25 @@ const (
 	// Klusterlet named in its value.
 	SPIFFEAddOnNamespaceLabel = "open-cluster-management.io/spiffe-addon-namespace"
 
-	agentPolicyPrefix           = "ocm-spiffe-agents-"
-	addOnPolicyPrefix           = "ocm-spiffe-addons-"
-	namespaceLabelPolicyName    = "ocm-spiffe-addon-namespace-label"
-	deploymentController        = "system:serviceaccount:kube-system:deployment-controller"
-	replicaSetController        = "system:serviceaccount:kube-system:replicaset-controller"
-	daemonSetController         = "system:serviceaccount:kube-system:daemon-set-controller"
-	statefulSetController       = "system:serviceaccount:kube-system:statefulset-controller"
-	recoveryRequeue             = 5 * time.Second
-	ReasonSPIFFEPolicyAPIAbsent = "SPIFFEAdmissionPolicyUnavailable"
+	agentPolicyPrefix        = "ocm-spiffe-agents-"
+	addOnPolicyPrefix        = "ocm-spiffe-addons-"
+	namespaceLabelPolicyName = "ocm-spiffe-addon-namespace-label"
+	deploymentController     = "system:serviceaccount:kube-system:deployment-controller"
+	replicaSetController     = "system:serviceaccount:kube-system:replicaset-controller"
+	daemonSetController      = "system:serviceaccount:kube-system:daemon-set-controller"
+	statefulSetController    = "system:serviceaccount:kube-system:statefulset-controller"
+	recoveryRequeue          = 5 * time.Second
+	// ReasonSPIFFEUnsupportedKubernetesVersion is the Applied reason when the Klusterlet asks for
+	// ValidatingAdmissionPolicy enforcement on a cluster older than Kubernetes 1.30.
+	ReasonSPIFFEUnsupportedKubernetesVersion = "UnsupportedKubernetesVersion"
+	// ReasonSPIFFEPermissionsMissing is the Applied reason when the operator lacks the
+	// klusterlet-spiffe ClusterRole's permissions.
+	ReasonSPIFFEPermissionsMissing = "SPIFFEPermissionsMissing"
+	// ReasonSPIFFEWebhookNotReady is the SPIFFEAdmissionReady reason while the operator's webhook
+	// has no usable SVID.
+	ReasonSPIFFEWebhookNotReady = "WebhookNotReady"
+	// spiffeOperatorServiceAccount is the operator's ServiceAccount, which its SPIRE entry selects.
+	spiffeOperatorServiceAccount = "klusterlet"
 	// ConditionAddOnNamespaceNotDedicated is True when the add-on namespace exists without the
 	// add-on namespace label: the operator never labels an existing namespace.
 	ConditionAddOnNamespaceNotDedicated = "AddOnNamespaceNotDedicated"
@@ -351,6 +363,13 @@ type spiffeAdmissionReconcile struct {
 	kubeClient            kubernetes.Interface
 	// spiffeWorkAgents lists every SPIFFE Klusterlet's work agent user, by Klusterlet name.
 	spiffeWorkAgents func() (map[string]string, error)
+	// spiffeEnforcements lists every SPIFFE Klusterlet's recorded enforcement, by Klusterlet name.
+	spiffeEnforcements func() (map[string]operatorapiv1.SPIFFEAdmissionEnforcement, error)
+	// watch is started, with queue, the first time a Klusterlet uses the spiffe driver.
+	watch *spiffeAdmissionWatch
+	queue workqueue.TypedRateLimitingInterface[string]
+	// webhook serves the ValidatingWebhook enforcement.
+	webhook *spiffeWebhookServer
 }
 
 func (r *spiffeAdmissionReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
@@ -366,74 +385,256 @@ func (r *spiffeAdmissionReconcile) reconcile(ctx context.Context, klusterlet *op
 		}
 		return klusterlet, reconcileContinue, nil
 	}
-	managed := r.managedClusterClients.kubeClient
-	for _, c := range []kubernetes.Interface{r.kubeClient, managed} {
-		served, err := policyAPIServed(c)
+	served := true
+	for _, c := range []kubernetes.Interface{r.kubeClient, r.managedClusterClients.kubeClient} {
+		ok, err := policyAPIServed(c)
 		if err != nil {
 			return klusterlet, reconcileStop, err
 		}
-		if !served {
-			meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-				Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse, Reason: ReasonSPIFFEPolicyAPIAbsent,
-				Message: "the spiffe driver needs the admissionregistration.k8s.io/v1 ValidatingAdmissionPolicy API (Kubernetes 1.30 or later)"})
-			return klusterlet, reconcileStop, fmt.Errorf("the ValidatingAdmissionPolicy API is not served")
+		served = served && ok
+	}
+	want := config.SPIFFEAdmissionEnforcement
+	if want == operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy && !served {
+		version := "unknown"
+		if v, err := r.kubeClient.Discovery().ServerVersion(); err == nil {
+			version = v.GitVersion
 		}
+		err := fmt.Errorf("unsupported Kubernetes version %s: admissionEnforcement ValidatingAdmissionPolicy needs "+
+			"Kubernetes 1.30 or later, which serves the admissionregistration.k8s.io/v1 ValidatingAdmissionPolicy API; "+
+			"use ValidatingWebhook on this cluster", version)
+		klog.FromContext(ctx).Error(err, "the spiffe admission enforcement can't be used", "klusterlet", klusterlet.Name)
+		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
+			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse,
+			Reason: ReasonSPIFFEUnsupportedKubernetesVersion, Message: err.Error()})
+		return klusterlet, reconcileStop, err
+	}
+
+	if !r.watch.isStarted(served) {
+		missing, err := missingSPIFFEAccess(ctx, r.kubeClient)
+		if err != nil {
+			return klusterlet, reconcileStop, err
+		}
+		if len(missing) > 0 {
+			meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
+				Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse, Reason: ReasonSPIFFEPermissionsMissing,
+				Message: fmt.Sprintf("the spiffe driver needs the %s ClusterRole bound to the operator; missing: %s",
+					SPIFFEClusterRoleName, strings.Join(missing, ", "))})
+			return klusterlet, reconcileStop, fmt.Errorf("the operator lacks the permissions of the spiffe driver")
+		}
+		r.watch.ensure(ctx, r.queue, served)
 	}
 
 	objects, err := r.render(ctx, klusterlet, config)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
+	var enf enforcement = policyEnforcement{objects}
+	if want == operatorapiv1.SPIFFEAdmissionValidatingWebhook {
+		ready, webhooks, err := r.ensureWebhook(ctx, klusterlet, config, objects)
+		if err != nil || !ready {
+			return klusterlet, reconcileStop, err
+		}
+		enf = webhooks
+	}
 	if err := r.ensureAddOnNamespace(ctx, klusterlet, config); err != nil {
 		return klusterlet, reconcileStop, err
 	}
 
-	var recorded []operatorapiv1.SPIFFEAdmissionPolicyStatus
-	if klusterlet.Status.SPIFFE != nil {
-		recorded = klusterlet.Status.SPIFFE.AdmissionPolicies
-	}
-	live, upToDate, err := observeAll(ctx, objects)
+	recordedMode, recorded := recordedEnforcement(klusterlet)
+	live, found, upToDate, err := enf.observe(ctx)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
-
-	if matchesRecord(recorded, live) {
+	if recordedMode == want && found && recorded.same(live) {
 		if !upToDate {
-			// The operator changes its own policies (for example after an upgrade). The live state
-			// was the recorded one before the change, so record the new generations without
-			// recovery.
-			for _, o := range objects {
-				if err := apply(ctx, o); err != nil {
-					return klusterlet, reconcileStop, err
-				}
-			}
-			if live, _, err = observeAll(ctx, objects); err != nil {
+			// The operator changes its own enforcement (for example after an upgrade, or when
+			// SPIRE's CA rotates). The live state was the recorded one before the change, so record
+			// the new generations without recovery.
+			if err := enf.apply(ctx); err != nil {
 				return klusterlet, reconcileStop, err
 			}
-			setAdmissionRecord(klusterlet, live)
+			if live, _, _, err = enf.observe(ctx); err != nil {
+				return klusterlet, reconcileStop, err
+			}
+			setEnforcementRecord(klusterlet, want, live)
+		}
+		// A switch leaves the other enforcement in place until the new one is on record.
+		if err := r.removeEnforcement(ctx, klusterlet.Name, otherEnforcement(want), served); err != nil {
+			return klusterlet, reconcileStop, err
 		}
 		setAdmissionReady(klusterlet, metav1.ConditionTrue, "Recorded", "the admission state is recorded")
 		return klusterlet, reconcileContinue, nil
 	}
-
-	return r.recover(ctx, klusterlet, config, objects)
+	if recordedMode != "" && recordedMode != want {
+		return r.switchEnforcement(ctx, klusterlet, config, objects, recordedMode, recorded, enf, served)
+	}
+	return r.recover(ctx, klusterlet, config, enf)
 }
 
-// recover runs the recovery steps: restore the policies, unlabel add-on namespaces that aren't on
-// record, delete every workload in the agent namespace and the recorded add-on namespaces, and
-// record the policies once no pod is left and they didn't change meanwhile. No agent runs until
-// then.
+func otherEnforcement(mode operatorapiv1.SPIFFEAdmissionEnforcement) operatorapiv1.SPIFFEAdmissionEnforcement {
+	if mode == operatorapiv1.SPIFFEAdmissionValidatingWebhook {
+		return operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy
+	}
+	return operatorapiv1.SPIFFEAdmissionValidatingWebhook
+}
+
+// ensureWebhook starts the operator's webhook and renders its configurations. While the operator
+// has no usable SVID, the Klusterlet waits: SPIFFEAdmissionReady is False with reason
+// WebhookNotReady and says which SPIRE entry the operator needs.
+func (r *spiffeAdmissionReconcile) ensureWebhook(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
+	config klusterletConfig, objects []admissionObjects) (bool, webhookEnforcement, error) {
+	if klusterlet.Status.SPIFFE == nil {
+		klusterlet.Status.SPIFFE = &operatorapiv1.KlusterletSPIFFEStatus{}
+	}
+	klusterlet.Status.SPIFFE.WebhookDNSName = r.webhook.dnsName()
+	klusterlet.Status.SPIFFE.WebhookSPIFFEID = config.SPIFFEWebhookID
+	id, err := spiffeid.FromString(config.SPIFFEWebhookID)
+	if err != nil {
+		return false, webhookEnforcement{}, err
+	}
+	servingID, caBundle, err := r.webhook.ensure(ctx, config.SPIFFEWorkloadAPISocket, id)
+	klusterlet.Status.SPIFFE.WebhookSPIFFEID = servingID.String()
+	if err != nil {
+		setAdmissionReady(klusterlet, metav1.ConditionFalse, ReasonSPIFFEWebhookNotReady, fmt.Sprintf(
+			"the operator's webhook needs an SVID: create a SPIRE registration entry for ServiceAccount %s in namespace %s "+
+				"with SPIFFE ID %s and DNS name %s (%v)",
+			spiffeOperatorServiceAccount, r.webhook.namespace, servingID, r.webhook.dnsName(), err))
+		return false, webhookEnforcement{}, commonhelpers.NewRequeueError("SPIFFE webhook: "+err.Error(), webhookRequeue)
+	}
+	if err := r.webhook.setPolicies(objects); err != nil {
+		return false, webhookEnforcement{}, err
+	}
+	return true, r.webhookEnforcement(objects, caBundle), nil
+}
+
+func (r *spiffeAdmissionReconcile) webhookEnforcement(objects []admissionObjects, caBundle []byte) webhookEnforcement {
+	var e webhookEnforcement
+	for _, o := range objects {
+		e.configs = append(e.configs, webhookConfig{client: o.client, config: r.webhook.webhookConfiguration(o, caBundle)})
+	}
+	return e
+}
+
+// switchEnforcement moves to the wanted enforcement. If the recorded one is still intact, the
+// namespaces stay trusted: the new enforcement is put in place and recorded, and the next pass
+// removes the old one, so the rules are enforced throughout. Otherwise it runs recovery.
+func (r *spiffeAdmissionReconcile) switchEnforcement(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
+	config klusterletConfig, objects []admissionObjects, recordedMode operatorapiv1.SPIFFEAdmissionEnforcement,
+	recorded admissionRecord, enf enforcement, served bool) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	var old enforcement = r.webhookEnforcement(objects, nil)
+	if recordedMode == operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy {
+		old = policyEnforcement{objects}
+	}
+	intact := false
+	if recordedMode != operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy || served {
+		oldLive, found, _, err := old.observe(ctx)
+		if err != nil {
+			return klusterlet, reconcileStop, err
+		}
+		intact = found && recorded.same(oldLive)
+	}
+	if !intact {
+		return r.recover(ctx, klusterlet, config, enf)
+	}
+	if err := enf.apply(ctx); err != nil {
+		return klusterlet, reconcileStop, err
+	}
+	live, found, _, err := enf.observe(ctx)
+	if err != nil {
+		return klusterlet, reconcileStop, err
+	}
+	if !found {
+		return klusterlet, reconcileStop, fmt.Errorf("the %s enforcement isn't in place yet", enf.mode())
+	}
+	setEnforcementRecord(klusterlet, enf.mode(), live)
+	setAdmissionReady(klusterlet, metav1.ConditionTrue, "Switched",
+		fmt.Sprintf("switched from %s to %s; the %s objects are removed next", recordedMode, enf.mode(), recordedMode))
+	return klusterlet, reconcileStop, commonhelpers.NewRequeueError(
+		"SPIFFE admission enforcement switched; removing the old one once the record is stored", recordedRequeue)
+}
+
+// removeEnforcement deletes a Klusterlet's objects of one enforcement, and the shared namespace
+// label object when no other Klusterlet has that enforcement on record. ValidatingAdmissionPolicies
+// are left alone where the API isn't served.
+func (r *spiffeAdmissionReconcile) removeEnforcement(ctx context.Context, klusterletName string,
+	mode operatorapiv1.SPIFFEAdmissionEnforcement, served bool) error {
+	if mode == operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy && !served {
+		return nil
+	}
+	managed := r.managedClusterClients.kubeClient
+	names := []struct {
+		client kubernetes.Interface
+		name   string
+	}{
+		{r.kubeClient, agentPolicyPrefix + klusterletName},
+		{managed, addOnPolicyPrefix + klusterletName},
+	}
+	shared, err := r.othersUsing(klusterletName, mode)
+	if err != nil {
+		return err
+	}
+	if !shared {
+		names = append(names, struct {
+			client kubernetes.Interface
+			name   string
+		}{managed, namespaceLabelPolicyName})
+	}
+	for _, n := range names {
+		if err := deleteEnforcementObjects(ctx, n.client, mode, n.name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteEnforcementObjects(ctx context.Context, c kubernetes.Interface, mode operatorapiv1.SPIFFEAdmissionEnforcement,
+	name string) error {
+	ignore := func(err error) error {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if mode == operatorapiv1.SPIFFEAdmissionValidatingWebhook {
+		return ignore(c.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, name, metav1.DeleteOptions{}))
+	}
+	if err := ignore(c.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(ctx, name, metav1.DeleteOptions{})); err != nil {
+		return err
+	}
+	return ignore(c.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete(ctx, name, metav1.DeleteOptions{}))
+}
+
+// othersUsing reports whether another SPIFFE Klusterlet has the enforcement on record, and so
+// needs the shared namespace label object.
+func (r *spiffeAdmissionReconcile) othersUsing(klusterletName string, mode operatorapiv1.SPIFFEAdmissionEnforcement) (bool, error) {
+	if r.spiffeEnforcements == nil {
+		return false, nil
+	}
+	modes, err := r.spiffeEnforcements()
+	if err != nil {
+		return false, err
+	}
+	for name, m := range modes {
+		if name != klusterletName && m == mode {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// recover runs the recovery steps: put the enforcement in place, unlabel add-on namespaces that
+// aren't on record, delete every workload in the agent namespace and the recorded add-on
+// namespaces, and record the enforcement once no pod is left and it didn't change meanwhile. No
+// agent runs until then.
 func (r *spiffeAdmissionReconcile) recover(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
-	config klusterletConfig, objects []admissionObjects) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	config klusterletConfig, enf enforcement) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	logger := klog.FromContext(ctx)
 	setAdmissionReady(klusterlet, metav1.ConditionFalse, "Recovering", "cleaning the agent and add-on namespaces")
 
-	for _, o := range objects {
-		if err := apply(ctx, o); err != nil {
-			return klusterlet, reconcileStop, err
-		}
+	if err := enf.apply(ctx); err != nil {
+		return klusterlet, reconcileStop, err
 	}
-	noted, _, err := observeAll(ctx, objects)
+	noted, _, _, err := enf.observe(ctx)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
@@ -464,15 +665,15 @@ func (r *spiffeAdmissionReconcile) recover(ctx context.Context, klusterlet *oper
 			fmt.Sprintf("SPIFFE recovery: %d pod(s) left", remaining), recoveryRequeue)
 	}
 
-	after, _, err := observeAll(ctx, objects)
+	after, _, _, err := enf.observe(ctx)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
-	if !sameRecords(noted, after) {
+	if !noted.same(after) {
 		return klusterlet, reconcileStop, commonhelpers.NewRequeueError(
-			"SPIFFE recovery: the admission policies changed during cleanup; starting over", recoveryRequeue)
+			"SPIFFE recovery: the admission enforcement changed during cleanup; starting over", recoveryRequeue)
 	}
-	setAdmissionRecord(klusterlet, noted)
+	setEnforcementRecord(klusterlet, enf.mode(), noted)
 	setAdmissionReady(klusterlet, metav1.ConditionTrue, "Recorded", "recovery finished and the admission state is recorded")
 	// Start no agent in this pass: the record must be stored first. Other controllers write the
 	// Klusterlet status too, so this pass's status write can conflict; agents started now would
@@ -552,10 +753,6 @@ func observeAll(ctx context.Context, objects []admissionObjects) ([]operatorapiv
 	return out, all, nil
 }
 
-func matchesRecord(recorded, live []operatorapiv1.SPIFFEAdmissionPolicyStatus) bool {
-	return live != nil && sameRecords(recorded, live)
-}
-
 func sameRecords(a, b []operatorapiv1.SPIFFEAdmissionPolicyStatus) bool {
 	if len(a) != len(b) {
 		return false
@@ -570,13 +767,6 @@ func sameRecords(a, b []operatorapiv1.SPIFFEAdmissionPolicyStatus) bool {
 		}
 	}
 	return true
-}
-
-func setAdmissionRecord(k *operatorapiv1.Klusterlet, rec []operatorapiv1.SPIFFEAdmissionPolicyStatus) {
-	if k.Status.SPIFFE == nil {
-		k.Status.SPIFFE = &operatorapiv1.KlusterletSPIFFEStatus{}
-	}
-	k.Status.SPIFFE.AdmissionPolicies = rec
 }
 
 func setAdmissionReady(k *operatorapiv1.Klusterlet, status metav1.ConditionStatus, reason, message string) {
@@ -722,35 +912,17 @@ func (r *spiffeAdmissionReconcile) clean(ctx context.Context, klusterlet *operat
 }
 
 // removeSPIFFE undoes the spiffe driver's admission state when a Klusterlet moves to another
-// driver: its policies and bindings, the shared namespace label policy when no other Klusterlet
-// uses spiffe, its add-on namespace labels, and its status.spiffe and SPIFFEAdmissionReady.
+// driver: its objects of both enforcements, the shared namespace label objects when no other
+// Klusterlet has that enforcement, its add-on namespace labels, and its status.spiffe and
+// SPIFFEAdmissionReady.
 func (r *spiffeAdmissionReconcile) removeSPIFFE(ctx context.Context, klusterlet *operatorapiv1.Klusterlet) error {
-	managed := r.managedClusterClients.kubeClient
-	names := []struct {
-		client kubernetes.Interface
-		name   string
-	}{
-		{r.kubeClient, agentPolicyPrefix + klusterlet.Name},
-		{managed, addOnPolicyPrefix + klusterlet.Name},
-	}
-	others, err := r.spiffeWorkAgents()
+	served, err := policyAPIServed(r.managedClusterClients.kubeClient)
 	if err != nil {
 		return err
 	}
-	delete(others, klusterlet.Name)
-	if len(others) == 0 {
-		names = append(names, struct {
-			client kubernetes.Interface
-			name   string
-		}{managed, namespaceLabelPolicyName})
-	}
-	for _, n := range names {
-		bindings := n.client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings()
-		if err := bindings.Delete(ctx, n.name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		policies := n.client.AdmissionregistrationV1().ValidatingAdmissionPolicies()
-		if err := policies.Delete(ctx, n.name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+	for _, mode := range []operatorapiv1.SPIFFEAdmissionEnforcement{
+		operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy, operatorapiv1.SPIFFEAdmissionValidatingWebhook} {
+		if err := r.removeEnforcement(ctx, klusterlet.Name, mode, served); err != nil {
 			return err
 		}
 	}

@@ -1,0 +1,14 @@
+# The webhook of the spiffe driver's ValidatingWebhook enforcement, served by the operator with its
+# SVID, which carries the DNS name klusterlet-spiffe-webhook.open-cluster-management.svc.
+apiVersion: v1
+kind: Service
+metadata:
+  name: klusterlet-spiffe-webhook
+  namespace: open-cluster-management
+spec:
+  selector:
+    app: klusterlet
+  ports:
+  - name: webhook
+    port: 443
+    targetPort: 9443

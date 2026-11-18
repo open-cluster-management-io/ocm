@@ -6,6 +6,19 @@ set -euo pipefail
 source "$(dirname "$0")/env.sh"
 CLUSTER="${CLUSTER:-cluster1}" TTL="${TTL:-2m}" EVERY="${EVERY:-20}" DURATION="${DURATION:-300}"
 
+# wait_agents_lead: after the agents restart, wait until the new work agent holds its leader lease;
+# an old pod that didn't release it makes the new one wait for the lease to expire.
+wait_agents_lead() {
+  local pod holder
+  for _ in $(seq 60); do
+    pod=$(kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent get pods -o name | grep -m1 work-agent || true)
+    holder=$(kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent get lease work-agent-lock \
+      -o jsonpath='{.spec.holderIdentity}' 2>/dev/null || true)
+    [[ -n "$pod" && "$holder" == "${pod#pod/}"_* ]] && return 0
+    sleep 5
+  done
+  echo "FAIL: the new work agent didn't become leader"; exit 1
+}
 for e in registration work klusterlet; do
   kubectl --context "$SPOKE_CTX" patch clusterspiffeid "ocm-${CLUSTER}-$e" --type merge -p "{\"spec\":{\"ttl\":\"$TTL\"}}" | cat
 done
@@ -13,6 +26,7 @@ done
 # change the agent Deployments (a rollout restart is refused by the admission policy).
 kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent delete pods --all | cat
 kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent rollout status deployment --timeout 5m | cat
+wait_agents_lead
 
 start=$(date +%s) i=0 failed=0
 while (( $(date +%s) - start < DURATION )); do
@@ -31,7 +45,7 @@ spec:
 YAML
   ok=false
   for _ in $(seq 30); do
-    got=$(kubectl --context "$SPOKE_CTX" -n default get cm rotation -o jsonpath='{.data.seq}' 2>/dev/null | cat)
+    got=$(kubectl --context "$SPOKE_CTX" -n default get cm rotation -o jsonpath='{.data.seq}' 2>/dev/null || true)
     if [[ "$got" == "$i" ]]; then ok=true; break; fi
     sleep 1
   done

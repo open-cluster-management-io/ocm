@@ -18,7 +18,6 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/addonsecretcontroller"
@@ -110,11 +109,6 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		return err
 	}
 
-	admissionInformers, err := spiffeAdmissionInformers(kubeClient, kubeInformer)
-	if err != nil {
-		return err
-	}
-
 	klusterletController := klusterletcontroller.NewKlusterletController(
 		kubeClient,
 		apiExtensionClient,
@@ -128,8 +122,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		o.ControlPlaneNodeLabelSelector,
 		o.DeploymentReplicas,
 		o.DisableAddonNamespace,
-		o.EnableSyncLabels,
-		admissionInformers...)
+		o.EnableSyncLabels)
 
 	klusterletCleanupController := klusterletcontroller.NewKlusterletCleanupController(
 		kubeClient,
@@ -186,19 +179,4 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 
 	<-ctx.Done()
 	return nil
-}
-
-// spiffeAdmissionInformers returns the informers of the spiffe driver's admission policies and
-// bindings: with them, a change to a policy or binding runs recovery at once. They are watched
-// only where the API is served (Kubernetes 1.30 or later).
-func spiffeAdmissionInformers(kubeClient kubernetes.Interface, kubeInformer informers.SharedInformerFactory) (
-	[]factory.Informer, error) {
-	served, err := klusterletcontroller.PolicyAPIServed(kubeClient)
-	if err != nil || !served {
-		return nil, err
-	}
-	return []factory.Informer{
-		kubeInformer.Admissionregistration().V1().ValidatingAdmissionPolicies().Informer(),
-		kubeInformer.Admissionregistration().V1().ValidatingAdmissionPolicyBindings().Informer(),
-	}, nil
 }

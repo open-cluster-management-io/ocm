@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Installs the hub with the spiffe driver only, and joins the managed cluster as $CLUSTER in
 # $MODE (Default or Singleton) with no token: it follows the order the proposal requires.
+# SPIFFE_ADMISSION_ENFORCEMENT is --spiffe-admission-enforcement: ValidatingAdmissionPolicy (the
+# default here; Kubernetes 1.30 or later) or ValidatingWebhook.
 set -euo pipefail
 source "$(dirname "$0")/env.sh"
 CLUSTERADM="${CLUSTERADM:-$SPIFFE_E2E_DIR/../../../_output/clusteradm}"
@@ -17,12 +19,17 @@ kubectl --context "$HUB_CTX" apply -f "$SPIFFE_E2E_DIR/entries-hub.yaml"
 kubectl --context "$HUB_CTX" apply -f "$SPIFFE_E2E_DIR/hub-nodeport.yaml"
 kubectl --context "$HUB_CTX" -n open-cluster-management-hub rollout status deployment/cluster-manager-grpc-server --timeout 5m
 
+echo "== managed cluster: the operator's SPIRE entry, for its admission webhook"
+CLUSTER=$CLUSTER envsubst '${CLUSTER}' < "$SPIFFE_E2E_DIR/entries-operator.yaml.tmpl" |
+  kubectl --context "$SPOKE_CTX" apply -f -
+
 echo "== managed cluster: join with no token ($MODE)"
 singleton=()
 [[ "$MODE" == Singleton ]] && singleton=(--singleton)
 "$CLUSTERADM" --context "$SPOKE_CTX" join --cluster-name "$CLUSTER" --registration-auth spiffe \
   --hub-grpc-endpoint "$HUB_ENDPOINT" --hub-spiffe-id "$HUB_ID" \
-  --bundle-version-overrides "$SPIFFE_E2E_DIR/bundle.json" "${singleton[@]}" --wait
+  --bundle-version-overrides "$SPIFFE_E2E_DIR/bundle.json" "${singleton[@]}" \
+  --spiffe-admission-enforcement "${SPIFFE_ADMISSION_ENFORCEMENT:-ValidatingAdmissionPolicy}" --wait
 
 echo "== managed cluster: the agents' SPIRE entries, now that the Klusterlet is SPIFFEAdmissionReady"
 CLUSTER=$CLUSTER AGENT_NAMESPACE=open-cluster-management-agent KLUSTERLET=klusterlet \

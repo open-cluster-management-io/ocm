@@ -21,6 +21,26 @@ spiffe=$(kubectl --context "$HUB_CTX" get clustermanager cluster-manager \
 hold=$(( $(seconds "$(jq -r .maxSVIDLifetime <<<"$spiffe")") + $(seconds "$(jq -r .maxClockSkew <<<"$spiffe")") ))
 echo "the delete guard should hold the cluster for ${hold}s"
 
+# wait_agents_lead: after the agents restart, wait until the new work agent holds its leader lease;
+# an old pod that didn't release it makes the new one wait for the lease to expire.
+wait_agents_lead() {
+  local pod holder
+  for _ in $(seq 60); do
+    pod=$(kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent get pods -o name | grep -m1 work-agent || true)
+    holder=$(kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent get lease work-agent-lock \
+      -o jsonpath='{.spec.holderIdentity}' 2>/dev/null || true)
+    [[ -n "$pod" && "$holder" == "${pod#pod/}"_* ]] && return 0
+    sleep 5
+  done
+  echo "FAIL: the new work agent didn't become leader"; exit 1
+}
+# Start from fresh agents: a new connection and a new SVID. Otherwise, after short SVIDs (for
+# example check-rotation's), the hub may close the connection at the old SVID's expiry just as the
+# entries go, and the agent's reconnect backoff can outlast its last SVID, so it can't clean up.
+kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent delete pods --all | cat
+kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent rollout status deployment --timeout 5m | cat
+wait_agents_lead
+
 cat <<YAML | kubectl --context "$HUB_CTX" apply -f - >/dev/null
 apiVersion: work.open-cluster-management.io/v1
 kind: ManifestWork

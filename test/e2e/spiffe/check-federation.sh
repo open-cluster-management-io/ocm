@@ -45,6 +45,7 @@ agent_trust_domains '[]'
 echo "== $EAST_CLUSTER: join as $CLUSTER from $EAST_TRUST_DOMAIN, no token"
 "$CLUSTERADM" --context "$EAST_CTX" join --cluster-name "$CLUSTER" --registration-auth spiffe \
   --hub-grpc-endpoint "$HUB_ENDPOINT" --hub-spiffe-id "$HUB_ID" --spiffe-trust-domain "$EAST_TRUST_DOMAIN" \
+  --spiffe-admission-enforcement ValidatingAdmissionPolicy \
   --bundle-version-overrides "$SPIFFE_E2E_DIR/bundle.json" --wait
 # The agents' entries also carry the hub's bundle, to verify the hub's SVID.
 CLUSTER=$CLUSTER AGENT_NAMESPACE=$ns KLUSTERLET=klusterlet \

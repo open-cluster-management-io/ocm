@@ -201,6 +201,7 @@ func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, recor
 		managedClusterClientsBuilder: newManagedClusterClientsBuilder(fakeKubeClient, fakeAPIExtensionClient,
 			fakeWorkClient.WorkV1().AppliedManifestWorks()),
 		enableSyncLabels: enableSyncLabels,
+		spiffeWatch:      newSPIFFEAdmissionWatch(fakeKubeClient, operatorInformers.Operator().V1().Klusterlets().Lister()),
 	}
 
 	cleanupController := &klusterletCleanupController{
@@ -299,6 +300,7 @@ func newTestControllerHosted(
 			fakeAPIExtensionClient: fakeManagedAPIExtensionClient,
 			fakeKubeClient:         fakeManagedKubeClient,
 		},
+		spiffeWatch: newSPIFFEAdmissionWatch(fakeKubeClient, operatorInformers.Operator().V1().Klusterlets().Lister()),
 	}
 	cleanupController := &klusterletCleanupController{
 		patcher: patcher.NewPatcher[

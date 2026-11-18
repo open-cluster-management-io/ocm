@@ -44,6 +44,12 @@ spec:
           {{- if .Values.enableSyncLabels }}
           - --enable-sync-labels
           {{- end }}
+        {{- if include "spiffeEnabled" . }}
+        # The webhook of the spiffe driver's ValidatingWebhook enforcement.
+        ports:
+        - name: spiffe-webhook
+          containerPort: 9443
+        {{- end }}
         env:
           - name: POD_NAME
             valueFrom:
@@ -69,12 +75,24 @@ spec:
         volumeMounts:
         - name: tmpdir
           mountPath: /tmp
+        {{- if include "spiffeEnabled" . }}
+        # The local SPIRE agent's Workload API: the webhook's SVID, in memory only.
+        - name: spiffe-workload-api
+          mountPath: /spiffe-workload-api
+          readOnly: true
+        {{- end }}
         {{- with .Values.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       volumes:
       - name: tmpdir
         emptyDir: { }
+      {{- if include "spiffeEnabled" . }}
+      - name: spiffe-workload-api
+        csi:
+          driver: csi.spiffe.io
+          readOnly: true
+      {{- end }}
       {{- with .Values.extraVolumes }}
       {{- toYaml . | nindent 6 }}
       {{- end }}

@@ -159,6 +159,7 @@ func TestSPIFFEAdmissionWorkAgentsError(t *testing.T) {
 		t.Errorf("reconcile: %v", err)
 	}
 	k.Status.SPIFFE = &operatorapiv1.KlusterletSPIFFEStatus{}
+	r.spiffeEnforcements = func() (map[string]operatorapiv1.SPIFFEAdmissionEnforcement, error) { return nil, errInjected }
 	if _, _, err := r.clean(context.TODO(), k, spiffeConfig(k)); !errors.Is(err, errInjected) {
 		t.Errorf("clean: %v", err)
 	}
