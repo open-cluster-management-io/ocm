@@ -551,9 +551,10 @@ var _ = Describe("ManifestWorkReplicaSet", func() {
 				ObservedGeneration: workCopy.Generation,
 			})
 			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
-				Type:   workapiv1.WorkAvailable,
-				Status: metav1.ConditionTrue,
-				Reason: "AppliedManifestWorkComplete",
+				Type:               workapiv1.WorkAvailable,
+				Status:             metav1.ConditionTrue,
+				Reason:             "AppliedManifestWorkComplete",
+				ObservedGeneration: workCopy.Generation,
 			})
 			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
 				Type:               workapiv1.WorkProgressing,
@@ -585,9 +586,10 @@ var _ = Describe("ManifestWorkReplicaSet", func() {
 				ObservedGeneration: workCopy.Generation,
 			})
 			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
-				Type:   workapiv1.WorkAvailable,
-				Status: metav1.ConditionTrue,
-				Reason: "AppliedManifestWorkComplete",
+				Type:               workapiv1.WorkAvailable,
+				Status:             metav1.ConditionTrue,
+				Reason:             "AppliedManifestWorkComplete",
+				ObservedGeneration: workCopy.Generation,
 			})
 			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
 				Type:               workapiv1.WorkProgressing,
@@ -614,9 +616,10 @@ var _ = Describe("ManifestWorkReplicaSet", func() {
 				ObservedGeneration: workCopy.Generation,
 			})
 			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
-				Type:   workapiv1.WorkAvailable,
-				Status: metav1.ConditionTrue,
-				Reason: "AppliedManifestWorkComplete",
+				Type:               workapiv1.WorkAvailable,
+				Status:             metav1.ConditionTrue,
+				Reason:             "AppliedManifestWorkComplete",
+				ObservedGeneration: workCopy.Generation,
 			})
 			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
 				Type:               workapiv1.WorkProgressing,
@@ -733,9 +736,10 @@ var _ = Describe("ManifestWorkReplicaSet", func() {
 			meta.SetStatusCondition(
 				&workCopy.Status.Conditions,
 				metav1.Condition{
-					Type:   workapiv1.WorkAvailable,
-					Status: metav1.ConditionTrue,
-					Reason: "Applied",
+					Type:               workapiv1.WorkAvailable,
+					Status:             metav1.ConditionTrue,
+					Reason:             "Applied",
+					ObservedGeneration: workCopy.Generation,
 				})
 			meta.SetStatusCondition(
 				&workCopy.Status.Conditions,

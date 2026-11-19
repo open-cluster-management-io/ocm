@@ -1598,7 +1598,9 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 			expectedLastTransition: &now,
 		},
 		{
-			name: "progressing false - should return Succeeded",
+			// Succeeded requires Available, so an applied work with no Available condition
+			// is still rolling out.
+			name: "progressing false but not available - should return Progressing",
 			manifestWork: &workapiv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-mw",
@@ -1625,11 +1627,50 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 					},
 				},
 			},
+			expectedStatus:         clustersdkv1alpha1.Progressing,
+			expectedLastTransition: &now,
+		},
+		{
+			name: "progressing false and available - should return Succeeded",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionFalse,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Completed",
+						},
+						{
+							Type:               workapiv1.WorkAvailable,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Available",
+						},
+					},
+				},
+			},
 			expectedStatus:         clustersdkv1alpha1.Succeeded,
 			expectedLastTransition: &now,
 		},
 		{
-			name: "progressing false with degraded true - should return Succeeded",
+			// Degraded is terminal regardless of Progressing, so maxFailures can see it.
+			name: "progressing false with degraded true - should return Failed",
 			manifestWork: &workapiv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-mw",
@@ -1663,7 +1704,7 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 					},
 				},
 			},
-			expectedStatus:         clustersdkv1alpha1.Succeeded,
+			expectedStatus:         clustersdkv1alpha1.Failed,
 			expectedLastTransition: &now,
 		},
 		{
@@ -1698,7 +1739,9 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 			expectedLastTransition: &now,
 		},
 		{
-			name: "WorkApplied Status=False with current generation - should return ToApply",
+			// The agent observed this spec and could not apply it, so the work has failed
+			// rather than being still pending.
+			name: "WorkApplied Status=False with current generation - should return Failed",
 			manifestWork: &workapiv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-mw",
@@ -1725,8 +1768,8 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 					},
 				},
 			},
-			expectedStatus:         clustersdkv1alpha1.ToApply,
-			expectedLastTransition: nil,
+			expectedStatus:         clustersdkv1alpha1.Failed,
+			expectedLastTransition: &now,
 		},
 		{
 			name: "WorkApplied Status=Unknown with current generation - should return ToApply",
