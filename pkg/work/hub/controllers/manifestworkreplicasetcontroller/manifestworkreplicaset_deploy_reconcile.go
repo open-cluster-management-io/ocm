@@ -301,6 +301,22 @@ func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifest
 	// LastTransitionTime is used by rollout strategies to calculate:
 	// - Timeout for Progressing and Failed statuses
 	// - Minimum success time (soak time) for Succeeded status
+	//
+	// A ManifestWork without a Progressing condition has settled, so resolve it from Applied
+	// and Degraded alone and fall back to the Applied timestamp for soak time. This also
+	// keeps the switch below from dereferencing a nil progressingCond.
+	if progressingCond == nil {
+		if degradedCond != nil && degradedCond.Status == metav1.ConditionTrue {
+			clsRolloutStatus.Status = clustersdkv1alpha1.Failed
+			clsRolloutStatus.LastTransitionTime = &degradedCond.LastTransitionTime
+		} else {
+			clsRolloutStatus.Status = clustersdkv1alpha1.Succeeded
+			clsRolloutStatus.LastTransitionTime = &appliedCond.LastTransitionTime
+		}
+
+		return clsRolloutStatus, nil
+	}
+
 	switch {
 	case progressingCond.Status == metav1.ConditionTrue && degradedCond != nil && degradedCond.Status == metav1.ConditionTrue:
 		clsRolloutStatus.Status = clustersdkv1alpha1.Failed
@@ -341,8 +357,11 @@ func shouldReturnToApply(generation int64, appliedCond, progressingCond, degrade
 		return true
 	}
 
-	// Check Progressing condition - work must be reconciled by spoke agent
-	if !isConditionReady(progressingCond, generation, false) {
+	// Check Progressing condition if it exists - it must have observed the latest spec.
+	// Progressing is optional: an agent that has finished reconciling a ManifestWork reports
+	// only Applied and Available, so its absence means the rollout is complete rather than
+	// incomplete. Requiring it here would keep such works in ToApply forever.
+	if progressingCond != nil && progressingCond.ObservedGeneration != generation {
 		return true
 	}
 
