@@ -646,6 +646,9 @@ spec:
                               maxLength: 24
                               pattern: ^([0-9]{1,5}(s|m|h))+$
                               type: string
+                              x-kubernetes-validations:
+                              - message: must be at most 99999h
+                                rule: duration(self) <= duration('99999h')
                             maxSVIDLifetime:
                               default: 24h
                               description: |-
@@ -655,6 +658,9 @@ spec:
                               maxLength: 24
                               pattern: ^([0-9]{1,5}(s|m|h))+$
                               type: string
+                              x-kubernetes-validations:
+                              - message: must be at most 99999h
+                                rule: duration(self) <= duration('99999h')
                             serverSPIFFEID:
                               description: |-
                                 serverSPIFFEID is the SPIFFE ID the hub gRPC server presents to agents. It must be in

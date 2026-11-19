@@ -286,6 +286,7 @@ type SPIFFERegistrationConfig struct {
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:MaxLength=24
 	// +kubebuilder:validation:Pattern="^([0-9]{1,5}(s|m|h))+$"
+	// +kubebuilder:validation:XValidation:rule="duration(self) <= duration('99999h')",message="must be at most 99999h"
 	MaxSVIDLifetime *metav1.Duration `json:"maxSVIDLifetime,omitempty"`
 
 	// maxClockSkew is the allowed clock difference between the hub and the SPIRE servers of
@@ -296,6 +297,7 @@ type SPIFFERegistrationConfig struct {
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:MaxLength=24
 	// +kubebuilder:validation:Pattern="^([0-9]{1,5}(s|m|h))+$"
+	// +kubebuilder:validation:XValidation:rule="duration(self) <= duration('99999h')",message="must be at most 99999h"
 	MaxClockSkew *metav1.Duration `json:"maxClockSkew,omitempty"`
 
 	// autoApprovedIdentities are the SPIFFE IDs whose clusters are accepted automatically, as
