@@ -38,11 +38,11 @@ func ToAddOnRegistriesPrivateValues(config addonapiv1beta1.AddOnDeploymentConfig
 }
 
 func ToAddOnInstallNamespacePrivateValues(config addonapiv1beta1.AddOnDeploymentConfig) (addonfactory.Values, error) {
-	if len(config.Spec.AgentInstallNamespace) == 0 {
+	if config.Spec.AgentInstallNamespace == nil || len(*config.Spec.AgentInstallNamespace) == 0 {
 		return nil, nil
 	}
 	return addonfactory.Values{
-		InstallNamespacePrivateValueKey: config.Spec.AgentInstallNamespace,
+		InstallNamespacePrivateValueKey: *config.Spec.AgentInstallNamespace,
 	}, nil
 }
 

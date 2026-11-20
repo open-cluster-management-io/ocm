@@ -45,11 +45,14 @@ type RegexResourceRequirements struct {
 // for example: the spec of one AddOnDeploymentConfig is:
 //
 //	{
-//	 nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key":"test"}},
+//	 nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key":"test"}, affinity: {nodeAffinity: {...}}},
 //	}
 //
 // after transformed, the Values will be:
-// map[global:map[nodeSelector:map[host:ssd]] tolerations:[map[key:test]]]
+// map[global:map[nodeSelector:map[host:ssd]] tolerations:[map[key:test]] affinity:map[nodeAffinity:map[...]]]
+//
+// affinity is emitted as a top-level value, which is the key charts conventionally read it from, and is
+// omitted entirely when unset so that a chart keeps whatever affinity its own values define.
 func ToAddOnNodePlacementValues(config addonapiv1beta1.AddOnDeploymentConfig) (Values, error) {
 	if config.Spec.NodePlacement == nil {
 		return nil, nil
@@ -61,9 +64,11 @@ func ToAddOnNodePlacementValues(config addonapiv1beta1.AddOnDeploymentConfig) (V
 
 	jsonStruct := struct {
 		Tolerations []corev1.Toleration `json:"tolerations"`
+		Affinity    *corev1.Affinity    `json:"affinity,omitempty"`
 		Global      global              `json:"global"`
 	}{
 		Tolerations: config.Spec.NodePlacement.Tolerations,
+		Affinity:    config.Spec.NodePlacement.Affinity,
 		Global: global{
 			NodeSelector: config.Spec.NodePlacement.NodeSelector,
 		},
@@ -267,12 +272,12 @@ func toStringResourceList(resourceList corev1.ResourceList) map[string]string {
 //
 //	{
 //		customizedVariables: [{name: "Image", value: "img"}, {name: "ImagePullPolicy", value: "Always"}],
-//		nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key": "test"}},
+//		nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key": "test"}, affinity: {nodeAffinity: {...}}},
 //		resourceRequirements:[{containerID: "*:*:*", resources: { limits: { memory: "4Gi"}, requests: { memory: "512Mi"}}}],
 //	}
 //
 // after transformed, the key set of Values object will be: {"Image", "ImagePullPolicy", "NodeSelector", "Tolerations",
-// "ResourceRequirements"}
+// "Affinity", "ResourceRequirements"}
 func ToAddOnDeploymentConfigValues(config addonapiv1beta1.AddOnDeploymentConfig) (Values, error) {
 	values, err := ToAddOnCustomizedVariableValues(config)
 	if err != nil {
@@ -282,6 +287,9 @@ func ToAddOnDeploymentConfigValues(config addonapiv1beta1.AddOnDeploymentConfig)
 	if config.Spec.NodePlacement != nil {
 		values["NodeSelector"] = config.Spec.NodePlacement.NodeSelector
 		values["Tolerations"] = config.Spec.NodePlacement.Tolerations
+		if config.Spec.NodePlacement.Affinity != nil {
+			values["Affinity"] = config.Spec.NodePlacement.Affinity
+		}
 	}
 
 	// load add-on proxy settings

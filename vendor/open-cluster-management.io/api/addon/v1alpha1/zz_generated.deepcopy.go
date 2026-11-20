@@ -109,6 +109,11 @@ func (in *AddOnDeploymentConfigSpec) DeepCopyInto(out *AddOnDeploymentConfigSpec
 		copy(*out, *in)
 	}
 	in.ProxyConfig.DeepCopyInto(&out.ProxyConfig)
+	if in.AgentInstallNamespace != nil {
+		in, out := &in.AgentInstallNamespace, &out.AgentInstallNamespace
+		*out = new(string)
+		**out = **in
+	}
 	if in.ResourceRequirements != nil {
 		in, out := &in.ResourceRequirements, &out.ResourceRequirements
 		*out = make([]ContainerResourceRequirements, len(*in))
