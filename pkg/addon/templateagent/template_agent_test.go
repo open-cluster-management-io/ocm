@@ -190,7 +190,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: "test-install-namespace",
+					AgentInstallNamespace: new("test-install-namespace"),
 					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
@@ -292,7 +292,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: "test-install-namespace",
+					AgentInstallNamespace: new("test-install-namespace"),
 					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
@@ -515,7 +515,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: "test-install-namespace",
+					AgentInstallNamespace: new("test-install-namespace"),
 					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
@@ -744,7 +744,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: "test-install-namespace",
+					AgentInstallNamespace: new("test-install-namespace"),
 				},
 			},
 			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
@@ -855,7 +855,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: "test-install-namespace",
+					AgentInstallNamespace: new("test-install-namespace"),
 				},
 			},
 			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
@@ -890,7 +890,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: "",
+					AgentInstallNamespace: new(""),
 					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
