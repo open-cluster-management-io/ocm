@@ -531,7 +531,7 @@ func autoConvert_v1beta1_AddOnDeploymentConfigSpec_To_v1alpha1_AddOnDeploymentCo
 	if err := Convert_v1beta1_ProxyConfig_To_v1alpha1_ProxyConfig(&in.ProxyConfig, &out.ProxyConfig, s); err != nil {
 		return err
 	}
-	out.AgentInstallNamespace = in.AgentInstallNamespace
+	out.AgentInstallNamespace = (*string)(unsafe.Pointer(in.AgentInstallNamespace))
 	out.ResourceRequirements = *(*[]v1alpha1.ContainerResourceRequirements)(unsafe.Pointer(&in.ResourceRequirements))
 	return nil
 }
@@ -548,7 +548,7 @@ func autoConvert_v1alpha1_AddOnDeploymentConfigSpec_To_v1beta1_AddOnDeploymentCo
 	if err := Convert_v1alpha1_ProxyConfig_To_v1beta1_ProxyConfig(&in.ProxyConfig, &out.ProxyConfig, s); err != nil {
 		return err
 	}
-	out.AgentInstallNamespace = in.AgentInstallNamespace
+	out.AgentInstallNamespace = (*string)(unsafe.Pointer(in.AgentInstallNamespace))
 	out.ResourceRequirements = *(*[]ContainerResourceRequirements)(unsafe.Pointer(&in.ResourceRequirements))
 	return nil
 }

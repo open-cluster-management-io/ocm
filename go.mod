@@ -16,7 +16,7 @@ require (
 	github.com/google/cel-go v0.29.2
 	github.com/google/go-cmp v0.7.0
 	github.com/itchyny/gojq v0.12.20
-	github.com/onsi/ginkgo/v2 v2.33.1
+	github.com/onsi/ginkgo/v2 v2.34.0
 	github.com/onsi/gomega v1.44.0
 	github.com/openshift/api v0.0.0-20261023091600-9809689a2448
 	github.com/openshift/build-machinery-go v0.0.0-20250602125535-1b6d00b8c37c
@@ -159,12 +159,13 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.71.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0 // indirect
-	go.opentelemetry.io/otel v1.46.0 // indirect
+	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.46.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.46.0 // indirect
-	go.opentelemetry.io/otel/metric v1.46.0 // indirect
+	go.opentelemetry.io/otel/log v1.47.0 // indirect
+	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.46.0 // indirect
-	go.opentelemetry.io/otel/trace v1.46.0 // indirect
+	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
@@ -197,8 +198,8 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 )
 
-replace open-cluster-management.io/api => github.com/ssijbabu/api v1.3.1-0.20261120193913-0adf5a6ae3ae
+replace open-cluster-management.io/api => github.com/ssijbabu/api v1.3.1-0.20261120195137-1f77f8282d1d
 
-replace open-cluster-management.io/sdk-go => github.com/ssijbabu/sdk-go v1.4.1-0.20261120194007-076e6d2071ac
+replace open-cluster-management.io/sdk-go => github.com/ssijbabu/sdk-go v1.4.1-0.20261120195631-f2b7be8e5cee
 
-replace open-cluster-management.io/addon-framework => github.com/ssijbabu/addon-framework v1.4.1-0.20261120194134-ab2ae40a0875
+replace open-cluster-management.io/addon-framework => github.com/ssijbabu/addon-framework v1.4.1-0.20261120195915-bc2c9091591c

@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -59,7 +60,8 @@ func AgentInstallNamespaceFromDeploymentConfigFunc(
 			return "", nil
 		}
 
-		return config.Spec.AgentInstallNamespace, nil
+		// nil reads as "", as the field did when it was a string.
+		return ptr.Deref(config.Spec.AgentInstallNamespace, ""), nil
 	}
 }
 
