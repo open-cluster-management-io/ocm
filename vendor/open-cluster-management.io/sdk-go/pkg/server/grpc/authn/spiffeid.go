@@ -83,6 +83,12 @@ func (s *IDScheme) CheckServerID(id spiffeid.ID) error {
 // TrustDomains returns the accepted agent trust domains, for the server TLS authorizer.
 func (s *IDScheme) TrustDomains() []spiffeid.TrustDomain { return s.trustDomains }
 
+// SPIFFEAgentsGroup is given to the Klusterlet agents (registration, work and singleton) mapped
+// from a SPIFFE ID, and to no other identity. The hub binds the pre-acceptance permission to it
+// rather than to system:open-cluster-management:managed-clusters, which the agents of the csr and
+// grpc drivers carry in their certificates too.
+const SPIFFEAgentsGroup = "system:open-cluster-management:spiffe-agents"
+
 // Parse maps an agent SPIFFE ID to its OCM identity.
 func (s *IDScheme) Parse(id spiffeid.ID) (OCMIdentity, error) {
 	if !slices.Contains(s.trustDomains, id.TrustDomain()) {
@@ -118,6 +124,7 @@ func agentIdentity(id spiffeid.ID, v map[string]string) (OCMIdentity, error) {
 		Groups: []string{
 			"system:open-cluster-management:" + cluster,
 			"system:open-cluster-management:managed-clusters",
+			SPIFFEAgentsGroup,
 			"system:authenticated",
 		},
 	}, nil

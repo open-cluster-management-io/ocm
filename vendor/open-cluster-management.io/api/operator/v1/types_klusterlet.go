@@ -192,6 +192,7 @@ type HubApiServerHostAlias struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.registrationDriver) || !has(self.registrationDriver.authType) || self.registrationDriver.authType != 'spiffe' || (has(self.addOnKubeClientRegistrationDriver) && has(self.addOnKubeClientRegistrationDriver.authType) && self.addOnKubeClientRegistrationDriver.authType == 'spiffe')",message="addOnKubeClientRegistrationDriver.authType must be spiffe when registrationDriver.authType is spiffe"
+// +kubebuilder:validation:XValidation:rule="!has(self.addOnKubeClientRegistrationDriver) || !has(self.addOnKubeClientRegistrationDriver.authType) || self.addOnKubeClientRegistrationDriver.authType != 'spiffe' || (has(self.registrationDriver) && has(self.registrationDriver.authType) && self.registrationDriver.authType == 'spiffe')",message="registrationDriver.authType must be spiffe when addOnKubeClientRegistrationDriver.authType is spiffe"
 type RegistrationConfiguration struct {
 	// clientCertExpirationSeconds represents the seconds of a client certificate to expire. If it is not set or 0, the default
 	// duration seconds will be set by the hub cluster. If the value is larger than the max signing duration seconds set on
@@ -396,7 +397,9 @@ type AddOnRegistrationDriver struct {
 	// AuthType is the authentication driver used for add-on registration.
 	// Possible values are csr, token and spiffe. With spiffe, each add-on agent authenticates
 	// with its own SPIRE-issued SVID and no add-on credential is created.
-	// Currently, this field only affects kubeClient type add-on registration. The csr type add-on registration always uses csr driver.
+	// Currently, this field only affects kubeClient type add-on registration. The csr type add-on registration always uses csr driver,
+	// except with spiffe: the hub signs no certificates then, so a customSigner registration is refused, with the
+	// RegistrationApplied condition False and reason CustomSignerNotSupported on the ManagedClusterAddOn.
 	// In the future, this may be extended to customize authentication for csr type add-on registration as well.
 	// +optional
 	// +kubebuilder:validation:Enum=csr;token;spiffe

@@ -247,7 +247,8 @@ type SPIFFERegistrationConfig struct {
 	// klusterlet) and {namespace} (optional; the namespace the agent runs in, never used for
 	// authorization). Each placeholder fills a whole path segment and appears at most once, and
 	// at least one segment is fixed text. The Klusterlets must use the same template. The
-	// cluster-manager operator checks these rules and reports a Degraded condition otherwise.
+	// cluster-manager operator checks these rules and otherwise sets Applied to False with reason
+	// InvalidSPIFFEConfiguration.
 	// +optional
 	// +kubebuilder:default:="spiffe://{trustDomain}/ocm/cluster/{cluster}/agent/{role}"
 	// +kubebuilder:validation:MaxLength=512
@@ -265,7 +266,8 @@ type SPIFFERegistrationConfig struct {
 	AddOnAgentIDTemplate string `json:"addOnAgentIDTemplate,omitempty"`
 
 	// serverSPIFFEID is the SPIFFE ID the hub gRPC server presents to agents. It must be in
-	// trustDomain; the cluster-manager operator reports a Degraded condition otherwise.
+	// trustDomain; the cluster-manager operator otherwise sets Applied to False with reason
+	// InvalidSPIFFEConfiguration.
 	// If it is not set, spiffe://<trustDomain>/ocm/hub/grpc-server is used.
 	// +optional
 	// +kubebuilder:validation:MaxLength=512

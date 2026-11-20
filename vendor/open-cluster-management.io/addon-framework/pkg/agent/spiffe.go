@@ -146,12 +146,22 @@ func applySPIFFEToPod(t *corev1.PodTemplateSpec, addonName string) {
 	}
 	t.Labels[SPIFFERoleLabel] = "addon"
 
+	// The hub kubeconfig Secret, mounted directly or as a source of a projected volume, becomes
+	// the add-on's SPIFFE ConfigMap. Its keys are not the Secret's, so items aren't carried over.
 	hubSecret := addonName + "-hub-kubeconfig"
+	settings := corev1.LocalObjectReference{Name: SPIFFEConfigMapName(addonName)}
 	for i := range t.Spec.Volumes {
 		v := &t.Spec.Volumes[i]
 		if v.Secret != nil && v.Secret.SecretName == hubSecret {
-			v.VolumeSource = corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{Name: SPIFFEConfigMapName(addonName)}}}
+			v.VolumeSource = corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: settings}}
+		}
+		if v.Projected != nil {
+			for j := range v.Projected.Sources {
+				src := &v.Projected.Sources[j]
+				if src.Secret != nil && src.Secret.Name == hubSecret {
+					src.Secret, src.ConfigMap = nil, &corev1.ConfigMapProjection{LocalObjectReference: settings}
+				}
+			}
 		}
 	}
 	names := sets.New[string]()
@@ -163,8 +173,15 @@ func applySPIFFEToPod(t *corev1.PodTemplateSpec, addonName string) {
 		t.Spec.Volumes = append(t.Spec.Volumes, corev1.Volume{Name: SPIFFEWorkloadAPIVolume,
 			VolumeSource: corev1.VolumeSource{CSI: &corev1.CSIVolumeSource{Driver: "csi.spiffe.io", ReadOnly: &readOnly}}})
 	}
+	// Every container mounts the Workload API, init containers too: one may connect to the hub.
+	containers := make([]*corev1.Container, 0, len(t.Spec.InitContainers)+len(t.Spec.Containers))
+	for i := range t.Spec.InitContainers {
+		containers = append(containers, &t.Spec.InitContainers[i])
+	}
 	for i := range t.Spec.Containers {
-		c := &t.Spec.Containers[i]
+		containers = append(containers, &t.Spec.Containers[i])
+	}
+	for _, c := range containers {
 		mounted := false
 		for _, m := range c.VolumeMounts {
 			mounted = mounted || m.Name == SPIFFEWorkloadAPIVolume

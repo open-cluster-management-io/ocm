@@ -1991,7 +1991,7 @@ k8s.io/utils/path
 k8s.io/utils/ptr
 k8s.io/utils/third_party/forked/golang/btree
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v1.4.0 => ../addon-framework
+# open-cluster-management.io/addon-framework v1.4.0 => github.com/ssijbabu/addon-framework v1.4.1-0.20261120194134-ab2ae40a0875
 ## explicit; go 1.26.0
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
@@ -2007,7 +2007,7 @@ open-cluster-management.io/addon-framework/pkg/agent/v1alpha1
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v1.4.1-0.20261023183208-940bd2e3ecb2 => github.com/ssijbabu/api v1.3.1-0.20261113090800-b805cf6c07e4
+# open-cluster-management.io/api v1.4.1-0.20261023183208-940bd2e3ecb2 => github.com/ssijbabu/api v1.3.1-0.20261120193913-0adf5a6ae3ae
 ## explicit; go 1.26.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/addon/v1beta1
@@ -2080,7 +2080,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v1.4.0 => ../sdk-go
+# open-cluster-management.io/sdk-go v1.4.0 => github.com/ssijbabu/sdk-go v1.4.1-0.20261120194007-076e6d2071ac
 ## explicit; go 1.26.0
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -2271,6 +2271,6 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v3
-# open-cluster-management.io/api => github.com/ssijbabu/api v1.3.1-0.20261113090800-b805cf6c07e4
-# open-cluster-management.io/sdk-go => ../sdk-go
-# open-cluster-management.io/addon-framework => ../addon-framework
+# open-cluster-management.io/api => github.com/ssijbabu/api v1.3.1-0.20261120193913-0adf5a6ae3ae
+# open-cluster-management.io/sdk-go => github.com/ssijbabu/sdk-go v1.4.1-0.20261120194007-076e6d2071ac
+# open-cluster-management.io/addon-framework => github.com/ssijbabu/addon-framework v1.4.1-0.20261120194134-ab2ae40a0875
