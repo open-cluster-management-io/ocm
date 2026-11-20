@@ -110,6 +110,28 @@ type KlusterletSpec struct {
 // AgentConfiguration represents customization of the klusterlet agents.
 type AgentConfiguration struct {
 	// BindConfiguration represents the server bind configuration of the klusterlet agents.
+	// It applies to the klusterlet-agent in Singleton mode. In Default mode, it applies to
+	// the registration and work agents that do not set their own bindConfiguration.
+	// +optional
+	BindConfiguration *AgentBindConfiguration `json:"bindConfiguration,omitempty"`
+
+	// RegistrationAgentConfiguration represents the configuration of the registration agent
+	// in Default mode. It is ignored in Singleton mode.
+	// +optional
+	RegistrationAgentConfiguration *AgentComponentConfiguration `json:"registrationAgentConfiguration,omitempty"`
+
+	// WorkAgentConfiguration represents the configuration of the work agent in Default mode.
+	// It is ignored in Singleton mode.
+	// +optional
+	WorkAgentConfiguration *AgentComponentConfiguration `json:"workAgentConfiguration,omitempty"`
+}
+
+// AgentComponentConfiguration represents customization of a single klusterlet agent.
+type AgentComponentConfiguration struct {
+	// BindConfiguration represents the server bind configuration of the agent.
+	// In Default mode the registration and work agents run as separate pods. When both
+	// use hostNetwork and can be scheduled on the same node, set a different
+	// healthProbePort for each of them.
 	// +optional
 	BindConfiguration *AgentBindConfiguration `json:"bindConfiguration,omitempty"`
 }
