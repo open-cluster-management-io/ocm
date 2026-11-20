@@ -285,39 +285,65 @@ func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifest
 	progressingCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkProgressing)
 	degradedCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkDegraded)
 	appliedCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkApplied)
+	availableCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkAvailable)
+
+	// A work that observed the current spec and could not apply it has failed, it is not
+	// still pending. Reporting ToApply here hides it from maxFailures and makes the rollout
+	// wait for progressDeadline instead.
+	if appliedCond != nil && appliedCond.ObservedGeneration == manifestWork.Generation &&
+		appliedCond.Status == metav1.ConditionFalse {
+		clsRolloutStatus.Status = clustersdkv1alpha1.Failed
+		clsRolloutStatus.LastTransitionTime = &appliedCond.LastTransitionTime
+
+		return clsRolloutStatus, nil
+	}
 
 	// Check if the work should be in ToApply status
 	if shouldReturnToApply(manifestWork.Generation, appliedCond, progressingCond, degradedCond) {
 		return clsRolloutStatus, nil
 	}
 
-	// Agent has observed the latest spec, determine status based on Progressing and Degraded conditions.
-	// Degraded is an optional condition only used to determine Failed case.
-	// - Progressing=True + Degraded=True → Failed (work is progressing but degraded)
-	// - Progressing=True (not degraded) → Progressing
-	// - Progressing=False → Succeeded
-	// - Unknown state → Progressing (conservative fallback)
+	// The agent has observed the latest spec, so resolve the rollout status:
+	// - Degraded=True                      → Failed
+	// - Progressing=True                   → Progressing
+	// - Available=True                     → Succeeded
+	// - anything else                      → Progressing (conservative fallback)
+	//
+	// Progressing is optional. An agent that has finished reconciling a ManifestWork reports
+	// Applied and Available only, so its absence means the work has settled rather than that
+	// it is still pending.
+	//
+	// Succeeded requires Available: a work whose resources are applied but not yet available
+	// is not done, and advancing on Applied alone moves the rollout to the next cluster too
+	// early.
 	//
 	// LastTransitionTime is used by rollout strategies to calculate:
 	// - Timeout for Progressing and Failed statuses
 	// - Minimum success time (soak time) for Succeeded status
+	// Prefer the Progressing timestamp where there is one, otherwise fall back to Applied.
+	settledTime := &appliedCond.LastTransitionTime
+	if progressingCond != nil {
+		settledTime = &progressingCond.LastTransitionTime
+	}
+
 	switch {
-	case progressingCond.Status == metav1.ConditionTrue && degradedCond != nil && degradedCond.Status == metav1.ConditionTrue:
+	case degradedCond != nil && degradedCond.Status == metav1.ConditionTrue:
 		clsRolloutStatus.Status = clustersdkv1alpha1.Failed
 		clsRolloutStatus.LastTransitionTime = &degradedCond.LastTransitionTime
 
-	case progressingCond.Status == metav1.ConditionTrue:
+	case progressingCond != nil && progressingCond.Status == metav1.ConditionTrue:
 		clsRolloutStatus.Status = clustersdkv1alpha1.Progressing
 		clsRolloutStatus.LastTransitionTime = &progressingCond.LastTransitionTime
 
-	case progressingCond.Status == metav1.ConditionFalse:
+	case isConditionReady(availableCond, manifestWork.Generation, true):
 		clsRolloutStatus.Status = clustersdkv1alpha1.Succeeded
-		clsRolloutStatus.LastTransitionTime = &progressingCond.LastTransitionTime
+		clsRolloutStatus.LastTransitionTime = settledTime
 
 	default:
-		// Unknown state, conservatively treat as still progressing
+		// Either the agent reported an unknown state, or the work applied but its resources
+		// are not available yet. Both mean the rollout should not advance past this cluster.
 		clsRolloutStatus.Status = clustersdkv1alpha1.Progressing
-		clsRolloutStatus.LastTransitionTime = &progressingCond.LastTransitionTime
+		clsRolloutStatus.LastTransitionTime = settledTime
 	}
 
 	return clsRolloutStatus, nil
@@ -341,8 +367,11 @@ func shouldReturnToApply(generation int64, appliedCond, progressingCond, degrade
 		return true
 	}
 
-	// Check Progressing condition - work must be reconciled by spoke agent
-	if !isConditionReady(progressingCond, generation, false) {
+	// Check Progressing condition if it exists - it must have observed the latest spec.
+	// Progressing is optional: an agent that has finished reconciling a ManifestWork reports
+	// only Applied and Available, so its absence means the rollout is complete rather than
+	// incomplete. Requiring it here would keep such works in ToApply forever.
+	if progressingCond != nil && progressingCond.ObservedGeneration != generation {
 		return true
 	}
 
