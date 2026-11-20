@@ -325,7 +325,9 @@ spec:
                           AuthType is the authentication driver used for add-on registration.
                           Possible values are csr, token and spiffe. With spiffe, each add-on agent authenticates
                           with its own SPIRE-issued SVID and no add-on credential is created.
-                          Currently, this field only affects kubeClient type add-on registration. The csr type add-on registration always uses csr driver.
+                          Currently, this field only affects kubeClient type add-on registration. The csr type add-on registration always uses csr driver,
+                          except with spiffe: the hub signs no certificates then, so a customSigner registration is refused, with the
+                          RegistrationApplied condition False and reason CustomSignerNotSupported on the ManagedClusterAddOn.
                           In the future, this may be extended to customize authentication for csr type add-on registration as well.
                         enum:
                         - csr
@@ -633,6 +635,12 @@ spec:
                     || self.registrationDriver.authType != ''spiffe'' || (has(self.addOnKubeClientRegistrationDriver)
                     && has(self.addOnKubeClientRegistrationDriver.authType) && self.addOnKubeClientRegistrationDriver.authType
                     == ''spiffe'')'
+                - message: registrationDriver.authType must be spiffe when addOnKubeClientRegistrationDriver.authType
+                    is spiffe
+                  rule: '!has(self.addOnKubeClientRegistrationDriver) || !has(self.addOnKubeClientRegistrationDriver.authType)
+                    || self.addOnKubeClientRegistrationDriver.authType != ''spiffe''
+                    || (has(self.registrationDriver) && has(self.registrationDriver.authType)
+                    && self.registrationDriver.authType == ''spiffe'')'
               registrationImagePullSpec:
                 description: |-
                   RegistrationImagePullSpec represents the desired image configuration of registration agent.
