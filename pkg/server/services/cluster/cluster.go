@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
@@ -22,6 +23,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
 	grpcauthn "open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 
+	spiffeguard "open-cluster-management.io/ocm/pkg/registration/hub/spiffe"
 	"open-cluster-management.io/ocm/pkg/server/services"
 )
 
@@ -203,5 +205,10 @@ func pinTrustDomain(ctx context.Context, cluster *clusterv1.ManagedCluster) {
 	cluster.Annotations[clusterv1.SPIFFETrustDomainAnnotationKey] = id.TrustDomain
 	if sid, ok := ctx.Value(grpcauthn.ContextSPIFFEIDKey).(spiffeid.ID); ok {
 		cluster.Annotations[clusterv1.SPIFFERegisteredByAnnotationKey] = sid.String()
+	}
+	// The delete guard's finalizer is set in the same write: a cluster deleted before the guard
+	// first sees it is still held until the SVIDs issued before the deletion have expired.
+	if !slices.Contains(cluster.Finalizers, spiffeguard.RevocationFinalizer) {
+		cluster.Finalizers = append(cluster.Finalizers, spiffeguard.RevocationFinalizer)
 	}
 }

@@ -15,4 +15,4 @@ roleRef:
 subjects:
 - kind: Group
   apiGroup: rbac.authorization.k8s.io
-  name: system:open-cluster-management:managed-clusters
+  name: system:open-cluster-management:spiffe-agents

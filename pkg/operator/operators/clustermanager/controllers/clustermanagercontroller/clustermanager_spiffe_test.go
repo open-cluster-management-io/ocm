@@ -195,7 +195,7 @@ func TestSPIFFEHubRendering(t *testing.T) {
 		}
 		b := r.bindings["open-cluster-management:spiffe-agent"]
 		if b == nil || len(b.Subjects) != 1 || b.Subjects[0].Kind != "Group" ||
-			b.Subjects[0].Name != "system:open-cluster-management:managed-clusters" {
+			b.Subjects[0].Name != "system:open-cluster-management:spiffe-agents" {
 			t.Errorf("pre-acceptance binding %+v, want the managed-clusters group", b)
 		}
 	})

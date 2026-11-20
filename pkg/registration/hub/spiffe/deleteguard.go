@@ -3,6 +3,7 @@ package spiffe
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,16 +41,21 @@ type deleteGuard struct {
 	lifetime    time.Duration
 	skew        time.Duration
 	allClusters bool
-	now         func() time.Time
+	// adds is false when spiffe is no longer enabled: the guard then only releases the clusters
+	// that still carry the finalizer, after the same wait.
+	adds bool
+	now  func() time.Time
 }
 
 // NewDeleteGuardController returns the delete guard. spiffeOnly is true when spiffe is the only
-// enabled registration driver.
+// enabled registration driver. enabled is false when the spiffe driver isn't enabled: the guard
+// adds no finalizer then, but still releases the ones clusters carry, so a cluster deleted after
+// spiffe was turned off isn't left terminating.
 func NewDeleteGuardController(
 	clusterClient clusterclient.Interface,
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
 	maxSVIDLifetime, maxClockSkew time.Duration,
-	spiffeOnly bool,
+	spiffeOnly, enabled bool,
 ) factory.Controller {
 	g := &deleteGuard{
 		patcher: patcher.NewPatcher[
@@ -59,6 +65,7 @@ func NewDeleteGuardController(
 		lifetime:    maxSVIDLifetime,
 		skew:        maxClockSkew,
 		allClusters: spiffeOnly,
+		adds:        enabled,
 		now:         time.Now,
 	}
 	return factory.New().
@@ -84,13 +91,16 @@ func (g *deleteGuard) sync(ctx context.Context, syncCtx factory.SyncContext, nam
 		return err
 	}
 	if c.DeletionTimestamp.IsZero() {
-		if !g.guards(c) {
+		if !g.adds || !g.guards(c) {
 			return nil
 		}
 		_, err := g.patcher.AddFinalizer(ctx, c, RevocationFinalizer)
 		return err
 	}
 
+	if !slices.Contains(c.Finalizers, RevocationFinalizer) {
+		return nil
+	}
 	release := c.DeletionTimestamp.Add(g.lifetime + g.skew)
 	if wait := release.Sub(g.now()); wait > 0 {
 		klog.FromContext(ctx).V(4).Info("holding deleted cluster until its SVIDs have expired",

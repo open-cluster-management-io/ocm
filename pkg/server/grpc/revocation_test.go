@@ -28,6 +28,11 @@ func (f *fakeCloser) CloseAddOn(cluster, addon string) int {
 	return 1
 }
 
+func pinned(c *clusterv1.ManagedCluster, trustDomain string) *clusterv1.ManagedCluster {
+	c.Annotations = map[string]string{clusterv1.SPIFFETrustDomainAnnotationKey: trustDomain}
+	return c
+}
+
 func managedCluster(name string, accepted, deleting bool) *clusterv1.ManagedCluster {
 	c := &clusterv1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
@@ -53,6 +58,9 @@ func TestClusterRevocationHandler(t *testing.T) {
 		{"delete starts", managedCluster("cluster1", true, false), managedCluster("cluster1", true, true), []string{"cluster1"}},
 		{"never accepted, delete starts", managedCluster("cluster3", false, false), managedCluster("cluster3", false, true), []string{"cluster3"}},
 		{"already deleting", managedCluster("cluster1", true, true), managedCluster("cluster1", true, true), nil},
+		{"pinned", managedCluster("cluster1", true, false), pinned(managedCluster("cluster1", true, false), "east.example.org"), []string{"cluster1"}},
+		{"pin changed", pinned(managedCluster("cluster1", true, false), "east.example.org"), pinned(managedCluster("cluster1", true, false), "west.example.org"), []string{"cluster1"}},
+		{"pin unchanged", pinned(managedCluster("cluster1", true, false), "east.example.org"), pinned(managedCluster("cluster1", true, false), "east.example.org"), nil},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

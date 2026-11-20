@@ -57,7 +57,8 @@ func startSPIFFEServer(ctx context.Context, socket string, agentTemplate string)
 	opts := ocmgrpcserver.NewGRPCServerOptions()
 	opts.GRPCEnabled = false
 	opts.SPIFFE.Enabled = true
-	opts.SPIFFE.ListenAddress = "127.0.0.1:" + port
+	// Only a port: the listener binds on every interface.
+	opts.SPIFFE.ListenAddress = ":" + port
 	opts.SPIFFE.TrustDomain = spiffeTD
 	opts.SPIFFE.WorkloadAPISocket = socket
 	if agentTemplate != "" {
@@ -69,6 +70,12 @@ func startSPIFFEServer(ctx context.Context, socket string, agentTemplate string)
 	}()
 	addr := "127.0.0.1:" + port
 	Eventually(func() error {
+		// A server that stopped at once (a refused option) fails here, not after the timeout.
+		select {
+		case err := <-done:
+			return StopTrying("the SPIFFE server stopped").Wrap(fmt.Errorf("%v", err))
+		default:
+		}
 		conn, err := net.DialTimeout("tcp", addr, time.Second)
 		if err == nil {
 			_ = conn.Close()
@@ -144,7 +151,7 @@ var _ = Describe("Registration using SPIFFE", Ordered, Label("spiffe-test"), fun
 			ObjectMeta: metav1.ObjectMeta{Name: "open-cluster-management:spiffe-agent"},
 			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: "open-cluster-management:spiffe-agent"},
 			Subjects: []rbacv1.Subject{{APIGroup: rbacv1.GroupName, Kind: "Group",
-				Name: "system:open-cluster-management:managed-clusters"}},
+				Name: "system:open-cluster-management:spiffe-agents"}},
 		}, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
@@ -584,6 +591,8 @@ var _ = Describe("Registration using SPIFFE", Ordered, Label("spiffe-test"), fun
 				ClusterHealthCheckPeriod: time.Minute,
 				RegisterDriverOption:     factory.NewOptions(),
 			}, commOptions, spokeCfg)
+			// Stopped even if an assertion below fails; stopping twice is harmless.
+			DeferCleanup(stop)
 			Eventually(func() error {
 				return authn.ApproveSpokeClusterCSR(kubeClient, cluster, 24*time.Hour)
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
@@ -655,6 +664,12 @@ var _ = Describe("Registration using SPIFFE", Ordered, Label("spiffe-test"), fun
 
 		By("its agent switches to spiffe")
 		stopCSRAgent()
+		// The SPIFFE agent must renew the lease itself: later than the csr agent's last renewal.
+		var renewedByCSR time.Time
+		if lease, err := kubeClient.CoordinationV1().Leases(cluster).Get(ctx, "managed-cluster-lease", metav1.GetOptions{}); err == nil &&
+			lease.Spec.RenewTime != nil {
+			renewedByCSR = lease.Spec.RenewTime.Time
+		}
 		api := fakespire.Start(GinkgoTB(), spiffeCA)
 		api.SetSVIDs(spiffeCA.Issue(GinkgoTB(), registrationID(cluster), time.Hour))
 		driverOption := factory.NewOptions()
@@ -671,6 +686,7 @@ var _ = Describe("Registration using SPIFFE", Ordered, Label("spiffe-test"), fun
 			ClusterHealthCheckPeriod:  time.Minute,
 			RegisterDriverOption:      driverOption,
 		}, commOptions, spokeCfg)
+		DeferCleanup(stopSPIFFEAgent)
 
 		By("the old hub credentials go once the cluster is reachable with the SVID")
 		for _, s := range []struct{ ns, name string }{
@@ -686,8 +702,8 @@ var _ = Describe("Registration using SPIFFE", Ordered, Label("spiffe-test"), fun
 			if err != nil {
 				return err
 			}
-			if lease.Spec.RenewTime == nil || time.Since(lease.Spec.RenewTime.Time) > 30*time.Second {
-				return fmt.Errorf("lease not renewed: %v", lease.Spec.RenewTime)
+			if lease.Spec.RenewTime == nil || !lease.Spec.RenewTime.After(renewedByCSR) {
+				return fmt.Errorf("lease not renewed by the spiffe agent: %v, csr agent's last %v", lease.Spec.RenewTime, renewedByCSR)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())

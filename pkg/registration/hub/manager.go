@@ -346,15 +346,14 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		addOnInformers.Addon().V1beta1().ManagedClusterAddOns(),
 	)
 
-	var spiffeDeleteGuard factory.Controller
-	if m.spiffeEnabled() {
-		spiffeDeleteGuard = spiffe.NewDeleteGuardController(
-			clusterClient,
-			clusterInformers.Cluster().V1().ManagedClusters(),
-			m.SPIFFEMaxSVIDLifetime, m.SPIFFEMaxClockSkew,
-			len(m.EnabledRegistrationDrivers) == 1,
-		)
-	}
+	// The delete guard runs also when spiffe is off: it then only releases the finalizers clusters
+	// still carry from when it was on.
+	spiffeDeleteGuard := spiffe.NewDeleteGuardController(
+		clusterClient,
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		m.SPIFFEMaxSVIDLifetime, m.SPIFFEMaxClockSkew,
+		m.spiffeEnabled() && len(m.EnabledRegistrationDrivers) == 1, m.spiffeEnabled(),
+	)
 
 	var defaultManagedClusterSetController, globalManagedClusterSetController factory.Controller
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
@@ -434,9 +433,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	go clusterroleController.Run(ctx, 1)
 	go addOnHealthCheckController.Run(ctx, 1)
 	go addOnFeatureDiscoveryController.Run(ctx, 1)
-	if spiffeDeleteGuard != nil {
-		go spiffeDeleteGuard.Run(ctx, 1)
-	}
+	go spiffeDeleteGuard.Run(ctx, 1)
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		go defaultManagedClusterSetController.Run(ctx, 1)
 		go globalManagedClusterSetController.Run(ctx, 1)

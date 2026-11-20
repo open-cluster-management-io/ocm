@@ -48,7 +48,7 @@ func newSPIFFEListenerOptions() SPIFFEListenerOptions {
 func (o *SPIFFEListenerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Enabled, "spiffe-enabled", o.Enabled,
 		"Run the SPIFFE listener, which authenticates agents only by their SPIRE-issued X.509-SVIDs.")
-	fs.StringVar(&o.ListenAddress, "spiffe-listen-address", o.ListenAddress, "Address of the SPIFFE listener.")
+	fs.StringVar(&o.ListenAddress, "spiffe-listen-address", o.ListenAddress, "Port of the SPIFFE listener, as :8091; it binds on every interface.")
 	fs.StringVar(&o.TrustDomain, "spiffe-trust-domain", o.TrustDomain,
 		"The hub's SPIFFE trust domain. The server's SVID is in it.")
 	fs.StringSliceVar(&o.AgentTrustDomains, "spiffe-agent-trust-domains", o.AgentTrustDomains,
@@ -100,9 +100,15 @@ func (o *SPIFFEListenerOptions) complete() (*spiffeListenerConfig, error) {
 	if err := scheme.CheckServerID(sid); err != nil {
 		return nil, err
 	}
-	_, port, err := net.SplitHostPort(o.ListenAddress)
+	host, port, err := net.SplitHostPort(o.ListenAddress)
 	if err != nil {
 		return nil, fmt.Errorf("--spiffe-listen-address %q: %w", o.ListenAddress, err)
+	}
+	if host != "" {
+		// The gRPC server binds a port on every interface, as the grpc listener does; a host
+		// here would be ignored, so it is refused.
+		return nil, fmt.Errorf("--spiffe-listen-address %q: give only the port, as :8091; the listener binds on every interface",
+			o.ListenAddress)
 	}
 	return &spiffeListenerConfig{port: port, serverID: sid, scheme: scheme, trustDomains: trustDomains}, nil
 }

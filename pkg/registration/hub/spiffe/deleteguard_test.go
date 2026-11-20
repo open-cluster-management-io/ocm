@@ -59,6 +59,11 @@ type guardResult struct {
 
 func runGuard(t *testing.T, c *clusterv1.ManagedCluster, now time.Time, lifetime, skew time.Duration, all bool) guardResult {
 	t.Helper()
+	return runGuardEnabled(t, c, now, lifetime, skew, all, true)
+}
+
+func runGuardEnabled(t *testing.T, c *clusterv1.ManagedCluster, now time.Time, lifetime, skew time.Duration, all, enabled bool) guardResult {
+	t.Helper()
 	client := clusterfake.NewSimpleClientset(c)
 	informers := clusterinformers.NewSharedInformerFactory(client, 0)
 	require.NoError(t, informers.Cluster().V1().ManagedClusters().Informer().GetStore().Add(c))
@@ -70,6 +75,7 @@ func runGuard(t *testing.T, c *clusterv1.ManagedCluster, now time.Time, lifetime
 		lifetime:    lifetime,
 		skew:        skew,
 		allClusters: all,
+		adds:        enabled,
 		now:         func() time.Time { return now },
 	}
 	q := &recordingQueue{}
@@ -96,6 +102,26 @@ func TestDeleteGuardSkipsOtherDrivers(t *testing.T) {
 	r = runGuard(t, cluster(nil, nil), t1040, time.Hour, 5*time.Minute, true)
 	require.Len(t, r.actions, 1, "every cluster is guarded when spiffe is the only driver")
 	require.Contains(t, patchedFinalizers(t, r.actions[0]), RevocationFinalizer)
+}
+
+// With spiffe turned off, the guard adds no finalizer, but still releases the ones clusters carry,
+// after the same wait.
+func TestDeleteGuardSPIFFEOff(t *testing.T) {
+	r := runGuardEnabled(t, cluster(pin, nil), t1040, time.Hour, 5*time.Minute, true, false)
+	require.Empty(t, r.actions, "no finalizer added while spiffe is off")
+
+	deleted := t1040
+	r = runGuardEnabled(t, cluster(pin, &deleted, RevocationFinalizer), t1040.Add(time.Minute), time.Hour, 5*time.Minute, false, false)
+	require.Empty(t, r.actions)
+	require.Equal(t, []time.Duration{64 * time.Minute}, r.afters, "still held for the same wait")
+
+	r = runGuardEnabled(t, cluster(pin, &deleted, RevocationFinalizer), t1040.Add(65*time.Minute), time.Hour, 5*time.Minute, false, false)
+	require.Len(t, r.actions, 1, "released after the wait")
+	require.NotContains(t, patchedFinalizers(t, r.actions[0]), RevocationFinalizer)
+
+	r = runGuardEnabled(t, cluster(nil, &deleted), t1040.Add(time.Minute), time.Hour, 5*time.Minute, false, false)
+	require.Empty(t, r.actions, "a deleted cluster without the finalizer is left alone")
+	require.Empty(t, r.afters)
 }
 
 func TestDeleteGuardWaits(t *testing.T) {

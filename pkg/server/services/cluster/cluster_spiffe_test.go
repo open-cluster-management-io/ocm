@@ -18,6 +18,7 @@ import (
 	grpcauthn "open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	spiffeguard "open-cluster-management.io/ocm/pkg/registration/hub/spiffe"
 )
 
 func TestHandleStatusUpdatePinsTrustDomain(t *testing.T) {
@@ -116,6 +117,13 @@ func TestHandleStatusUpdatePinsTrustDomain(t *testing.T) {
 			}
 			if got != c.want {
 				t.Errorf("annotation %s = %q, want %q", key, got, c.want)
+			}
+			// A pinned cluster is created with the delete guard's finalizer.
+			if a, ok := actions[len(actions)-1].(clienttesting.CreateAction); ok && a.GetVerb() == "create" {
+				fs := a.GetObject().(*clusterv1.ManagedCluster).Finalizers
+				if len(fs) != 1 || fs[0] != spiffeguard.RevocationFinalizer {
+					t.Errorf("finalizers %v, want only %s", fs, spiffeguard.RevocationFinalizer)
+				}
 			}
 		})
 	}

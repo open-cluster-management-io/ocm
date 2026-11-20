@@ -37,6 +37,10 @@ func clusterRevocationHandler(reg connectionCloser) cache.ResourceEventHandler {
 				closeCluster(newer.Name, "cluster is being deleted")
 			case older.Spec.HubAcceptsClient && !newer.Spec.HubAcceptsClient:
 				closeCluster(newer.Name, "hubAcceptsClient is false")
+			case older.Annotations[clusterv1.SPIFFETrustDomainAnnotationKey] != newer.Annotations[clusterv1.SPIFFETrustDomainAnnotationKey]:
+				// The gate checks the pin when a stream opens; close the open ones so the agents
+				// reconnect and only those from the new trust domain get back in.
+				closeCluster(newer.Name, "trust domain pin changed")
 			}
 		},
 		DeleteFunc: func(obj any) {

@@ -82,6 +82,7 @@ func TestSPIFFEListenerComplete(t *testing.T) {
 		}, "needs at least one fixed path segment"},
 		{"bad agent trust domain", func(o *SPIFFEListenerOptions) { o.AgentTrustDomains = []string{"East_Example"} }, "East_Example"},
 		{"bad listen address", func(o *SPIFFEListenerOptions) { o.ListenAddress = "8091" }, "--spiffe-listen-address"},
+		{"a listen address with a host", func(o *SPIFFEListenerOptions) { o.ListenAddress = "127.0.0.1:8091" }, "give only the port"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -152,7 +153,7 @@ func startHubServer(t *testing.T, grpcEnabled bool, serverIDs ...string) *hubUnd
 	h.opts.GRPCEnabled = grpcEnabled
 	h.opts.SPIFFE.Enabled = true
 	h.opts.SPIFFE.TrustDomain = testTD
-	h.opts.SPIFFE.ListenAddress = "127.0.0.1:" + h.spiffePort
+	h.opts.SPIFFE.ListenAddress = ":" + h.spiffePort
 	h.opts.SPIFFE.WorkloadAPISocket = hubAPI.Addr
 
 	ctx, cancel := context.WithCancel(context.Background())
