@@ -1,0 +1,57 @@
+apiVersion: work.open-cluster-management.io/v1alpha1
+kind: ManifestWorkReplicaSet
+metadata:
+  name: rack-job
+  namespace: was-demo
+spec:
+  placementRefs:
+  - name: rack-job-topology
+  manifestWorkTemplate:
+    workload:
+      manifests:
+      # A plain batch/v1 Job: no JobSet. With WorkloadWithJob on, the in-tree Job
+      # controller compiles spec.scheduling into a Workload and a PodGroup it owns.
+      - apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: rack-job
+          namespace: default
+        spec:
+          parallelism: 4
+          completions: 4
+          completionMode: Indexed
+          backoffLimit: 0
+          scheduling:
+            # minCount defaults to parallelism: all 4 pods are bound together or none are.
+            schedulingPolicy:
+              gang: {}
+            disruptionMode:
+              all: {}
+            # Every pod in the gang must land in the same topology.example.io/rack domain.
+            schedulingConstraints:
+              topology:
+              - key: topology.example.io/rack
+          template:
+            spec:
+              restartPolicy: Never
+              containers:
+              - name: worker
+                image: gcr.io/k8s-staging-perf-tests/sleep:v0.1.0
+                args: ["120s"]
+                resources:
+                  requests: {cpu: 100m, memory: 32Mi}
+    manifestConfigs:
+    - resourceIdentifier:
+        group: batch
+        resource: jobs
+        name: rack-job
+        namespace: default
+      feedbackRules:
+      - type: JSONPaths
+        jsonPaths:
+        - name: ready
+          path: .status.ready
+        - name: active
+          path: .status.active
+        - name: succeeded
+          path: .status.succeeded

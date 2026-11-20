@@ -1,0 +1,17 @@
+# Picks a cluster whose LWS controller runs gang scheduling on the upstream
+# Workload/PodGroup API and whose nodes expose a rack topology domain.
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: rack-lws-topology
+  namespace: was-demo
+spec:
+  clusterSets: ["was-demo"]
+  numberOfClusters: 1
+  predicates:
+  - requiredClusterSelector:
+      labelSelector:
+        matchExpressions:
+        - {key: scheduling.example.io/workload-aware, operator: In, values: ["true"]}
+        - {key: scheduling.example.io/lws-gang, operator: In, values: ["true"]}
+        - {key: topology.example.io/rack, operator: Exists}

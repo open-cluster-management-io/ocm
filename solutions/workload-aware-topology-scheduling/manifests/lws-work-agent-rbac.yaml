@@ -1,0 +1,12 @@
+# Applied on each spoke: LWS's roles do not aggregate into "admin", so the OCM work
+# agent needs this to apply LeaderWorkerSets delivered by ManifestWorks.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:work:leaderworkersets
+  labels:
+    open-cluster-management.io/aggregate-to-work: "true"
+rules:
+- apiGroups: ["leaderworkerset.x-k8s.io"]
+  resources: ["leaderworkersets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

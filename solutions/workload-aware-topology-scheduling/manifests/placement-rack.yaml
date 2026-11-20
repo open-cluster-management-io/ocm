@@ -1,0 +1,16 @@
+# Picks a cluster that runs Workload Aware Scheduling and whose nodes expose a rack
+# topology domain, so a rack-constrained gang has somewhere to be colocated.
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: rack-topology
+  namespace: was-demo
+spec:
+  clusterSets: ["was-demo"]
+  numberOfClusters: 1
+  predicates:
+  - requiredClusterSelector:
+      labelSelector:
+        matchExpressions:
+        - {key: scheduling.example.io/workload-aware, operator: In, values: ["true"]}
+        - {key: topology.example.io/rack, operator: Exists}
