@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"sort"
 	"strings"
 	"time"
@@ -129,10 +133,18 @@ var (
 	}
 )
 
+// The policies and bindings set every field the API server would default, so the objects it
+// stores equal the rendered ones and an unchanged policy is never seen as drifted.
+var (
+	allScopes        = admissionv1.AllScopes
+	equivalentPolicy = admissionv1.Equivalent
+)
+
 func rule(group string, resources []string, ops ...admissionv1.OperationType) admissionv1.NamedRuleWithOperations {
 	return admissionv1.NamedRuleWithOperations{RuleWithOperations: admissionv1.RuleWithOperations{
 		Operations: ops,
-		Rule:       admissionv1.Rule{APIGroups: []string{group}, APIVersions: []string{"v1"}, Resources: resources},
+		Rule: admissionv1.Rule{APIGroups: []string{group}, APIVersions: []string{"v1"}, Resources: resources,
+			Scope: &allScopes},
 	}}
 }
 
@@ -143,10 +155,11 @@ func policyWithBinding(name string, rules []admissionv1.NamedRuleWithOperations,
 	policy := &admissionv1.ValidatingAdmissionPolicy{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels},
 		Spec: admissionv1.ValidatingAdmissionPolicySpec{
-			FailurePolicy:    &fail,
-			MatchConstraints: &admissionv1.MatchResources{ResourceRules: rules},
-			Variables:        variables,
-			Validations:      validations,
+			FailurePolicy: &fail,
+			MatchConstraints: &admissionv1.MatchResources{ResourceRules: rules, MatchPolicy: &equivalentPolicy,
+				NamespaceSelector: &metav1.LabelSelector{}, ObjectSelector: &metav1.LabelSelector{}},
+			Variables:   variables,
+			Validations: validations,
 		},
 	}
 	binding := &admissionv1.ValidatingAdmissionPolicyBinding{
@@ -157,7 +170,8 @@ func policyWithBinding(name string, rules []admissionv1.NamedRuleWithOperations,
 		},
 	}
 	if selector != nil {
-		binding.Spec.MatchResources = &admissionv1.MatchResources{NamespaceSelector: selector}
+		binding.Spec.MatchResources = &admissionv1.MatchResources{NamespaceSelector: selector,
+			MatchPolicy: &equivalentPolicy, ObjectSelector: &metav1.LabelSelector{}}
 	}
 	return policy, binding
 }
@@ -292,7 +306,7 @@ func observe(ctx context.Context, o admissionObjects) (rec operatorapiv1.SPIFFEA
 	return rec, true, upToDate, nil
 }
 
-func apply(ctx context.Context, o admissionObjects) error {
+func apply(ctx context.Context, o admissionObjects, writes *ownWrites) error {
 	policies := o.client.AdmissionregistrationV1().ValidatingAdmissionPolicies()
 	p, err := policies.Get(ctx, o.policy.Name, metav1.GetOptions{})
 	switch {
@@ -304,9 +318,11 @@ func apply(ctx context.Context, o admissionObjects) error {
 		return err
 	case !equality.Semantic.DeepEqual(p.Spec, o.policy.Spec):
 		p.Spec = o.policy.Spec
-		if _, err := policies.Update(ctx, p, metav1.UpdateOptions{}); err != nil {
+		updated, err := policies.Update(ctx, p, metav1.UpdateOptions{})
+		if err != nil {
 			return err
 		}
+		writes.note(updated.UID, p.Generation, updated.Generation)
 	}
 	bindings := o.client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings()
 	b, err := bindings.Get(ctx, o.binding.Name, metav1.GetOptions{})
@@ -318,8 +334,11 @@ func apply(ctx context.Context, o admissionObjects) error {
 		return err
 	case !equality.Semantic.DeepEqual(b.Spec, o.binding.Spec):
 		b.Spec = o.binding.Spec
-		_, err = bindings.Update(ctx, b, metav1.UpdateOptions{})
-		return err
+		updated, err := bindings.Update(ctx, b, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+		writes.note(updated.UID, b.Generation, updated.Generation)
 	}
 	return nil
 }
@@ -370,6 +389,13 @@ type spiffeAdmissionReconcile struct {
 	queue workqueue.TypedRateLimitingInterface[string]
 	// webhook serves the ValidatingWebhook enforcement.
 	webhook *spiffeWebhookServer
+	// writes are the operator's own changes to the admission objects, shared by its Klusterlets.
+	writes *ownWrites
+	// probe checks that the API server enforces an enforcement; enforcementActive by default.
+	probe func(ctx context.Context, mode operatorapiv1.SPIFFEAdmissionEnforcement, klusterletName, agentNamespace string) (bool, error)
+	// storeStatus writes the Klusterlet's SPIFFE status at once, when it can't wait for the end of
+	// the pass (the UID of an add-on namespace the operator just created).
+	storeStatus func(ctx context.Context, klusterlet *operatorapiv1.Klusterlet) error
 }
 
 func (r *spiffeAdmissionReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
@@ -428,7 +454,7 @@ func (r *spiffeAdmissionReconcile) reconcile(ctx context.Context, klusterlet *op
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
-	var enf enforcement = policyEnforcement{objects}
+	var enf enforcement = policyEnforcement{objects: objects, writes: r.writes}
 	if want == operatorapiv1.SPIFFEAdmissionValidatingWebhook {
 		ready, webhooks, err := r.ensureWebhook(ctx, klusterlet, config, objects)
 		if err != nil || !ready {
@@ -445,7 +471,12 @@ func (r *spiffeAdmissionReconcile) reconcile(ctx context.Context, klusterlet *op
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
-	if recordedMode == want && found && recorded.same(live) {
+	if recordedMode == want && found && r.writes.explains(recorded, live) {
+		if !recorded.same(live) {
+			// Only the operator's own updates changed them, for example another Klusterlet's
+			// pass updating the shared objects: record the new generations.
+			setEnforcementRecord(klusterlet, want, live)
+		}
 		if !upToDate {
 			// The operator changes its own enforcement (for example after an upgrade, or when
 			// SPIRE's CA rotates). The live state was the recorded one before the change, so record
@@ -492,6 +523,10 @@ func (r *spiffeAdmissionReconcile) ensureWebhook(ctx context.Context, klusterlet
 	if err != nil {
 		return false, webhookEnforcement{}, err
 	}
+	if r.queue != nil {
+		name := klusterlet.Name
+		r.webhook.setOnStop(func() { r.queue.Add(name) })
+	}
 	servingID, caBundle, err := r.webhook.ensure(ctx, config.SPIFFEWorkloadAPISocket, id)
 	klusterlet.Status.SPIFFE.WebhookSPIFFEID = servingID.String()
 	if err != nil {
@@ -508,7 +543,7 @@ func (r *spiffeAdmissionReconcile) ensureWebhook(ctx context.Context, klusterlet
 }
 
 func (r *spiffeAdmissionReconcile) webhookEnforcement(objects []admissionObjects, caBundle []byte) webhookEnforcement {
-	var e webhookEnforcement
+	e := webhookEnforcement{writes: r.writes}
 	for _, o := range objects {
 		e.configs = append(e.configs, webhookConfig{client: o.client, config: r.webhook.webhookConfiguration(o, caBundle)})
 	}
@@ -523,7 +558,7 @@ func (r *spiffeAdmissionReconcile) switchEnforcement(ctx context.Context, kluste
 	recorded admissionRecord, enf enforcement, served bool) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	var old enforcement = r.webhookEnforcement(objects, nil)
 	if recordedMode == operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy {
-		old = policyEnforcement{objects}
+		old = policyEnforcement{objects: objects, writes: r.writes}
 	}
 	intact := false
 	if recordedMode != operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy || served {
@@ -531,7 +566,7 @@ func (r *spiffeAdmissionReconcile) switchEnforcement(ctx context.Context, kluste
 		if err != nil {
 			return klusterlet, reconcileStop, err
 		}
-		intact = found && recorded.same(oldLive)
+		intact = found && r.writes.explains(recorded, oldLive)
 	}
 	if !intact {
 		return r.recover(ctx, klusterlet, config, enf)
@@ -545,6 +580,18 @@ func (r *spiffeAdmissionReconcile) switchEnforcement(ctx context.Context, kluste
 	}
 	if !found {
 		return klusterlet, reconcileStop, fmt.Errorf("the %s enforcement isn't in place yet", enf.mode())
+	}
+	// The API server starts enforcing new objects a moment after they are created. The old
+	// enforcement goes once the new one is on record, so record it only once a probe shows the
+	// API server enforces it.
+	active, err := r.enforcementActive(ctx, enf.mode(), klusterlet.Name, config.AgentNamespace)
+	if err != nil {
+		return klusterlet, reconcileStop, err
+	}
+	if !active {
+		return klusterlet, reconcileStop, commonhelpers.NewRequeueError(
+			fmt.Sprintf("SPIFFE admission enforcement switch: waiting for the API server to enforce %s", enf.mode()),
+			recordedRequeue)
 	}
 	setEnforcementRecord(klusterlet, enf.mode(), live)
 	setAdmissionReady(klusterlet, metav1.ConditionTrue, "Switched",
@@ -634,9 +681,14 @@ func (r *spiffeAdmissionReconcile) recover(ctx context.Context, klusterlet *oper
 	if err := enf.apply(ctx); err != nil {
 		return klusterlet, reconcileStop, err
 	}
-	noted, _, _, err := enf.observe(ctx)
+	noted, found, upToDate, err := enf.observe(ctx)
 	if err != nil {
 		return klusterlet, reconcileStop, err
+	}
+	if !found || !upToDate {
+		// It was just applied: something changed it right away. Don't trust it yet.
+		return klusterlet, reconcileStop, commonhelpers.NewRequeueError(
+			"SPIFFE recovery: the admission enforcement isn't as applied; starting over", recoveryRequeue)
 	}
 
 	trusted, err := r.trustedAddOnNamespaces(ctx, klusterlet)
@@ -647,12 +699,23 @@ func (r *spiffeAdmissionReconcile) recover(ctx context.Context, klusterlet *oper
 		return klusterlet, reconcileStop, err
 	}
 
-	targets := []nsTarget{{r.kubeClient, config.AgentNamespace}}
+	targets := []nsTarget{{client: r.kubeClient, namespace: config.AgentNamespace}}
 	for _, ns := range trusted {
-		targets = append(targets, nsTarget{r.managedClusterClients.kubeClient, ns})
+		targets = append(targets, nsTarget{client: r.managedClusterClients.kubeClient, namespace: ns.name, uid: ns.uid})
 	}
 	remaining := 0
 	for _, t := range targets {
+		if t.uid != "" {
+			// Act only on the namespace on record: one deleted and created again under the same
+			// name since it was listed isn't this Klusterlet's.
+			ns, err := t.client.CoreV1().Namespaces().Get(ctx, t.namespace, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) || (err == nil && ns.UID != t.uid) {
+				continue
+			}
+			if err != nil {
+				return klusterlet, reconcileStop, err
+			}
+		}
 		n, err := deleteWorkloads(ctx, t.client, t.namespace)
 		if err != nil {
 			return klusterlet, reconcileStop, err
@@ -665,11 +728,11 @@ func (r *spiffeAdmissionReconcile) recover(ctx context.Context, klusterlet *oper
 			fmt.Sprintf("SPIFFE recovery: %d pod(s) left", remaining), recoveryRequeue)
 	}
 
-	after, _, _, err := enf.observe(ctx)
+	after, found, upToDate, err := enf.observe(ctx)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
-	if !noted.same(after) {
+	if !found || !upToDate || !noted.same(after) {
 		return klusterlet, reconcileStop, commonhelpers.NewRequeueError(
 			"SPIFFE recovery: the admission enforcement changed during cleanup; starting over", recoveryRequeue)
 	}
@@ -688,6 +751,14 @@ const recordedRequeue = time.Second
 type nsTarget struct {
 	client    kubernetes.Interface
 	namespace string
+	// uid, when set, is the namespace's UID on record.
+	uid types.UID
+}
+
+// trustedNamespace is an add-on namespace on record, by name and UID.
+type trustedNamespace struct {
+	name string
+	uid  types.UID
 }
 
 func (r *spiffeAdmissionReconcile) render(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
@@ -776,8 +847,8 @@ func setAdmissionReady(k *operatorapiv1.Klusterlet, status metav1.ConditionStatu
 
 // trustedAddOnNamespaces returns the namespaces labeled for this Klusterlet whose UID is on record:
 // the add-on namespace the operator created (status.spiffe.addOnNamespace), or one the work agent
-// created, listed in an AppliedManifestWork on the managed cluster.
-func (r *spiffeAdmissionReconcile) trustedAddOnNamespaces(ctx context.Context, klusterlet *operatorapiv1.Klusterlet) ([]string, error) {
+// created, listed in an AppliedManifestWork of this Klusterlet's work agent on the managed cluster.
+func (r *spiffeAdmissionReconcile) trustedAddOnNamespaces(ctx context.Context, klusterlet *operatorapiv1.Klusterlet) ([]trustedNamespace, error) {
 	recorded := map[types.UID]bool{}
 	if klusterlet.Status.SPIFFE != nil && klusterlet.Status.SPIFFE.AddOnNamespace != nil {
 		recorded[klusterlet.Status.SPIFFE.AddOnNamespace.UID] = true
@@ -788,6 +859,10 @@ func (r *spiffeAdmissionReconcile) trustedAddOnNamespaces(ctx context.Context, k
 	}
 	if amws != nil {
 		for _, amw := range amws.Items {
+			// Only this Klusterlet's work agent vouches for its namespaces.
+			if amw.Spec.AgentID != string(klusterlet.UID) {
+				continue
+			}
 			for _, res := range amw.Status.AppliedResources {
 				if res.Group == "" && res.Resource == "namespaces" {
 					recorded[types.UID(res.UID)] = true
@@ -800,10 +875,10 @@ func (r *spiffeAdmissionReconcile) trustedAddOnNamespaces(ctx context.Context, k
 	if err != nil {
 		return nil, err
 	}
-	var out []string
+	var out []trustedNamespace
 	for _, ns := range nss.Items {
 		if recorded[ns.UID] {
-			out = append(out, ns.Name)
+			out = append(out, trustedNamespace{name: ns.Name, uid: ns.UID})
 		}
 	}
 	return out, nil
@@ -811,7 +886,7 @@ func (r *spiffeAdmissionReconcile) trustedAddOnNamespaces(ctx context.Context, k
 
 // unlabelUntrusted removes this Klusterlet's add-on namespace label from every namespace that
 // isn't on record. Nothing else in such a namespace is touched.
-func (r *spiffeAdmissionReconcile) unlabelUntrusted(ctx context.Context, klusterletName string, trusted []string) error {
+func (r *spiffeAdmissionReconcile) unlabelUntrusted(ctx context.Context, klusterletName string, trusted []trustedNamespace) error {
 	nss, err := r.managedClusterClients.kubeClient.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		LabelSelector: SPIFFEAddOnNamespaceLabel + "=" + klusterletName})
 	if err != nil {
@@ -819,7 +894,7 @@ func (r *spiffeAdmissionReconcile) unlabelUntrusted(ctx context.Context, kluster
 	}
 	keep := map[string]bool{}
 	for _, ns := range trusted {
-		keep[ns] = true
+		keep[ns.name] = true
 	}
 	patch := []byte(`{"metadata":{"labels":{"` + SPIFFEAddOnNamespaceLabel + `":null}}}`)
 	for _, ns := range nss.Items {
@@ -884,8 +959,25 @@ func (r *spiffeAdmissionReconcile) ensureAddOnNamespace(ctx context.Context, klu
 			klusterlet.Status.SPIFFE = &operatorapiv1.KlusterletSPIFFEStatus{}
 		}
 		klusterlet.Status.SPIFFE.AddOnNamespace = &operatorapiv1.SPIFFENamespaceRef{Name: ns.Name, UID: ns.UID}
+		// The UID is what makes the namespace trusted. Store it now: if it were lost, the next
+		// pass would find a labeled namespace that isn't on record and distrust it for good.
+		// If it can't be stored, remove the namespace, which is still empty, and start over.
+		if r.storeStatus != nil {
+			if err := r.storeStatus(ctx, klusterlet); err != nil {
+				uid := ns.UID
+				if derr := namespaces.Delete(ctx, ns.Name, metav1.DeleteOptions{
+					Preconditions: &metav1.Preconditions{UID: &uid}}); derr != nil && !apierrors.IsNotFound(derr) {
+					return utilerrors.NewAggregate([]error{err, derr})
+				}
+				klusterlet.Status.SPIFFE.AddOnNamespace = nil
+				return err
+			}
+		}
 	} else if err != nil {
 		return err
+	}
+	if ns.DeletionTimestamp != nil {
+		return commonhelpers.NewRequeueError(fmt.Sprintf("namespace %s is being deleted", ns.Name), recoveryRequeue)
 	}
 	if ns.Labels[SPIFFEAddOnNamespaceLabel] != klusterlet.Name {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
@@ -902,10 +994,17 @@ func (r *spiffeAdmissionReconcile) ensureAddOnNamespace(ctx context.Context, klu
 // shared namespace label policy when no other Klusterlet uses spiffe).
 func (r *spiffeAdmissionReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	_ klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	if klusterlet.Status.SPIFFE == nil {
+	recorded := klusterlet.Status.SPIFFE != nil
+	if !recorded && !usesSPIFFE(klusterlet) {
 		return klusterlet, reconcileContinue, nil
 	}
+	// A spiffe Klusterlet whose record was never stored may still have objects in place: the
+	// operator applies them before it stores the record.
 	if err := r.removeSPIFFE(ctx, klusterlet); err != nil {
+		if !recorded && apierrors.IsForbidden(err) {
+			// Without the klusterlet-spiffe permissions the operator applied nothing.
+			return klusterlet, reconcileContinue, nil
+		}
 		return klusterlet, reconcileStop, err
 	}
 	return klusterlet, reconcileContinue, nil
@@ -931,6 +1030,54 @@ func (r *spiffeAdmissionReconcile) removeSPIFFE(ctx context.Context, klusterlet 
 	}
 	klusterlet.Status.SPIFFE = nil
 	meta.RemoveStatusCondition(&klusterlet.Status.Conditions, operatorapiv1.ConditionSPIFFEAdmissionReady)
+	meta.RemoveStatusCondition(&klusterlet.Status.Conditions, ConditionAddOnNamespaceNotDedicated)
 	klog.FromContext(ctx).Info("removed the spiffe admission state", "klusterlet", klusterlet.Name)
 	return nil
+}
+
+// spiffeProbePrefix names the dry-run probe requests.
+const spiffeProbePrefix = "ocm-spiffe-probe-"
+
+// enforcementActive checks with a dry-run request whether the API server already enforces mode
+// in the agent namespace.
+//   - ValidatingAdmissionPolicy: a Job, which the agent policy refuses to everyone. The API server
+//     runs the policies before any webhook, so a refusal that names this Klusterlet's policy
+//     shows it is in effect, even while the old webhook is still in place.
+//   - ValidatingWebhook: a Deployment from the operator, which both enforcements allow. The old
+//     policy would refuse a Job before the webhook is called, so instead the webhook notes the
+//     probe when the API server sends it.
+func (r *spiffeAdmissionReconcile) enforcementActive(ctx context.Context, mode operatorapiv1.SPIFFEAdmissionEnforcement,
+	klusterletName, agentNamespace string) (bool, error) {
+	if r.probe != nil {
+		return r.probe(ctx, mode, klusterletName, agentNamespace)
+	}
+	dryRun := metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}}
+	labels := map[string]string{"app": "ocm-spiffe-probe"}
+	pod := corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labels}, Spec: corev1.PodSpec{
+		RestartPolicy: corev1.RestartPolicyNever,
+		Containers:    []corev1.Container{{Name: "probe", Image: "ocm-spiffe-probe"}}}}
+	name := spiffeProbePrefix + utilrand.String(8)
+	if mode == operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy {
+		_, err := r.kubeClient.BatchV1().Jobs(agentNamespace).Create(ctx, &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: agentNamespace},
+			Spec:       batchv1.JobSpec{Template: pod}}, dryRun)
+		switch {
+		case err == nil:
+			return false, nil
+		case strings.Contains(err.Error(), "ValidatingAdmissionPolicy '"+agentPolicyPrefix+klusterletName+"'"):
+			return true, nil
+		case strings.Contains(err.Error(), "admission webhook"):
+			// Refused by the old webhook: the policy isn't in effect yet.
+			return false, nil
+		default:
+			return false, err
+		}
+	}
+	pod.Spec.RestartPolicy = corev1.RestartPolicyAlways
+	if _, err := r.kubeClient.AppsV1().Deployments(agentNamespace).Create(ctx, &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: agentNamespace},
+		Spec:       appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: labels}, Template: pod}}, dryRun); err != nil {
+		return false, err
+	}
+	return r.webhook.sawProbe(agentNamespace, name), nil
 }

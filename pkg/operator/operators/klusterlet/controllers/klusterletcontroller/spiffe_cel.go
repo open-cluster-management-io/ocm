@@ -71,6 +71,10 @@ func compilePolicy(spec admissionregistrationv1.ValidatingAdmissionPolicySpec) (
 			return nil, err
 		}
 		c := celValidation{program: prg, message: v.Message}
+		if c.message == "" {
+			// As the API server says when a validation has no message.
+			c.message = "failed expression: " + v.Expression
+		}
 		if v.MessageExpression != "" {
 			if c.messageProgram, err = celCompile(v.MessageExpression); err != nil {
 				return nil, err
@@ -115,17 +119,18 @@ func celRequest(req *admissionv1.AdmissionRequest) map[string]interface{} {
 	return out
 }
 
-// admit evaluates the policy on a request: it returns "" when every validation holds, else the
-// first failed validation's message. An expression that fails to evaluate refuses the request,
-// as the policies' failurePolicy Fail does.
-func (p *celPolicy) admit(req *admissionv1.AdmissionRequest) string {
+// admit evaluates the policy on a request: it allows it when every validation holds, else it
+// refuses it with the first failed validation's message. An expression that fails to evaluate
+// refuses the request, as the policies' failurePolicy Fail does. The decision never depends on
+// the message: a refusal whose message is empty is still a refusal.
+func (p *celPolicy) admit(req *admissionv1.AdmissionRequest) (bool, string) {
 	object, err := celObject(req.Object.Raw)
 	if err != nil {
-		return "the object can't be decoded: " + err.Error()
+		return false, "the object can't be decoded: " + err.Error()
 	}
 	oldObject, err := celObject(req.OldObject.Raw)
 	if err != nil {
-		return "the old object can't be decoded: " + err.Error()
+		return false, "the old object can't be decoded: " + err.Error()
 	}
 	variables := map[string]interface{}{}
 	activation := map[string]interface{}{
@@ -138,26 +143,26 @@ func (p *celPolicy) admit(req *admissionv1.AdmissionRequest) string {
 	for _, v := range p.variables {
 		out, err := eval(v.program)
 		if err != nil {
-			return fmt.Sprintf("variable %s: %v", v.name, err)
+			return false, fmt.Sprintf("variable %s: %v", v.name, err)
 		}
 		variables[v.name] = out
 	}
 	for _, v := range p.validations {
 		out, err := eval(v.program)
 		if err != nil {
-			return "validation failed to evaluate: " + err.Error()
+			return false, "validation failed to evaluate: " + err.Error()
 		}
 		if out == types.True {
 			continue
 		}
 		if v.messageProgram != nil {
 			if msg, err := eval(v.messageProgram); err == nil {
-				if s, ok := msg.Value().(string); ok {
-					return s
+				if s, ok := msg.Value().(string); ok && s != "" {
+					return false, s
 				}
 			}
 		}
-		return v.message
+		return false, v.message
 	}
-	return ""
+	return true, ""
 }

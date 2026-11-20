@@ -41,7 +41,8 @@ var spiffeRequiredAccess = []spiffeAccess{
 	{"apps", "replicasets", []string{"list", "delete", "deletecollection"}},
 	{"apps", "daemonsets", []string{"list", "delete", "deletecollection"}},
 	{"apps", "statefulsets", []string{"list", "delete", "deletecollection"}},
-	{"batch", "jobs", []string{"list", "delete", "deletecollection"}},
+	// create: the dry-run probe that checks a new enforcement is in effect before a switch.
+	{"batch", "jobs", []string{"create", "list", "delete", "deletecollection"}},
 	{"batch", "cronjobs", []string{"list", "delete", "deletecollection"}},
 	{"", "pods", []string{"list", "delete", "deletecollection"}},
 }

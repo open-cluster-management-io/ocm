@@ -57,8 +57,14 @@ func checkAdmissionRules(t *testing.T, mode operatorapiv1.SPIFFEAdmissionEnforce
 	defer func() { _ = env.Stop() }()
 	ctx := context.Background()
 	admin := kubernetes.NewForConfigOrDie(cfg)
-	if served, err := policyAPIServed(admin); mode == operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy && (err != nil || !served) {
-		t.Skipf("the API server doesn't serve ValidatingAdmissionPolicy (Kubernetes older than 1.30): %v", err)
+	if mode == operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy {
+		served, err := policyAPIServed(admin)
+		if err != nil {
+			t.Fatalf("discovery: %v", err)
+		}
+		if !served {
+			t.Skip("the API server doesn't serve ValidatingAdmissionPolicy (Kubernetes older than 1.30)")
+		}
 	}
 	as := func(user string) kubernetes.Interface {
 		c := rest.CopyConfig(cfg)
@@ -104,9 +110,10 @@ func checkAdmissionRules(t *testing.T, mode operatorapiv1.SPIFFEAdmissionEnforce
 		p, b := render(in)
 		objects = append(objects, admissionObjects{client: admin, policy: p, binding: b})
 	}
-	var enf enforcement = policyEnforcement{objects}
+	var enf enforcement = policyEnforcement{objects: objects}
+	var webhook *spiffeWebhookServer
 	if mode == operatorapiv1.SPIFFEAdmissionValidatingWebhook {
-		webhook := testWebhookServer(t, newFakeSource(t, testWebhookID, "klusterlet-spiffe-webhook.open-cluster-management.svc"))
+		webhook = testWebhookServer(t, newFakeSource(t, testWebhookID, "klusterlet-spiffe-webhook.open-cluster-management.svc"))
 		_, caBundle, err := webhook.ensure(ctx, "unix:///unused", spiffeid.RequireFromString(testWebhookID))
 		must(err)
 		must(webhook.setPolicies(objects))
@@ -114,6 +121,11 @@ func checkAdmissionRules(t *testing.T, mode operatorapiv1.SPIFFEAdmissionEnforce
 		enf = r.webhookEnforcement(objects, caBundle)
 	}
 	must(enf.apply(ctx))
+	// The API server fills defaults into what it stores; the operator must still see its own
+	// objects as up to date, or every pass would update them and recovery couldn't finish.
+	if _, found, upToDate, err := enf.observe(ctx); err != nil || !found || !upToDate {
+		t.Fatalf("observe right after apply: found %v, up to date %v, %v", found, upToDate, err)
+	}
 
 	deployment := func(ns, name string) *appsv1.Deployment {
 		return &appsv1.Deployment{
@@ -125,29 +137,27 @@ func checkAdmissionRules(t *testing.T, mode operatorapiv1.SPIFFEAdmissionEnforce
 		}
 	}
 
-	// The policies take a moment to become active.
-	waitDenied(t, func() error {
-		_, err := as(envAlice).AppsV1().Deployments(envAgentNS).Create(ctx, deployment(envAgentNS, "probe"), metav1.CreateOptions{})
-		if err == nil {
-			_ = admin.AppsV1().Deployments(envAgentNS).Delete(ctx, "probe", metav1.DeleteOptions{})
-		}
+	// The policies take a moment to become active. The probes are dry runs, so nothing is left
+	// behind, and only the rule's own refusal counts.
+	dryRun := metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}}
+	waitDenied(t, "only the Klusterlet operator may create or change Deployments here", func() error {
+		_, err := as(envAlice).AppsV1().Deployments(envAgentNS).Create(ctx, deployment(envAgentNS, "probe"), dryRun)
 		return err
 	})
+	// The probe a switch waits for sees the enforcement in effect.
+	probe := &spiffeAdmissionReconcile{kubeClient: as(envOperator), webhook: webhook}
+	if active, err := probe.enforcementActive(ctx, mode, "klusterlet", envAgentNS); err != nil || !active {
+		t.Errorf("enforcementActive: %v, %v", active, err)
+	}
 
 	// Each policy becomes active on its own.
-	waitDenied(t, func() error {
-		_, err := as(envAlice).AppsV1().Deployments(envAddOnNS).Create(ctx, deployment(envAddOnNS, "probe"), metav1.CreateOptions{})
-		if err == nil {
-			_ = admin.AppsV1().Deployments(envAddOnNS).Delete(ctx, "probe", metav1.DeleteOptions{})
-		}
+	waitDenied(t, "only this Klusterlet's work agent may create or change add-on workloads", func() error {
+		_, err := as(envAlice).AppsV1().Deployments(envAddOnNS).Create(ctx, deployment(envAddOnNS, "probe"), dryRun)
 		return err
 	})
-	waitDenied(t, func() error {
+	waitDenied(t, "may create an add-on namespace", func() error {
 		_, err := as(envAlice).CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
-			Name: "probe-ns", Labels: map[string]string{SPIFFEAddOnNamespaceLabel: "klusterlet"}}}, metav1.CreateOptions{})
-		if err == nil {
-			_ = admin.CoreV1().Namespaces().Delete(ctx, "probe-ns", metav1.DeleteOptions{})
-		}
+			Name: "probe-ns", Labels: map[string]string{SPIFFEAddOnNamespaceLabel: "klusterlet"}}}, dryRun)
 		return err
 	})
 
@@ -321,16 +331,20 @@ func checkAdmissionRules(t *testing.T, mode operatorapiv1.SPIFFEAdmissionEnforce
 	must(err)
 }
 
-func waitDenied(t *testing.T, f func() error) {
+// waitDenied waits until f is refused with message: an allowed request means the rule isn't in
+// effect yet; any other error is reported.
+func waitDenied(t *testing.T, message string, f func() error) {
 	t.Helper()
 	deadline := time.Now().Add(30 * time.Second)
+	var last error
 	for time.Now().Before(deadline) {
-		if f() != nil {
+		last = f()
+		if last != nil && strings.Contains(last.Error(), message) {
 			return
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	t.Fatal("the admission policies never became active")
+	t.Fatalf("the admission rule %q never became active; last answer: %v", message, last)
 }
 
 func expectDenied(t *testing.T, name, message string, f func() error) {

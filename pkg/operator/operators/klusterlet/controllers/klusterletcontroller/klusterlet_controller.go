@@ -103,6 +103,8 @@ type klusterletController struct {
 	spiffeWatch *spiffeAdmissionWatch
 	// spiffeWebhook serves the ValidatingWebhook enforcement once a Klusterlet uses it.
 	spiffeWebhook *spiffeWebhookServer
+	// spiffeWrites are the operator's own changes to the SPIFFE admission objects.
+	spiffeWrites *ownWrites
 }
 
 type klusterletReconcile interface {
@@ -149,6 +151,7 @@ func NewKlusterletController(
 	}
 	controller.spiffeWatch = newSPIFFEAdmissionWatch(kubeClient, controller.klusterletLister)
 	controller.spiffeWebhook = newSPIFFEWebhookServer(operatorNamespace)
+	controller.spiffeWrites = newOwnWrites()
 
 	return factory.New().WithSync(controller.sync).
 		WithInformersQueueKeysFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
@@ -594,6 +597,8 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			watch:                 n.spiffeWatch,
 			queue:                 controllerContext.Queue(),
 			webhook:               n.spiffeWebhook,
+			storeStatus:           n.storeSPIFFEStatus,
+			writes:                n.spiffeWrites,
 		},
 		&managedReconcile{
 			managedClusterClients: managedClusterClients,
@@ -621,12 +626,17 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	var errs []error
+	// pending is set when a reconciler stops the pass to come back later (the SPIFFE admission
+	// reconcile, while the webhook, a switch or recovery is in progress): the later reconcilers
+	// did not run, so nothing is reported Applied yet.
+	pending := false
 	for _, reconciler := range reconcilers {
 		var state reconcileState
 		klusterlet, state, err = reconciler.reconcile(ctx, klusterlet, config)
 		var rqe commonhelpers.RequeueError
 		if stderrors.As(err, &rqe) {
 			controllerContext.Queue().AddAfter(klusterletName, rqe.RequeueTime)
+			pending = state == reconcileStop
 		} else if err != nil {
 			errs = append(errs, err)
 		}
@@ -637,7 +647,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	klusterlet.Status.ObservedGeneration = klusterlet.Generation
 
-	if len(errs) == 0 {
+	if len(errs) == 0 && !pending {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionTrue, Reason: operatorapiv1.ReasonKlusterletApplied,
 			Message: "Klusterlet Component Applied"})
@@ -684,6 +694,11 @@ func (n *klusterletController) storeSPIFFEStatus(ctx context.Context, desired *o
 		latest, err := n.klusterletClient.Get(ctx, desired.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
+		}
+		if latest.UID != desired.UID {
+			// The Klusterlet was replaced; the record belongs to the old one. The new one is
+			// reconciled from its own state.
+			return nil
 		}
 		status := latest.Status.DeepCopy()
 		status.SPIFFE = desired.Status.SPIFFE.DeepCopy()

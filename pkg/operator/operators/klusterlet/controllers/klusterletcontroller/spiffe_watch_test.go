@@ -66,7 +66,8 @@ func admissionActions(kube *fakekube.Clientset) []string {
 	var out []string
 	for _, a := range kube.Actions() {
 		switch a.GetResource().Resource {
-		case "validatingadmissionpolicies", "validatingadmissionpolicybindings", "selfsubjectaccessreviews", "resource":
+		case "validatingadmissionpolicies", "validatingadmissionpolicybindings", "validatingwebhookconfigurations",
+			"selfsubjectaccessreviews", "resource":
 			out = append(out, a.GetVerb()+" "+a.GetResource().Resource)
 		}
 	}
@@ -218,7 +219,12 @@ func TestSPIFFEAdmissionWatchEnqueue(t *testing.T) {
 		t.Fatalf("queued %d keys for objects that aren't the Klusterlet's", queue.Len())
 	}
 	w.enqueue(queue, cache.DeletedFinalStateUnknown{Key: policy.Name, Obj: policy})
-	if key, _ := queue.Get(); key != k.Name {
+	if queue.Len() != 1 {
+		t.Fatalf("queued %d keys for a deleted policy, want 1", queue.Len())
+	}
+	key, _ := queue.Get()
+	queue.Done(key)
+	if key != k.Name {
 		t.Errorf("a deleted policy queued %q, want %q", key, k.Name)
 	}
 }
@@ -270,8 +276,11 @@ func TestSPIFFEAdmissionStartsWatch(t *testing.T) {
 	r.watch = newSPIFFEAdmissionWatch(kube, klusterletLister(t, k))
 	r.queue = newQueue()
 	defer r.queue.ShutDown()
+	// The informers the watch starts live as long as this context; stop them before the queue.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	k = activate(t, r, k, spiffeConfig(k))
+	k = activateWith(ctx, t, r, k, spiffeConfig(k))
 	if !r.watch.isStarted(true) {
 		t.Fatal("the watch didn't start")
 	}
@@ -285,7 +294,7 @@ func TestSPIFFEAdmissionStartsWatch(t *testing.T) {
 		return n
 	}
 	before := checks()
-	if _, _, err := r.reconcile(context.TODO(), k, spiffeConfig(k)); err != nil {
+	if _, _, err := r.reconcile(ctx, k, spiffeConfig(k)); err != nil {
 		t.Fatal(err)
 	}
 	if after := checks(); after != before {

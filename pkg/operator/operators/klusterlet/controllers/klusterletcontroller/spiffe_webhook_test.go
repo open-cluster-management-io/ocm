@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -26,7 +27,10 @@ import (
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -124,6 +128,9 @@ func testWebhookServer(t *testing.T, src x509Source) *spiffeWebhookServer {
 		l, err := net.Listen(network, address)
 		if err == nil {
 			addr = l.Addr().String()
+			// Whatever context started it, the server stops with the test: closing its listener
+			// ends the server, which closes its source.
+			t.Cleanup(func() { _ = l.Close() })
 		}
 		return l, err
 	}
@@ -203,8 +210,8 @@ func TestCELPolicyAdmit(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := compiled.admit(c.req)
-			if (c.want == "") != (got == "") || !strings.Contains(got, c.want) {
+			allowed, got := compiled.admit(c.req)
+			if allowed != (c.want == "") || !strings.Contains(got, c.want) {
 				t.Errorf("admit: %q, want %q", got, c.want)
 			}
 		})
@@ -239,12 +246,16 @@ func TestCELPolicyErrors(t *testing.T) {
 			Message: "fallback", MessageExpression: "object.missing"}), "fallback"},
 		"a message expression that isn't a string": {spec(nil, admissionregistrationv1.Validation{Expression: "false",
 			Message: "fallback", MessageExpression: "1"}), "fallback"},
+		"a message expression that is empty": {spec(nil, admissionregistrationv1.Validation{Expression: "false",
+			Message: "fallback", MessageExpression: "''"}), "fallback"},
+		"no message at all": {spec(nil, admissionregistrationv1.Validation{Expression: "1 == 2"}),
+			"failed expression: 1 == 2"},
 	} {
 		p, err := compilePolicy(c.spec)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := p.admit(req); !strings.Contains(got, c.want) {
+		if allowed, got := p.admit(req); allowed || !strings.Contains(got, c.want) {
 			t.Errorf("%s: %q, want %q", name, got, c.want)
 		}
 	}
@@ -281,6 +292,13 @@ func TestWebhookServeHTTP(t *testing.T) {
 	}
 	if w := serve(http.MethodPost, spiffeWebhookPath+p.Name, bytes.NewBufferString("{}")); w.Code != http.StatusBadRequest {
 		t.Errorf("a review without a request: %d", w.Code)
+	}
+	// A body larger than any AdmissionReview isn't read to the end.
+	huge := bytes.NewBufferString(`{"request":{"name":"`)
+	huge.Write(bytes.Repeat([]byte("a"), maxAdmissionReviewBytes))
+	huge.WriteString(`"}}`)
+	if w := serve(http.MethodPost, spiffeWebhookPath+p.Name, huge); w.Code != http.StatusBadRequest {
+		t.Errorf("a body over the limit: %d", w.Code)
 	}
 	decode := func(w *httptest.ResponseRecorder) *admissionv1.AdmissionResponse {
 		t.Helper()
@@ -362,6 +380,7 @@ func TestWebhookEnsure(t *testing.T) {
 	src := newFakeSource(t, testWebhookID, testWebhookDNS)
 	s := testWebhookServer(t, src)
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	id := spiffeid.RequireFromString(testWebhookID)
 	got, caBundle, err := s.ensure(ctx, "unix:///unused", id)
 	if err != nil || got != id || !strings.Contains(string(caBundle), "BEGIN CERTIFICATE") {
@@ -514,7 +533,7 @@ func TestSPIFFEWebhookThenPolicies(t *testing.T) {
 	// The cluster is upgraded to 1.30, and the user moves to the policies.
 	servePolicyAPI(kube, envOperator)
 	k.Spec.RegistrationConfiguration.RegistrationDriver.SPIFFE.AdmissionEnforcement = operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy
-	cleaned := len(deleteCollections(kube))
+	kube.ClearActions() // from here on, no workload may be deleted
 	k, state, err = r.reconcile(context.TODO(), k, testWebhookConfig(k))
 	var rqe commonhelpers.RequeueError
 	if state != reconcileStop || !errors.As(err, &rqe) || !strings.Contains(err.Error(), "switched") {
@@ -534,7 +553,7 @@ func TestSPIFFEWebhookThenPolicies(t *testing.T) {
 	if got := webhookConfigNames(t, kube); len(got) != 0 {
 		t.Errorf("webhook configurations left: %v", got)
 	}
-	if len(deleteCollections(kube)) != cleaned {
+	if len(deleteCollections(kube)) != 0 {
 		t.Error("the switch ran recovery")
 	}
 
@@ -560,7 +579,7 @@ func TestSPIFFEWebhookCARotation(t *testing.T) {
 	src := newFakeSource(t, testWebhookID, testWebhookDNS)
 	r := webhookReconcile(kube, src, t)
 	k = activate(t, r, k, testWebhookConfig(k))
-	cleaned := len(deleteCollections(kube))
+	kube.ClearActions() // from here on, no workload may be deleted
 
 	*src = *newFakeSource(t, testWebhookID, testWebhookDNS)
 	k, state, err := r.reconcile(context.TODO(), k, testWebhookConfig(k))
@@ -576,7 +595,7 @@ func TestSPIFFEWebhookCARotation(t *testing.T) {
 	if _, err := src.svid.Certificates[0].Verify(x509.VerifyOptions{Roots: pool}); err != nil {
 		t.Errorf("the configuration doesn't trust the new CA: %v", err)
 	}
-	if len(deleteCollections(kube)) != cleaned {
+	if len(deleteCollections(kube)) != 0 {
 		t.Error("the rotation ran recovery")
 	}
 }
@@ -868,5 +887,138 @@ func TestWebhookDefaultSource(t *testing.T) {
 	defer cancel()
 	if _, err := s.newSource(ctx, "not a socket address", spiffeid.RequireFromString(testWebhookID)); err == nil {
 		t.Error("no error for an invalid Workload API address")
+	}
+}
+
+// failingListener stops the server at once, as if the listener broke.
+type failingListener struct{ net.Listener }
+
+func (failingListener) Accept() (net.Conn, error) { return nil, errInjected }
+
+// When the server stops unexpectedly, the next ensure starts a new one, and the Klusterlet is
+// queued for that pass at once.
+func TestWebhookRestartsAfterUnexpectedStop(t *testing.T) {
+	s := testWebhookServer(t, newFakeSource(t, testWebhookID, testWebhookDNS))
+	listens := 0
+	next := s.listen
+	s.listen = func(network, address string) (net.Listener, error) {
+		listens++
+		l, err := next(network, address)
+		if listens == 1 && err == nil {
+			return failingListener{l}, nil
+		}
+		return l, err
+	}
+	// The cleanup that closes the second server's listener is reported too: close once.
+	stopped := make(chan struct{})
+	var once sync.Once
+	s.setOnStop(func() { once.Do(func() { close(stopped) }) })
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	id := spiffeid.RequireFromString(testWebhookID)
+	if _, _, err := s.ensure(ctx, "unix:///unused", id); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-stopped:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the stop wasn't reported")
+	}
+	if _, _, err := s.ensure(ctx, "unix:///unused", id); err != nil {
+		t.Fatal(err)
+	}
+	if listens != 2 {
+		t.Errorf("listened %d times, want a new server after the stop", listens)
+	}
+}
+
+// The probe that a switch waits for, against what the API server would answer.
+func TestEnforcementActive(t *testing.T) {
+	const ns = "open-cluster-management-agent"
+	policyMode, webhookMode := operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy, operatorapiv1.SPIFFEAdmissionValidatingWebhook
+	refuse := func(message string) func(clienttesting.Action) (bool, runtime.Object, error) {
+		return func(a clienttesting.Action) (bool, runtime.Object, error) {
+			if !slices.Contains(a.(clienttesting.CreateActionImpl).CreateOptions.DryRun, metav1.DryRunAll) {
+				t.Error("the probe isn't a dry run")
+			}
+			if message == "" {
+				return true, a.(clienttesting.CreateAction).GetObject(), nil
+			}
+			return true, nil, apierrors.NewForbidden(batchv1.Resource("jobs"), "probe", errors.New(message))
+		}
+	}
+	for _, c := range []struct {
+		name, answer string
+		want         bool
+		wantErr      bool
+	}{
+		{"the policy refuses the Job", "ValidatingAdmissionPolicy 'ocm-spiffe-agents-klusterlet' with binding " +
+			"'ocm-spiffe-agents-klusterlet' denied request: StatefulSets, DaemonSets, Jobs and CronJobs are not allowed", true, false},
+		{"only the old webhook refuses it", `admission webhook "ocm-spiffe-agents-klusterlet.spiffe.open-cluster-management.io" denied the request`, false, false},
+		{"nothing refuses it", "", false, false},
+		{"another error", "User cannot create resource jobs", false, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			kube := fakekube.NewSimpleClientset()
+			kube.PrependReactor("create", "jobs", refuse(c.answer))
+			r := &spiffeAdmissionReconcile{kubeClient: kube}
+			got, err := r.enforcementActive(context.TODO(), policyMode, "klusterlet", ns)
+			if got != c.want || (err != nil) != c.wantErr {
+				t.Errorf("got %v, %v; want %v, error %v", got, err, c.want, c.wantErr)
+			}
+		})
+	}
+
+	// The webhook: active once the API server sends it the probe Deployment.
+	kube := fakekube.NewSimpleClientset()
+	webhook := newSPIFFEWebhookServer("open-cluster-management")
+	r := &spiffeAdmissionReconcile{kubeClient: kube, webhook: webhook}
+	if got, err := r.enforcementActive(context.TODO(), webhookMode, "klusterlet", ns); got || err != nil {
+		t.Errorf("before the API server calls the webhook: %v, %v", got, err)
+	}
+	kube.PrependReactor("create", "deployments", func(a clienttesting.Action) (bool, runtime.Object, error) {
+		d := a.(clienttesting.CreateAction).GetObject().(*appsv1.Deployment)
+		body, _ := json.Marshal(&admissionv1.AdmissionReview{Request: &admissionv1.AdmissionRequest{
+			UID: "probe", Name: d.Name, Namespace: d.Namespace, Object: raw(t, map[string]interface{}{})}})
+		webhook.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, spiffeWebhookPath+"x", bytes.NewBuffer(body)))
+		return true, d, nil
+	})
+	if got, err := r.enforcementActive(context.TODO(), webhookMode, "klusterlet", ns); !got || err != nil {
+		t.Errorf("once the webhook got the probe: %v, %v", got, err)
+	}
+	kube.PrependReactor("create", "deployments", refuse("quota exceeded"))
+	if _, err := r.enforcementActive(context.TODO(), webhookMode, "klusterlet", ns); err == nil {
+		t.Error("no error when the probe Deployment fails")
+	}
+}
+
+// A switch waits while the API server doesn't enforce the new enforcement yet: nothing is
+// recorded and the old one stays.
+func TestSPIFFESwitchWaitsForEnforcement(t *testing.T) {
+	k := spiffeKlusterlet()
+	k.Spec.RegistrationConfiguration.RegistrationDriver.SPIFFE.AdmissionEnforcement = operatorapiv1.SPIFFEAdmissionValidatingWebhook
+	kube := fakekube.NewSimpleClientset(newNamespace("open-cluster-management-agent"))
+	r := webhookReconcile(kube, newFakeSource(t, testWebhookID, testWebhookDNS), t)
+	k = activate(t, r, k, testWebhookConfig(k))
+	k.Spec.RegistrationConfiguration.RegistrationDriver.SPIFFE.AdmissionEnforcement = operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy
+	r.probe = func(context.Context, operatorapiv1.SPIFFEAdmissionEnforcement, string, string) (bool, error) {
+		return false, nil
+	}
+	k, state, err := r.reconcile(context.TODO(), k, spiffeConfig(k))
+	var rqe commonhelpers.RequeueError
+	if state != reconcileStop || !errors.As(err, &rqe) || !strings.Contains(err.Error(), "waiting for the API server") {
+		t.Fatalf("got %v, %v; want to wait", state, err)
+	}
+	if got := k.Status.SPIFFE.AdmissionEnforcement; got != operatorapiv1.SPIFFEAdmissionValidatingWebhook {
+		t.Errorf("on record: %s, want the webhook until the policy is enforced", got)
+	}
+	if len(webhookConfigNames(t, kube)) != 3 {
+		t.Errorf("the webhook configurations went before the policy is enforced: %v", webhookConfigNames(t, kube))
+	}
+	r.probe = func(context.Context, operatorapiv1.SPIFFEAdmissionEnforcement, string, string) (bool, error) {
+		return false, errInjected
+	}
+	if _, _, err := r.reconcile(context.TODO(), k, spiffeConfig(k)); !errors.Is(err, errInjected) {
+		t.Errorf("a probe error: %v", err)
 	}
 }

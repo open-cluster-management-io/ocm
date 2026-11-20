@@ -108,8 +108,10 @@ func TestKlusterletChartSPIFFERBAC(t *testing.T) {
 				binding.Subjects[0].Name != "klusterlet" || binding.Subjects[0].Namespace != "open-cluster-management" {
 				t.Errorf("binding %+v", binding)
 			}
-			if len(role.Rules) != 5 {
-				t.Errorf("role has %d rules, want 5", len(role.Rules))
+			// Admission objects, SelfSubjectReviews, the workloads cleaned in recovery, Jobs (also
+			// created as the dry-run probe of a switch), CronJobs and Pods.
+			if len(role.Rules) != 6 {
+				t.Errorf("role has %d rules, want 6", len(role.Rules))
 			}
 		})
 	}

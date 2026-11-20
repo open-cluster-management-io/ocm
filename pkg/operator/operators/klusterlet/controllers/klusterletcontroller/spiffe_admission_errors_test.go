@@ -9,6 +9,7 @@ import (
 
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakekube "k8s.io/client-go/kubernetes/fake"
@@ -129,8 +130,21 @@ func scenarios() []scenario {
 // again, and no agent starts on a half-finished state.
 func TestSPIFFEAdmissionReturnsAPIErrors(t *testing.T) {
 	for _, s := range scenarios() {
+		// A pass without faults shows which calls the scenario makes: each fault on one of
+		// those calls must fire.
+		_, kube, work, run := s.setup(t)
+		kube.ClearActions()
+		work.ClearActions()
+		_ = run()
+		made := map[string]int{}
+		for _, a := range append(kube.Actions(), work.Actions()...) {
+			made[a.GetVerb()+" "+a.GetResource().Resource]++
+		}
 		// Fresh faults per scenario: each records whether it fired.
 		for _, f := range append(faults(), &fault{verb: "list", resource: "appliedmanifestworks", n: 1}) {
+			if made[f.verb+" "+f.resource] < f.n {
+				continue // this scenario makes no such call
+			}
 			t.Run(s.name+"/"+f.String(), func(t *testing.T) {
 				_, kube, work, run := s.setup(t)
 				if f.resource == "appliedmanifestworks" {
@@ -140,7 +154,7 @@ func TestSPIFFEAdmissionReturnsAPIErrors(t *testing.T) {
 				}
 				err := run()
 				if !f.fired {
-					return // this scenario makes no such call
+					t.Fatalf("the scenario makes this call, but the fault didn't fire (err %v)", err)
 				}
 				if !errors.Is(err, errInjected) && (err == nil || !strings.Contains(err.Error(), errInjected.Error())) {
 					t.Fatalf("the injected error was not returned: %v", err)
@@ -165,18 +179,52 @@ func TestSPIFFEAdmissionWorkAgentsError(t *testing.T) {
 	}
 }
 
-// A Klusterlet deleted before it ever recorded admission state has nothing to clean.
+// A spiffe Klusterlet deleted before its record was stored may still have objects in place: they
+// are removed. A Klusterlet that never used spiffe has nothing to clean. Without the operator's
+// spiffe permissions nothing was applied, so the refusal doesn't hold up the deletion.
 func TestSPIFFEAdmissionCleanWithoutState(t *testing.T) {
 	kube := fakekube.NewSimpleClientset()
 	r := newAdmissionReconcile(kube)
 	k := spiffeKlusterlet()
+	objects, err := r.render(context.TODO(), k, spiffeConfig(k))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, o := range objects {
+		if err := apply(context.TODO(), o, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if _, state, err := r.clean(context.TODO(), k, spiffeConfig(k)); err != nil || state != reconcileContinue {
+		t.Fatalf("state %v, err %v", state, err)
+	}
+	if left, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicies().List(context.TODO(), metav1.ListOptions{}); len(left.Items) != 0 {
+		t.Errorf("policies left after deleting a spiffe Klusterlet with no record: %d", len(left.Items))
+	}
+
+	kube = fakekube.NewSimpleClientset()
+	r = newAdmissionReconcile(kube)
+	other := newKlusterlet("klusterlet", "open-cluster-management-agent", "cluster1")
+	if _, state, err := r.clean(context.TODO(), other, spiffeConfig(other)); err != nil || state != reconcileContinue {
 		t.Fatalf("state %v, err %v", state, err)
 	}
 	for _, a := range kube.Actions() {
 		if a.GetVerb() == "delete" {
-			t.Errorf("deleted %s without recorded state", a.GetResource().Resource)
+			t.Errorf("deleted %s for a Klusterlet that never used spiffe", a.GetResource().Resource)
 		}
+	}
+
+	kube = fakekube.NewSimpleClientset()
+	r = newAdmissionReconcile(kube)
+	kube.PrependReactor("delete", "*", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(admissionv1.Resource("validatingadmissionpolicies"), "x", errInjected)
+	})
+	if _, state, err := r.clean(context.TODO(), k, spiffeConfig(k)); err != nil || state != reconcileContinue {
+		t.Errorf("without permissions: state %v, err %v", state, err)
+	}
+	k.Status.SPIFFE = &operatorapiv1.KlusterletSPIFFEStatus{}
+	if _, _, err := r.clean(context.TODO(), k, spiffeConfig(k)); !apierrors.IsForbidden(err) {
+		t.Errorf("with a record, a refusal is returned: %v", err)
 	}
 }
 
@@ -216,19 +264,29 @@ func TestPolicyAPIServed(t *testing.T) {
 func TestSPIFFEAdmissionBindingMissing(t *testing.T) {
 	k := spiffeKlusterlet()
 	kube := fakekube.NewSimpleClientset()
+	countGenerations(kube) // the replacement gets a UID of its own
 	r := newAdmissionReconcile(kube)
 	k = activate(t, r, k, spiffeConfig(k))
-	if err := kube.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(context.TODO(),
-		agentPolicyPrefix+k.Name, metav1.DeleteOptions{}); err != nil {
+	bindings := kube.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings()
+	old, err := bindings.Get(context.TODO(), agentPolicyPrefix+k.Name, metav1.GetOptions{})
+	if err != nil {
 		t.Fatal(err)
 	}
-	k, _, _ = r.reconcile(context.TODO(), k, spiffeConfig(k))
-	if c := readyCondition(k); c == nil || c.Reason != "Recorded" {
-		t.Errorf("SPIFFEAdmissionReady %+v; want recovery to run and record again", c)
+	if err := bindings.Delete(context.TODO(), old.Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := kube.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Get(context.TODO(),
-		agentPolicyPrefix+k.Name, metav1.GetOptions{}); err != nil {
-		t.Errorf("the binding wasn't recreated: %v", err)
+	k = activate(t, r, k, spiffeConfig(k)) // recovery runs to the end
+	replacement, err := bindings.Get(context.TODO(), old.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("the binding wasn't recreated: %v", err)
+	}
+	if replacement.UID == old.UID {
+		t.Fatal("the fake gave the replacement the old UID")
+	}
+	for _, p := range k.Status.SPIFFE.AdmissionPolicies {
+		if p.PolicyName == old.Name && p.BindingUID != replacement.UID {
+			t.Errorf("on record: binding %s, want the replacement %s", p.BindingUID, replacement.UID)
+		}
 	}
 }
 
@@ -266,6 +324,30 @@ func TestSPIFFEAdmissionPolicyChangedDuringCleanup(t *testing.T) {
 	}
 	if k.Status.SPIFFE != nil && len(k.Status.SPIFFE.AdmissionPolicies) != 0 {
 		t.Errorf("recorded %v although the policy changed during cleanup", k.Status.SPIFFE.AdmissionPolicies)
+	}
+}
+
+// The policy is weakened right after the operator applies it, before recovery notes it: the
+// two notes then agree, but neither matches what the operator applied, so nothing is recorded.
+func TestSPIFFEAdmissionPolicyChangedRightAfterApply(t *testing.T) {
+	k := spiffeKlusterlet()
+	kube := fakekube.NewSimpleClientset()
+	r := newAdmissionReconcile(kube)
+	gvr := admissionv1.SchemeGroupVersion.WithResource("validatingadmissionpolicies")
+	kube.PrependReactor("create", "validatingadmissionpolicies", func(a clienttesting.Action) (bool, runtime.Object, error) {
+		p := a.(clienttesting.CreateAction).GetObject().(*admissionv1.ValidatingAdmissionPolicy).DeepCopy()
+		if p.Name == agentPolicyPrefix+k.Name {
+			p.Spec.Validations = nil
+		}
+		return true, p, kube.Tracker().Create(gvr, p, "")
+	})
+	k, state, err := r.reconcile(context.TODO(), k, spiffeConfig(k))
+	var rqe commonhelpers.RequeueError
+	if state != reconcileStop || !errors.As(err, &rqe) || !strings.Contains(err.Error(), "isn't as applied") {
+		t.Fatalf("state %v, err %v; want recovery to start over", state, err)
+	}
+	if k.Status.SPIFFE != nil && len(k.Status.SPIFFE.AdmissionPolicies) != 0 {
+		t.Errorf("recorded %v although the policy isn't as applied", k.Status.SPIFFE.AdmissionPolicies)
 	}
 }
 
@@ -320,5 +402,46 @@ func TestSPIFFEAdmissionRestoresBindingSpec(t *testing.T) {
 	b, err = bindings.Get(context.TODO(), agentPolicyPrefix+k.Name, metav1.GetOptions{})
 	if err != nil || len(b.Spec.ValidationActions) != 1 || b.Spec.ValidationActions[0] != admissionv1.Deny {
 		t.Errorf("binding %+v, %v; want Deny restored", b.Spec.ValidationActions, err)
+	}
+}
+
+// The add-on namespace's UID is stored as soon as the operator creates the namespace. If that
+// fails, the new namespace is removed, so the next pass creates it again instead of finding a
+// labeled namespace that isn't on record.
+func TestSPIFFEAdmissionAddOnNamespaceRecordedAtOnce(t *testing.T) {
+	k := spiffeKlusterlet()
+	kube := fakekube.NewSimpleClientset()
+	r := newAdmissionReconcile(kube)
+	r.storeStatus = func(context.Context, *operatorapiv1.Klusterlet) error { return errInjected }
+	if err := r.ensureAddOnNamespace(context.TODO(), k, spiffeConfig(k)); !errors.Is(err, errInjected) {
+		t.Fatalf("ensureAddOnNamespace: %v", err)
+	}
+	if _, err := kube.CoreV1().Namespaces().Get(context.TODO(), helpers.DefaultAddonNamespace, metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+		t.Errorf("the namespace whose UID couldn't be stored is still there: %v", err)
+	}
+	if k.Status.SPIFFE.AddOnNamespace != nil {
+		t.Errorf("a removed namespace is on record: %+v", k.Status.SPIFFE.AddOnNamespace)
+	}
+
+	var stored *operatorapiv1.SPIFFENamespaceRef
+	r.storeStatus = func(_ context.Context, k *operatorapiv1.Klusterlet) error {
+		stored = k.Status.SPIFFE.AddOnNamespace.DeepCopy()
+		return nil
+	}
+	if err := r.ensureAddOnNamespace(context.TODO(), k, spiffeConfig(k)); err != nil {
+		t.Fatalf("ensureAddOnNamespace: %v", err)
+	}
+	ns, err := kube.CoreV1().Namespaces().Get(context.TODO(), helpers.DefaultAddonNamespace, metav1.GetOptions{})
+	if err != nil || stored == nil || stored.UID != ns.UID {
+		t.Errorf("stored %+v for namespace %v (%v)", stored, ns, err)
+	}
+
+	// A namespace that is being deleted is waited for.
+	now := metav1.Now()
+	ns.DeletionTimestamp = &now
+	_ = kube.Tracker().Update(corev1.SchemeGroupVersion.WithResource("namespaces"), ns, "")
+	var rqe commonhelpers.RequeueError
+	if err := r.ensureAddOnNamespace(context.TODO(), k, spiffeConfig(k)); !errors.As(err, &rqe) {
+		t.Errorf("ensureAddOnNamespace on a terminating namespace: %v", err)
 	}
 }

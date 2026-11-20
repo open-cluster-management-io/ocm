@@ -31,8 +31,12 @@ func TestSPIFFEOnAPIServerWithoutPolicies(t *testing.T) {
 	defer func() { _ = env.Stop() }()
 	ctx := context.Background()
 	kube := kubernetes.NewForConfigOrDie(cfg)
-	if served, err := policyAPIServed(kube); err != nil || served {
-		t.Skipf("needs an API server without ValidatingAdmissionPolicy (Kubernetes older than 1.30); served %v, %v", served, err)
+	served, err := policyAPIServed(kube)
+	if err != nil {
+		t.Fatalf("discovery: %v", err)
+	}
+	if served {
+		t.Skip("needs an API server without ValidatingAdmissionPolicy (Kubernetes older than 1.30, such as 1.29)")
 	}
 	if _, err := kube.CoreV1().Namespaces().Create(ctx, newNamespace("open-cluster-management-agent"), metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)

@@ -63,11 +63,41 @@ type spiffeWebhookServer struct {
 	// clientConfig is how the API server reaches the webhook; replaceable in tests.
 	clientConfig func(path string, caBundle []byte) admissionregistrationv1.WebhookClientConfig
 
-	mu       sync.Mutex
+	mu sync.Mutex
+	// onStop is called when the server stops unexpectedly, to have it started again.
+	onStop func()
+	// probes are the dry-run probe requests the webhook received, by namespace/name.
+	probes   map[string]bool
 	source   x509Source
 	id       spiffeid.ID
 	specs    map[string]admissionregistrationv1.ValidatingAdmissionPolicySpec
 	policies map[string]*celPolicy
+}
+
+const (
+	// maxAdmissionReviewBytes bounds an AdmissionReview: it holds the object and the old object,
+	// each at most the API server's request size limit of 3 MiB.
+	maxAdmissionReviewBytes = 7 << 20
+	// webhookReadTimeout bounds reading a request and writing its answer; the API server gives up
+	// on the webhook after its timeoutSeconds anyway.
+	webhookReadTimeout = 30 * time.Second
+)
+
+// sawProbe reports, and forgets, whether the webhook received the probe request namespace/name.
+func (s *spiffeWebhookServer) sawProbe(namespace, name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := namespace + "/" + name
+	saw := s.probes[key]
+	delete(s.probes, key)
+	return saw
+}
+
+// setOnStop sets what is called when the server stops unexpectedly.
+func (s *spiffeWebhookServer) setOnStop(f func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onStop = f
 }
 
 func newSPIFFEWebhookServer(namespace string) *spiffeWebhookServer {
@@ -114,10 +144,25 @@ func (s *spiffeWebhookServer) ensure(ctx context.Context, socket string, id spif
 			_ = source.Close()
 			return id, nil, fmt.Errorf("the webhook can't listen on %s: %w", s.addr, err)
 		}
-		server := &http.Server{Handler: s, TLSConfig: tlsconfig.TLSServerConfig(source), ReadHeaderTimeout: 10 * time.Second}
+		server := &http.Server{Handler: s, TLSConfig: tlsconfig.TLSServerConfig(source),
+			ReadHeaderTimeout: 10 * time.Second, ReadTimeout: webhookReadTimeout, WriteTimeout: webhookReadTimeout,
+			IdleTimeout: 2 * time.Minute}
 		go func() {
-			if err := server.ServeTLS(listener, "", ""); err != http.ErrServerClosed {
-				klog.FromContext(ctx).Error(err, "the SPIFFE admission webhook stopped")
+			// A stop after the context ended is the expected one; any other is not.
+			if err := server.ServeTLS(listener, "", ""); err != http.ErrServerClosed && ctx.Err() == nil {
+				klog.FromContext(ctx).Error(err, "the SPIFFE admission webhook stopped; it is started again")
+				// Forget it, so the next ensure starts a new one, and ask for that pass now:
+				// while the webhook is down, the requests it covers are refused.
+				s.mu.Lock()
+				if s.source == source {
+					s.source = nil
+				}
+				onStop := s.onStop
+				s.mu.Unlock()
+				_ = source.Close()
+				if onStop != nil {
+					onStop()
+				}
 			}
 		}()
 		go func() {
@@ -177,15 +222,24 @@ func (s *spiffeWebhookServer) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	review := &admissionv1.AdmissionReview{}
-	if err := json.NewDecoder(r.Body).Decode(review); err != nil || review.Request == nil {
+	body := http.MaxBytesReader(w, r.Body, maxAdmissionReviewBytes)
+	if err := json.NewDecoder(body).Decode(review); err != nil || review.Request == nil {
 		http.Error(w, "not an AdmissionReview", http.StatusBadRequest)
 		return
 	}
-	message := "no SPIFFE admission policy " + name
-	if p := s.policy(name); p != nil {
-		message = p.admit(review.Request)
+	if strings.HasPrefix(review.Request.Name, spiffeProbePrefix) {
+		s.mu.Lock()
+		if s.probes == nil {
+			s.probes = map[string]bool{}
+		}
+		s.probes[review.Request.Namespace+"/"+review.Request.Name] = true
+		s.mu.Unlock()
 	}
-	response := &admissionv1.AdmissionResponse{UID: review.Request.UID, Allowed: message == ""}
+	allowed, message := false, "no SPIFFE admission policy "+name
+	if p := s.policy(name); p != nil {
+		allowed, message = p.admit(review.Request)
+	}
+	response := &admissionv1.AdmissionResponse{UID: review.Request.UID, Allowed: allowed}
 	if !response.Allowed {
 		response.Result = &metav1.Status{Status: metav1.StatusFailure, Code: http.StatusForbidden,
 			Reason: metav1.StatusReasonForbidden, Message: message}
@@ -293,7 +347,10 @@ type enforcement interface {
 }
 
 // policyEnforcement is the ValidatingAdmissionPolicy enforcement.
-type policyEnforcement struct{ objects []admissionObjects }
+type policyEnforcement struct {
+	objects []admissionObjects
+	writes  *ownWrites
+}
 
 func (e policyEnforcement) mode() operatorapiv1.SPIFFEAdmissionEnforcement {
 	return operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy
@@ -301,7 +358,7 @@ func (e policyEnforcement) mode() operatorapiv1.SPIFFEAdmissionEnforcement {
 
 func (e policyEnforcement) apply(ctx context.Context) error {
 	for _, o := range e.objects {
-		if err := apply(ctx, o); err != nil {
+		if err := apply(ctx, o, e.writes); err != nil {
 			return err
 		}
 	}
@@ -320,7 +377,10 @@ type webhookConfig struct {
 }
 
 // webhookEnforcement is the ValidatingWebhook enforcement.
-type webhookEnforcement struct{ configs []webhookConfig }
+type webhookEnforcement struct {
+	configs []webhookConfig
+	writes  *ownWrites
+}
 
 func (e webhookEnforcement) mode() operatorapiv1.SPIFFEAdmissionEnforcement {
 	return operatorapiv1.SPIFFEAdmissionValidatingWebhook
@@ -339,9 +399,11 @@ func (e webhookEnforcement) apply(ctx context.Context) error {
 			return err
 		case !equality.Semantic.DeepEqual(live.Webhooks, c.config.Webhooks):
 			live.Webhooks = c.config.Webhooks
-			if _, err := configs.Update(ctx, live, metav1.UpdateOptions{}); err != nil {
+			updated, err := configs.Update(ctx, live, metav1.UpdateOptions{})
+			if err != nil {
 				return err
 			}
+			e.writes.note(updated.UID, live.Generation, updated.Generation)
 		}
 	}
 	return nil

@@ -3,6 +3,7 @@ package klusterletcontroller
 import (
 	"context"
 	"errors"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"strings"
 	"testing"
 	"time"
@@ -238,5 +239,49 @@ func TestWorkAgentWaitsForHubKubeconfigSecret(t *testing.T) {
 	d := getDeployments(controller.kubeClient.Actions(), createVerb, "work-agent")
 	if d == nil || d.Spec.Replicas == nil || *d.Spec.Replicas != 0 {
 		t.Errorf("work agent %+v, want 0 replicas", d)
+	}
+}
+
+// A Klusterlet replaced between the status conflict and the retry keeps its own status: the old
+// one's admission record is not written onto it.
+func TestStoreSPIFFEStatusReplacedKlusterlet(t *testing.T) {
+	k := spiffeKlusterlet()
+	k.UID = "new"
+	controller := newTestController(t, k, nil, nil, false)
+	old := k.DeepCopy()
+	old.UID = "old"
+	old.Status.SPIFFE = &operatorapiv1.KlusterletSPIFFEStatus{AdmissionEnforcement: operatorapiv1.SPIFFEAdmissionValidatingWebhook}
+	if err := controller.controller.storeSPIFFEStatus(context.TODO(), old); err != nil {
+		t.Fatalf("storeSPIFFEStatus: %v", err)
+	}
+	got, _ := controller.operatorClient.OperatorV1().Klusterlets().Get(context.TODO(), k.Name, metav1.GetOptions{})
+	if got.Status.SPIFFE != nil {
+		t.Errorf("the replaced Klusterlet's record was written onto the new one: %+v", got.Status.SPIFFE)
+	}
+}
+
+// While the admission reconcile waits (here: the webhook has no SVID yet), the pass stops before
+// the agents are applied, so the Klusterlet is not reported Applied.
+func TestSPIFFESyncPendingIsNotApplied(t *testing.T) {
+	k := spiffeKlusterlet()
+	k.Spec.RegistrationConfiguration.RegistrationDriver.SPIFFE.AdmissionEnforcement = operatorapiv1.SPIFFEAdmissionValidatingWebhook
+	syncContext := testingcommon.NewFakeSyncContext(t, k.Name)
+	controller := newTestController(t, k, syncContext.Recorder(), nil, false, newNamespace("open-cluster-management-agent"))
+	servePolicyAPI(controller.kubeClient, "system:serviceaccount:open-cluster-management:klusterlet")
+	controller.controller.spiffeWebhook = newSPIFFEWebhookServer("open-cluster-management")
+	controller.controller.spiffeWebhook.newSource = func(context.Context, string, spiffeid.ID) (x509Source, error) {
+		return nil, errors.New("no entry")
+	}
+	if err := controller.controller.sync(context.TODO(), syncContext, k.Name); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	got, _ := controller.operatorClient.OperatorV1().Klusterlets().Get(context.TODO(), k.Name, metav1.GetOptions{})
+	if c := meta.FindStatusCondition(got.Status.Conditions, operatorapiv1.ConditionSPIFFEAdmissionReady); c == nil ||
+		c.Reason != ReasonSPIFFEWebhookNotReady {
+		t.Fatalf("SPIFFEAdmissionReady %+v", c)
+	}
+	if c := meta.FindStatusCondition(got.Status.Conditions, operatorapiv1.ConditionKlusterletApplied); c != nil &&
+		c.Status == metav1.ConditionTrue {
+		t.Errorf("Applied %+v while admission is pending", c)
 	}
 }
