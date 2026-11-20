@@ -286,6 +286,18 @@ const (
 	//
 	// Note: Image registries configured in the addonDeploymentConfig will take precedence over this annotation.
 	ClusterImageRegistriesAnnotationKey = "open-cluster-management.io/image-registries"
+
+	// SPIFFETrustDomainAnnotationKey pins a ManagedCluster that registers with the spiffe driver
+	// to one SPIFFE trust domain. The hub accepts the cluster's Klusterlet and add-on agents only
+	// with SVIDs from that trust domain. The hub sets it when the cluster is created and keeps it
+	// on agent updates; an admin confirms or sets it when accepting the cluster.
+	SPIFFETrustDomainAnnotationKey = "open-cluster-management.io/spiffe-trust-domain"
+
+	// SPIFFERegisteredByAnnotationKey records the SPIFFE ID of the agent that created a
+	// ManagedCluster with the spiffe driver. The hub sets it when the cluster is created and
+	// keeps it on agent updates. With the ManagedClusterAutoApproval feature gate, the cluster is
+	// accepted automatically only if this ID matches the spiffe driver's autoApprovedIdentities.
+	SPIFFERegisteredByAnnotationKey = "open-cluster-management.io/spiffe-registered-by"
 )
 
 const (

@@ -78,6 +78,11 @@ type KlusterletChartConfig struct {
 
 	// NoOperator is to only deploy the klusterlet CR if set true.
 	NoOperator bool `json:"noOperator,omitempty"`
+
+	// EnableSPIFFE grants the operator the permissions of the spiffe registration driver even when
+	// Klusterlet.RegistrationConfiguration doesn't use it, for a spiffe Klusterlet created outside
+	// the chart.
+	EnableSPIFFE bool `json:"enableSPIFFE,omitempty"`
 }
 
 type BootStrapKubeConfig struct {

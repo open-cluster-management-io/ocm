@@ -21,7 +21,8 @@ func NewWorkAgent() *cobra.Command {
 	agentOption := spoke.NewWorkloadAgentOptions()
 	cfg := spoke.NewWorkAgentConfig(commonOptions, agentOption)
 	cmdConfig := commonOptions.CommonOpts.
-		NewControllerCommandConfig("work-agent", version.Get(), cfg.RunWorkloadAgent, clock.RealClock{})
+		NewControllerCommandConfig("work-agent", version.Get(), cfg.RunWorkloadAgent, clock.RealClock{}).
+		WithHealthChecks(cfg.HealthCheckers()...)
 	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = agentCmdName
 	cmd.Short = "Start the Work Agent"
@@ -30,6 +31,7 @@ func NewWorkAgent() *cobra.Command {
 	flags := cmd.Flags()
 	commonOptions.AddFlags(flags)
 	agentOption.AddFlags(flags)
+	agentOption.AddSPIFFEFlags(flags)
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates))
 	features.SpokeMutableFeatureGate.AddFlag(flags)
 	// The klusterlet operator injects --tls-min-version and --tls-cipher-suites

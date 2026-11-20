@@ -1,0 +1,441 @@
+package klusterletcontroller
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+
+	admissionv1 "k8s.io/api/admissionregistration/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	fakekube "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
+
+	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
+
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
+)
+
+func spiffeKlusterlet() *operatorapiv1.Klusterlet {
+	k := newKlusterlet("klusterlet", "open-cluster-management-agent", "cluster1")
+	k.Spec.RegistrationConfiguration.RegistrationDriver = operatorapiv1.RegistrationDriver{
+		AuthType: operatorapiv1.SPIFFEAuthType,
+		SPIFFE: &operatorapiv1.KlusterletSPIFFEConfig{HubEndpoint: "hub:443", HubSPIFFEID: testSPIFFEHubID,
+			AdmissionEnforcement: operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy,
+		},
+	}
+	return k
+}
+
+func spiffeConfig(k *operatorapiv1.Klusterlet) klusterletConfig {
+	c := klusterletConfig{
+		KlusterletName:             k.Name,
+		KlusterletNamespace:        helpers.KlusterletNamespace(k),
+		AgentNamespace:             helpers.AgentNamespace(k),
+		InstallMode:                k.Spec.DeployOption.Mode,
+		RegistrationServiceAccount: serviceAccountName("registration-sa", k),
+		WorkServiceAccount:         serviceAccountName("work-sa", k),
+		RegistrationDriver:         RegistrationDriver{AuthType: operatorapiv1.SPIFFEAuthType},
+	}
+	if s := k.Spec.RegistrationConfiguration.RegistrationDriver.SPIFFE; s != nil {
+		c.SPIFFEAdmissionEnforcement = s.AdmissionEnforcement
+	}
+	return c
+}
+
+func newAdmissionReconcile(kube *fakekube.Clientset, amws ...runtime.Object) *spiffeAdmissionReconcile {
+	servePolicyAPI(kube, "system:serviceaccount:open-cluster-management:klusterlet")
+	work := fakeworkclient.NewSimpleClientset(amws...)
+	return &spiffeAdmissionReconcile{
+		kubeClient: kube,
+		managedClusterClients: &managedClusterClients{
+			kubeClient:                kube,
+			appliedManifestWorkClient: work.WorkV1().AppliedManifestWorks(),
+		},
+		spiffeWorkAgents: func() (map[string]string, error) {
+			return map[string]string{"klusterlet": "system:serviceaccount:open-cluster-management-agent:klusterlet-work-sa"}, nil
+		},
+		watch: startedWatch(),
+		// The fake API server enforces nothing; enforcementActive has its own tests.
+		probe: func(context.Context, operatorapiv1.SPIFFEAdmissionEnforcement, string, string) (bool, error) {
+			return true, nil
+		},
+	}
+}
+
+// startedWatch is a watch that already runs, so a reconcile neither checks the operator's
+// permissions nor starts informers.
+func startedWatch() *spiffeAdmissionWatch {
+	return &spiffeAdmissionWatch{webhooks: true, policies: true}
+}
+
+func deleteCollections(kube *fakekube.Clientset) map[string]bool {
+	out := map[string]bool{}
+	for _, a := range kube.Actions() {
+		if a.GetVerb() == "delete-collection" {
+			out[a.GetNamespace()+"/"+a.GetResource().Resource] = true
+		}
+	}
+	return out
+}
+
+func readyCondition(k *operatorapiv1.Klusterlet) *metav1.Condition {
+	return meta.FindStatusCondition(k.Status.Conditions, operatorapiv1.ConditionSPIFFEAdmissionReady)
+}
+
+// ValidatingAdmissionPolicy enforcement on a cluster that doesn't serve the API is refused as an
+// unsupported Kubernetes version.
+func TestSPIFFEAdmissionPolicyAPIMissing(t *testing.T) {
+	k := spiffeKlusterlet()
+	kube := fakekube.NewSimpleClientset()
+	r := &spiffeAdmissionReconcile{kubeClient: kube, managedClusterClients: &managedClusterClients{kubeClient: kube}}
+	k, state, err := r.reconcile(context.TODO(), k, spiffeConfig(k))
+	if err == nil || state != reconcileStop {
+		t.Fatalf("got state %v, err %v; want stop with an error", state, err)
+	}
+	cond := meta.FindStatusCondition(k.Status.Conditions, operatorapiv1.ConditionKlusterletApplied)
+	if cond == nil || cond.Reason != ReasonSPIFFEUnsupportedKubernetesVersion ||
+		!strings.HasPrefix(cond.Message, "unsupported Kubernetes version v") || !strings.Contains(cond.Message, "ValidatingWebhook") {
+		t.Errorf("Applied condition %+v, want reason %s naming the version", cond, ReasonSPIFFEUnsupportedKubernetesVersion)
+	}
+
+	// The version can't be read: the refusal says so.
+	kube.PrependReactor("get", "version", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("injected")
+	})
+	k, _, _ = r.reconcile(context.TODO(), k, spiffeConfig(k))
+	if cond := meta.FindStatusCondition(k.Status.Conditions, operatorapiv1.ConditionKlusterletApplied); cond == nil ||
+		!strings.HasPrefix(cond.Message, "unsupported Kubernetes version unknown") {
+		t.Errorf("Applied condition %+v", cond)
+	}
+}
+
+func TestSPIFFEAdmissionFirstActivation(t *testing.T) {
+	k := spiffeKlusterlet()
+	evil := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "evil", Namespace: "open-cluster-management-agent"}}
+	kube := fakekube.NewSimpleClientset(evil)
+	r := newAdmissionReconcile(kube)
+
+	k = activate(t, r, k, spiffeConfig(k))
+	if !deleteCollections(kube)["open-cluster-management-agent/deployments"] {
+		t.Error("recovery didn't clean the agent namespace")
+	}
+	if c := readyCondition(k); c == nil || c.Status != metav1.ConditionTrue {
+		t.Errorf("SPIFFEAdmissionReady %+v, want True", c)
+	}
+	if k.Status.SPIFFE == nil || len(k.Status.SPIFFE.AdmissionPolicies) != 3 {
+		t.Fatalf("recorded policies %+v, want 3", k.Status.SPIFFE)
+	}
+	policies, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicies().List(context.TODO(), metav1.ListOptions{})
+	bindings, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().List(context.TODO(), metav1.ListOptions{})
+	if len(policies.Items) != 3 || len(bindings.Items) != 3 {
+		t.Errorf("%d policies and %d bindings, want 3 and 3", len(policies.Items), len(bindings.Items))
+	}
+	ns, err := kube.CoreV1().Namespaces().Get(context.TODO(), helpers.DefaultAddonNamespace, metav1.GetOptions{})
+	if err != nil || ns.Labels[SPIFFEAddOnNamespaceLabel] != "klusterlet" {
+		t.Errorf("add-on namespace %+v, %v; want it created with the label", ns, err)
+	}
+	if k.Status.SPIFFE.AddOnNamespace == nil || k.Status.SPIFFE.AddOnNamespace.Name != helpers.DefaultAddonNamespace {
+		t.Errorf("add-on namespace not recorded: %+v", k.Status.SPIFFE.AddOnNamespace)
+	}
+
+	// The next reconcile finds everything as recorded: no recovery, the agents may start.
+	kube.ClearActions()
+	_, state, err := r.reconcile(context.TODO(), k, spiffeConfig(k))
+	if err != nil || state != reconcileContinue {
+		t.Fatalf("got state %v, err %v", state, err)
+	}
+	if len(deleteCollections(kube)) != 0 {
+		t.Errorf("recovery ran although nothing changed: %v", deleteCollections(kube))
+	}
+
+	// The policy is recreated (new UID) while the operator wasn't watching: recovery runs again.
+	kube.ClearActions()
+	rec := k.Status.SPIFFE.AdmissionPolicies
+	for i := range rec {
+		if rec[i].PolicyName == agentPolicyPrefix+"klusterlet" {
+			rec[i].PolicyUID = types.UID("old-uid")
+		}
+	}
+	activate(t, r, k, spiffeConfig(k))
+	if !deleteCollections(kube)["open-cluster-management-agent/deployments"] {
+		t.Error("recovery didn't run for a recreated policy")
+	}
+}
+
+func TestSPIFFEAdmissionOperatorsOwnChange(t *testing.T) {
+	k := spiffeKlusterlet()
+	kube := fakekube.NewSimpleClientset()
+	r := newAdmissionReconcile(kube)
+	k = activate(t, r, k, spiffeConfig(k))
+
+	// A new operator version renders a different policy; the live one is still the recorded one.
+	p, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(context.TODO(), agentPolicyPrefix+"klusterlet", metav1.GetOptions{})
+	p.Spec.Validations = p.Spec.Validations[:1]
+	if _, err := kube.AdmissionregistrationV1().ValidatingAdmissionPolicies().Update(context.TODO(), p, metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	kube.ClearActions()
+	_, state, err := r.reconcile(context.TODO(), k, spiffeConfig(k))
+	if err != nil || state != reconcileContinue {
+		t.Fatalf("got state %v, err %v", state, err)
+	}
+	if len(deleteCollections(kube)) != 0 {
+		t.Errorf("recovery ran for the operator's own change: %v", deleteCollections(kube))
+	}
+	p, _ = kube.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(context.TODO(), agentPolicyPrefix+"klusterlet", metav1.GetOptions{})
+	if len(p.Spec.Validations) == 1 {
+		t.Error("the rendered policy wasn't applied")
+	}
+}
+
+func TestSPIFFEAdmissionUntrustedNamespaces(t *testing.T) {
+	k := spiffeKlusterlet()
+	labeled := func(name, uid string) *corev1.Namespace {
+		return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(uid),
+			Labels: map[string]string{SPIFFEAddOnNamespaceLabel: "klusterlet"}}}
+	}
+	// default is labeled but not on record; addon-a was created by this Klusterlet's work agent;
+	// addon-b is on record only for another Klusterlet's work agent.
+	k.UID = "klusterlet-uid"
+	applied := func(agentID, ns, uid string) *workv1.AppliedManifestWork {
+		return &workv1.AppliedManifestWork{ObjectMeta: metav1.ObjectMeta{Name: agentID + "-" + ns},
+			Spec: workv1.AppliedManifestWorkSpec{AgentID: agentID},
+			Status: workv1.AppliedManifestWorkStatus{AppliedResources: []workv1.AppliedManifestResourceMeta{{
+				ResourceIdentifier: workv1.ResourceIdentifier{Resource: "namespaces", Name: ns}, UID: uid}}}}
+	}
+	kube := fakekube.NewSimpleClientset(labeled("default", "uid-default"), labeled("addon-a", "uid-a"),
+		labeled("addon-b", "uid-b"))
+	r := newAdmissionReconcile(kube, applied("klusterlet-uid", "addon-a", "uid-a"), applied("other-uid", "addon-b", "uid-b"))
+
+	activate(t, r, k, spiffeConfig(k))
+	cleaned := deleteCollections(kube)
+	if cleaned["default/deployments"] || cleaned["default/pods"] {
+		t.Error("recovery cleaned default, which isn't on record")
+	}
+	if !cleaned["addon-a/deployments"] {
+		t.Error("recovery didn't clean the recorded add-on namespace")
+	}
+	if cleaned["addon-b/deployments"] || cleaned["addon-b/pods"] {
+		t.Error("recovery cleaned addon-b, which only another Klusterlet's work agent has on record")
+	}
+	if b, _ := kube.CoreV1().Namespaces().Get(context.TODO(), "addon-b", metav1.GetOptions{}); b.Labels[SPIFFEAddOnNamespaceLabel] != "" {
+		t.Error("the label wasn't removed from addon-b")
+	}
+	def, _ := kube.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{})
+	if _, ok := def.Labels[SPIFFEAddOnNamespaceLabel]; ok {
+		t.Error("the label wasn't removed from default")
+	}
+}
+
+// A recorded add-on namespace deleted and created again under the same name between the listing
+// and the cleanup isn't this Klusterlet's: recovery leaves its workloads alone.
+func TestSPIFFEAdmissionRecreatedNamespace(t *testing.T) {
+	k := spiffeKlusterlet()
+	k.UID = "klusterlet-uid"
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "addon-a", UID: "uid-a",
+		Labels: map[string]string{SPIFFEAddOnNamespaceLabel: "klusterlet"}}}
+	amw := &workv1.AppliedManifestWork{ObjectMeta: metav1.ObjectMeta{Name: "addon-a"},
+		Spec: workv1.AppliedManifestWorkSpec{AgentID: "klusterlet-uid"},
+		Status: workv1.AppliedManifestWorkStatus{AppliedResources: []workv1.AppliedManifestResourceMeta{{
+			ResourceIdentifier: workv1.ResourceIdentifier{Resource: "namespaces", Name: "addon-a"}, UID: "uid-a"}}}}
+	kube := fakekube.NewSimpleClientset(ns)
+	r := newAdmissionReconcile(kube, amw)
+	// By the time recovery gets to it, addon-a is another namespace.
+	kube.PrependReactor("get", "namespaces", func(a clienttesting.Action) (bool, runtime.Object, error) {
+		if a.(clienttesting.GetAction).GetName() != "addon-a" {
+			return false, nil, nil
+		}
+		other := ns.DeepCopy()
+		other.UID = "uid-new"
+		return true, other, nil
+	})
+	activate(t, r, k, spiffeConfig(k))
+	if cleaned := deleteCollections(kube); cleaned["addon-a/deployments"] || cleaned["addon-a/pods"] {
+		t.Error("recovery cleaned a namespace that is no longer the one on record")
+	}
+	if !deleteCollections(kube)["open-cluster-management-agent/deployments"] {
+		t.Error("recovery didn't clean the agent namespace")
+	}
+}
+
+func TestSPIFFEAdmissionExistingAddOnNamespace(t *testing.T) {
+	k := spiffeKlusterlet()
+	kube := fakekube.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: helpers.DefaultAddonNamespace}})
+	r := newAdmissionReconcile(kube)
+	k = activate(t, r, k, spiffeConfig(k))
+	ns, _ := kube.CoreV1().Namespaces().Get(context.TODO(), helpers.DefaultAddonNamespace, metav1.GetOptions{})
+	if _, ok := ns.Labels[SPIFFEAddOnNamespaceLabel]; ok {
+		t.Error("an existing namespace was labeled")
+	}
+	if c := meta.FindStatusCondition(k.Status.Conditions, ConditionAddOnNamespaceNotDedicated); c == nil || c.Status != metav1.ConditionTrue {
+		t.Errorf("condition %+v, want AddOnNamespaceNotDedicated True", c)
+	}
+}
+
+func TestSPIFFEAdmissionWaitsForPods(t *testing.T) {
+	k := spiffeKlusterlet()
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "open-cluster-management-agent"}}
+	kube := fakekube.NewSimpleClientset(pod)
+	// Pods take time to go: delete-collection leaves them in place.
+	kube.PrependReactor("delete-collection", "pods", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, nil
+	})
+	r := newAdmissionReconcile(kube)
+	k, state, err := r.reconcile(context.TODO(), k, spiffeConfig(k))
+	var rqe commonhelpers.RequeueError
+	if !errors.As(err, &rqe) || state != reconcileStop {
+		t.Fatalf("got state %v, err %v; want a requeue", state, err)
+	}
+	if k.Status.SPIFFE != nil && len(k.Status.SPIFFE.AdmissionPolicies) != 0 {
+		t.Error("recorded the admission state while pods were left")
+	}
+	if c := readyCondition(k); c == nil || c.Status != metav1.ConditionFalse || c.Reason != "Recovering" {
+		t.Errorf("SPIFFEAdmissionReady %+v, want False/Recovering", c)
+	}
+}
+
+func TestSPIFFERolePairs(t *testing.T) {
+	k := spiffeKlusterlet()
+	if got := spiffeRolePairs(spiffeConfig(k)); got["registration"] != "klusterlet-registration-sa" || got["work"] != "klusterlet-work-sa" {
+		t.Errorf("Default pairs %v", got)
+	}
+	k.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
+	if got := spiffeRolePairs(spiffeConfig(k)); len(got) != 1 || got["klusterlet"] != "klusterlet-work-sa" {
+		t.Errorf("Singleton pairs %v", got)
+	}
+}
+
+func TestSPIFFEAdmissionDowngrade(t *testing.T) {
+	for _, otherSPIFFE := range []bool{false, true} {
+		k := spiffeKlusterlet()
+		kube := fakekube.NewSimpleClientset()
+		r := newAdmissionReconcile(kube)
+		k = activate(t, r, k, spiffeConfig(k))
+		// The Klusterlet moves back to grpc; another one may still use the policies.
+		r.spiffeEnforcements = func() (map[string]operatorapiv1.SPIFFEAdmissionEnforcement, error) {
+			if otherSPIFFE {
+				return map[string]operatorapiv1.SPIFFEAdmissionEnforcement{
+					"other": operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy}, nil
+			}
+			return map[string]operatorapiv1.SPIFFEAdmissionEnforcement{}, nil
+		}
+		config := spiffeConfig(k)
+		config.RegistrationDriver = RegistrationDriver{AuthType: operatorapiv1.GRPCAuthType}
+		meta.SetStatusCondition(&k.Status.Conditions, metav1.Condition{Type: ConditionAddOnNamespaceNotDedicated,
+			Status: metav1.ConditionTrue, Reason: "ExistingNamespace"})
+		k, state, err := r.reconcile(context.TODO(), k, config)
+		if err != nil || state != reconcileContinue {
+			t.Fatalf("got state %v, err %v", state, err)
+		}
+		if k.Status.SPIFFE != nil || readyCondition(k) != nil {
+			t.Errorf("status.spiffe %+v and condition %+v left", k.Status.SPIFFE, readyCondition(k))
+		}
+		if c := meta.FindStatusCondition(k.Status.Conditions, ConditionAddOnNamespaceNotDedicated); c != nil {
+			t.Errorf("the spiffe add-on namespace warning stays after leaving spiffe: %+v", c)
+		}
+		policies, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicies().List(context.TODO(), metav1.ListOptions{})
+		bindings, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().List(context.TODO(), metav1.ListOptions{})
+		want := 0
+		if otherSPIFFE {
+			want = 1 // the shared label policy stays for the other Klusterlet
+		}
+		if len(policies.Items) != want || len(bindings.Items) != want {
+			t.Fatalf("other spiffe Klusterlet %v: %d policies and %d bindings left, want %d", otherSPIFFE,
+				len(policies.Items), len(bindings.Items), want)
+		}
+		if want == 1 && policies.Items[0].Name != namespaceLabelPolicyName {
+			t.Errorf("kept %s", policies.Items[0].Name)
+		}
+		ns, _ := kube.CoreV1().Namespaces().Get(context.TODO(), helpers.DefaultAddonNamespace, metav1.GetOptions{})
+		if _, ok := ns.Labels[SPIFFEAddOnNamespaceLabel]; ok {
+			t.Error("the add-on namespace keeps its spiffe label")
+		}
+
+		// Nothing left to do: the next reconcile makes no call.
+		kube.ClearActions()
+		if _, _, err := r.reconcile(context.TODO(), k, config); err != nil {
+			t.Fatal(err)
+		}
+		if n := len(kube.Actions()); n != 0 {
+			t.Errorf("%d calls after cleanup, want none", n)
+		}
+	}
+}
+
+// activate runs a reconcile that is expected to finish recovery: it records the admission state
+// and stops the pass, so that the agents start only once the record is stored.
+func activate(t *testing.T, r *spiffeAdmissionReconcile, k *operatorapiv1.Klusterlet,
+	config klusterletConfig) *operatorapiv1.Klusterlet {
+	t.Helper()
+	return activateWith(context.TODO(), t, r, k, config)
+}
+
+// activateWith is activate with ctx, which bounds the informers a first activation starts.
+func activateWith(ctx context.Context, t *testing.T, r *spiffeAdmissionReconcile, k *operatorapiv1.Klusterlet,
+	config klusterletConfig) *operatorapiv1.Klusterlet {
+	t.Helper()
+	k, state, err := r.reconcile(ctx, k, config)
+	var rqe commonhelpers.RequeueError
+	if state != reconcileStop || !errors.As(err, &rqe) || !strings.Contains(err.Error(), "recovery finished") {
+		t.Fatalf("got state %v, err %v; want recovery to finish and requeue", state, err)
+	}
+	if c := readyCondition(k); c == nil || c.Status != metav1.ConditionTrue {
+		t.Fatalf("SPIFFEAdmissionReady %+v, want True", c)
+	}
+	return k
+}
+
+func TestSPIFFEAdmissionCleanOnDelete(t *testing.T) {
+	k := spiffeKlusterlet()
+	kube := fakekube.NewSimpleClientset()
+	r := newAdmissionReconcile(kube)
+	k = activate(t, r, k, spiffeConfig(k))
+	// The deleted Klusterlet is the only spiffe one left.
+	r.spiffeWorkAgents = func() (map[string]string, error) { return map[string]string{"klusterlet": "x"}, nil }
+	if _, _, err := r.clean(context.TODO(), k, spiffeConfig(k)); err != nil {
+		t.Fatal(err)
+	}
+	policies, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicies().List(context.TODO(), metav1.ListOptions{})
+	bindings, _ := kube.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().List(context.TODO(), metav1.ListOptions{})
+	if len(policies.Items) != 0 || len(bindings.Items) != 0 {
+		t.Errorf("%d policies and %d bindings left after the Klusterlet was deleted", len(policies.Items), len(bindings.Items))
+	}
+}
+
+func TestSPIFFEAdmissionQueueKeys(t *testing.T) {
+	spiffeK := spiffeKlusterlet()
+	other := newKlusterlet("other", "open-cluster-management-agent", "cluster2")
+	store := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	for _, k := range []*operatorapiv1.Klusterlet{spiffeK, other} {
+		if err := store.Add(k); err != nil {
+			t.Fatal(err)
+		}
+	}
+	keys := spiffeAdmissionQueueKeys(operatorlister.NewKlusterletLister(store))
+	policy := func(name string) runtime.Object {
+		return &admissionv1.ValidatingAdmissionPolicy{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	}
+	cases := map[string][]string{
+		agentPolicyPrefix + "klusterlet": {"klusterlet"},
+		addOnPolicyPrefix + "klusterlet": {"klusterlet"},
+		namespaceLabelPolicyName:         {"klusterlet"}, // only spiffe Klusterlets
+		"someone-elses-policy":           nil,
+	}
+	for name, want := range cases {
+		if got := keys(policy(name)); !equality.Semantic.DeepEqual(got, want) && !(len(got) == 0 && len(want) == 0) {
+			t.Errorf("%s: keys %v, want %v", name, got, want)
+		}
+	}
+}

@@ -140,3 +140,16 @@ type HubDriver interface {
 	// implementation, this method should return true
 	Accept(cluster *clusterv1.ManagedCluster) bool
 }
+
+// SecretlessDriver is implemented by drivers that keep no hub credential in a Secret, such as
+// spiffe: the agent's identity comes from elsewhere and is ready without a bootstrap phase. The
+// agent then skips the bootstrap phase and the hub-kubeconfig Secret controllers.
+type SecretlessDriver interface {
+	Secretless() bool
+}
+
+// IsSecretless reports whether d is a SecretlessDriver.
+func IsSecretless(d RegisterDriver) bool {
+	s, ok := d.(SecretlessDriver)
+	return ok && s.Secretless()
+}

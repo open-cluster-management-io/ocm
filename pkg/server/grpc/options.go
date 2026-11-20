@@ -6,7 +6,9 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/pflag"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 
 	v1alpha1addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
@@ -23,6 +25,7 @@ import (
 	cemetrics "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/metrics"
 	sdkgrpc "open-cluster-management.io/sdk-go/pkg/server/grpc"
 	grpcauthn "open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
+	spiffeserver "open-cluster-management.io/sdk-go/pkg/server/grpc/spiffe"
 
 	"open-cluster-management.io/ocm/pkg/server/services/addon/v1alpha1"
 	"open-cluster-management.io/ocm/pkg/server/services/addon/v1beta1"
@@ -42,17 +45,32 @@ type GRPCServerOptions struct {
 	// These take precedence over the YAML config file loaded by LoadGRPCServerOptions.
 	TLSMinVersionOverride   string
 	TLSCipherSuitesOverride string
+
+	// GRPCEnabled runs the existing grpc listener (token and OCM-signed certificates). It is
+	// off when spiffe is the only registration driver.
+	GRPCEnabled bool
+	// SPIFFE configures the separate listener of the spiffe registration driver.
+	SPIFFE SPIFFEListenerOptions
+
+	// registry tracks the SPIFFE listener's connections, for closing them on revocation.
+	registry *spiffeserver.Registry
 }
 
 func NewGRPCServerOptions() *GRPCServerOptions {
 	return &GRPCServerOptions{
 		grpcBrokerOptions: cloudeventsgrpc.NewBrokerOptions(),
+		GRPCEnabled:       true,
+		SPIFFE:            newSPIFFEListenerOptions(),
+		registry:          spiffeserver.NewRegistry(),
 	}
 }
 
 func (o *GRPCServerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.GRPCServerConfig, "server-config", o.GRPCServerConfig, "Location of the server configuration file.")
+	fs.BoolVar(&o.GRPCEnabled, "grpc-enabled", o.GRPCEnabled,
+		"Run the grpc listener, which authenticates agents with tokens or OCM-signed certificates.")
 	o.grpcBrokerOptions.AddFlags(fs)
+	o.SPIFFE.AddFlags(fs)
 }
 
 func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
@@ -69,6 +87,16 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 		}
 		klog.Infof("gRPC server TLS overridden: minVersion=%s, cipherSuites=%v",
 			o.TLSMinVersionOverride, serverOptions.CipherSuites)
+	}
+
+	if !o.GRPCEnabled && !o.SPIFFE.Enabled {
+		return fmt.Errorf("no listener enabled: set --grpc-enabled or --spiffe-enabled")
+	}
+	var spiffeCfg *spiffeListenerConfig
+	if o.SPIFFE.Enabled {
+		if spiffeCfg, err = o.SPIFFE.complete(); err != nil {
+			return err
+		}
 	}
 
 	clients, err := NewClients(controllerContext)
@@ -98,19 +126,52 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 			clients.AddOnInformers.Addon().V1beta1().ManagedClusterAddOns().Lister(),
 		))
 
+	// The SPIFFE listener closes connections when the hub withdraws access, and gates new
+	// requests on the cluster and add-on state.
+	var spiffeGate *clusterGate
+	if o.SPIFFE.Enabled {
+		clusterInformer := clients.ClusterInformers.Cluster().V1().ManagedClusters()
+		addOnInformer := clients.AddOnInformers.Addon().V1beta1().ManagedClusterAddOns()
+		// The informers were just created and aren't started, so they accept handlers; an error
+		// here is a bug.
+		utilruntime.Must(registerRevocationHandlers(clusterInformer.Informer(), addOnInformer.Informer(), o.registry))
+		spiffeGate = &clusterGate{
+			clusters:     clusterInformer.Lister(),
+			addOns:       addOnInformer.Lister(),
+			trustDomains: spiffeCfg.trustDomains,
+		}
+	}
+
 	// start clients
 	go clients.Run(ctx)
 
-	// initialize and run grpc server
+	// initialize and run the listeners. Both share the broker, so a cluster sees the same
+	// resources on either; the authorizer is shared too.
 	authorizer := grpcauthz.NewSARAuthorizer(clients.KubeClient)
-	return sdkgrpc.NewGRPCServer(serverOptions).
-		WithAuthenticator(grpcauthn.NewTokenAuthenticator(clients.KubeClient)).
-		WithAuthenticator(grpcauthn.NewMtlsAuthenticator()).
-		WithUnaryAuthorizer(authorizer).
-		WithStreamAuthorizer(authorizer).
-		WithRegisterFunc(func(s *grpc.Server) {
-			pbv1.RegisterCloudEventServiceServer(s, grpcEventServer)
-		}).
-		WithExtraMetrics(cemetrics.CloudEventsGRPCMetrics()...).
-		Run(ctx)
+	if spiffeGate != nil {
+		authorizer.WithSPIFFECheck(spiffeGate.checkDataType)
+		spiffeGate.next = authorizer
+	}
+	register := func(s *grpc.Server) {
+		pbv1.RegisterCloudEventServiceServer(s, grpcEventServer)
+	}
+	g, ctx := errgroup.WithContext(ctx)
+	if o.GRPCEnabled {
+		g.Go(func() error {
+			return sdkgrpc.NewGRPCServer(serverOptions).
+				WithAuthenticator(grpcauthn.NewTokenAuthenticator(clients.KubeClient)).
+				WithAuthenticator(grpcauthn.NewMtlsAuthenticator()).
+				WithUnaryAuthorizer(authorizer).
+				WithStreamAuthorizer(authorizer).
+				WithRegisterFunc(register).
+				WithExtraMetrics(cemetrics.CloudEventsGRPCMetrics()...).
+				Run(ctx)
+		})
+	}
+	if o.SPIFFE.Enabled {
+		g.Go(func() error {
+			return o.runSPIFFEListener(ctx, spiffeCfg, serverOptions, spiffeGate, register)
+		})
+	}
+	return g.Wait()
 }

@@ -81,11 +81,24 @@ var (
 	hubHostedWebhookEndpointRegistration = "cluster-manager/hub/registration/webhook-endpoint-hosted.yaml"
 	hubHostedWebhookEndpointWork         = "cluster-manager/hub/work/webhook-endpoint-hosted.yaml"
 
+	// grpcServerResourceFiles are applied when grpc or spiffe is a registration driver.
 	grpcServerResourceFiles = []string{
 		"cluster-manager/hub/grpc-server/clusterrole.yaml",
 		"cluster-manager/hub/grpc-server/clusterrolebinding.yaml",
 		"cluster-manager/hub/grpc-server/serviceaccount.yaml",
+	}
+
+	// grpcServiceFiles expose the grpc listener.
+	grpcServiceFiles = []string{
 		"cluster-manager/hub/grpc-server/service.yaml",
+	}
+
+	// spiffeServiceFiles expose the SPIFFE listener and give SPIFFE agents their pre-acceptance
+	// permission.
+	spiffeServiceFiles = []string{
+		"cluster-manager/hub/grpc-server/service-spiffe.yaml",
+		"cluster-manager/hub/grpc-server/spiffe-agent-clusterrole.yaml",
+		"cluster-manager/hub/grpc-server/spiffe-agent-clusterrolebinding.yaml",
 	}
 
 	// hubNetworkPolicyBaseFiles are always-on NetworkPolicy resources for open-cluster-management-hub.
@@ -124,9 +137,20 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		}
 	}
 
-	// Remove grpc server related resources if grpc auth is disabled
+	// Remove grpc server related resources if neither grpc nor spiffe is a registration driver,
+	// and each listener's Service when its driver is off.
+	var unused []string
+	if !config.GRPCServerEnabled {
+		unused = append(unused, grpcServerResourceFiles...)
+	}
 	if !config.GRPCAuthEnabled {
-		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, grpcServerResourceFiles...)
+		unused = append(unused, grpcServiceFiles...)
+	}
+	if !config.SPIFFEAuthEnabled {
+		unused = append(unused, spiffeServiceFiles...)
+	}
+	if len(unused) > 0 {
+		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, unused...)
 		if err != nil {
 			return cm, reconcileStop, err
 		}
@@ -188,8 +212,14 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 		hubResources = append(hubResources, workControllerResourceFiles...)
 	}
 
-	if config.GRPCAuthEnabled {
+	if config.GRPCServerEnabled {
 		hubResources = append(hubResources, grpcServerResourceFiles...)
+	}
+	if config.GRPCAuthEnabled {
+		hubResources = append(hubResources, grpcServiceFiles...)
+	}
+	if config.SPIFFEAuthEnabled {
+		hubResources = append(hubResources, spiffeServiceFiles...)
 	}
 
 	// the hubHostedWebhookServiceFiles are only used in hosted mode

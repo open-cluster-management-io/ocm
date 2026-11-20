@@ -144,6 +144,24 @@ const (
 	CSRAuthType = "csr"
 	// GRPCAuthType represents the authentication type that uses gRPC.
 	GRPCAuthType = "grpc"
+	// SPIFFEAuthType represents the authentication type that uses SPIRE-issued SPIFFE
+	// X.509-SVIDs over gRPC. OCM issues no certificate or token in this mode.
+	SPIFFEAuthType = "spiffe"
+)
+
+const (
+	// DefaultSPIFFEAgentIDTemplate is the default layout of Klusterlet agent SPIFFE IDs, from
+	// enhancement #199.
+	DefaultSPIFFEAgentIDTemplate = "spiffe://{trustDomain}/ocm/cluster/{cluster}/agent/{role}"
+	// DefaultSPIFFEAddOnAgentIDTemplate is the default layout of add-on agent SPIFFE IDs, from
+	// enhancement #199.
+	DefaultSPIFFEAddOnAgentIDTemplate = "spiffe://{trustDomain}/ocm/cluster/{cluster}/addon/{addon}/agent/{agent}"
+)
+
+const (
+	// GRPCSPIFFEProtocol is the endpoint exposure protocol of the separate gRPC listener used
+	// by the spiffe registration driver.
+	GRPCSPIFFEProtocol = "grpc-spiffe"
 )
 
 // AwsCredentialSource selects how the awsirsa registration driver obtains AWS credentials.
@@ -168,13 +186,14 @@ const (
 	CSRUsernameAnnotation = "open-cluster-management.io/csr-user"
 )
 
+// +kubebuilder:validation:XValidation:rule="self.authType != 'spiffe' || has(self.spiffe)",message="spiffe is required when authType is spiffe"
 type RegistrationDriverHub struct {
 
 	// authType is the type of the authentication used by hub to initialize the Hub cluster.
-	// Possible values are csr, awsirsa and grpc.
+	// Possible values are csr, awsirsa, grpc and spiffe.
 	// +required
 	// +kubebuilder:default:=csr
-	// +kubebuilder:validation:Enum=csr;awsirsa;grpc
+	// +kubebuilder:validation:Enum=csr;awsirsa;grpc;spiffe
 	AuthType string `json:"authType,omitempty"`
 
 	// csr represents the configuration for csr driver.
@@ -188,6 +207,114 @@ type RegistrationDriverHub struct {
 	// grpc represents the configuration for gRPC driver.
 	// +optional
 	GRPC *GRPCRegistrationConfig `json:"grpc,omitempty"`
+
+	// spiffe represents the configuration for the spiffe driver. It is required when
+	// authType is spiffe. Effective only when the SPIFFERegistration feature gate is enabled.
+	// +optional
+	SPIFFE *SPIFFERegistrationConfig `json:"spiffe,omitempty"`
+}
+
+// SPIFFERegistrationConfig configures the spiffe registration driver on the hub. Agents
+// authenticate with SPIRE-issued X.509-SVIDs; nothing here is secret.
+type SPIFFERegistrationConfig struct {
+	// trustDomain is the hub's own SPIFFE trust domain, for example ocm-hub.example.org. The
+	// hub gRPC server's SVID is in it. Agents may be in other trust domains; see
+	// agentTrustDomains.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:Pattern=`^[a-z0-9._-]+$`
+	TrustDomain string `json:"trustDomain"`
+
+	// agentTrustDomains are the trust domains the hub accepts Klusterlet and add-on agents
+	// from. An agent whose SVID comes from any other trust domain is refused. Each managed
+	// cluster is pinned to one of them with the open-cluster-management.io/spiffe-trust-domain
+	// annotation. The hub's SPIRE must federate with every trust domain listed here other than
+	// its own. The hub's own trustDomain is always accepted, whether or not it is listed here;
+	// if this is empty, only trustDomain is accepted. GetAgentTrustDomains returns the full set.
+	// +optional
+	// +listType=set
+	// +kubebuilder:validation:MaxItems=64
+	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=255
+	// +kubebuilder:validation:items:Pattern=`^[a-z0-9._-]+$`
+	AgentTrustDomains []string `json:"agentTrustDomains,omitempty"`
+
+	// agentIDTemplate is the layout of Klusterlet agent SPIFFE IDs. The hub reads the cluster
+	// name and the agent role from an agent's SPIFFE ID with it. It must start with
+	// spiffe://{trustDomain}/, where {trustDomain} stands for any of the accepted agent trust
+	// domains. Path placeholders: {cluster} and {role} (required; role is registration, work or
+	// klusterlet) and {namespace} (optional; the namespace the agent runs in, never used for
+	// authorization). Each placeholder fills a whole path segment and appears at most once, and
+	// at least one segment is fixed text. The Klusterlets must use the same template. The
+	// cluster-manager operator checks these rules and otherwise sets Applied to False with reason
+	// InvalidSPIFFEConfiguration.
+	// +optional
+	// +kubebuilder:default:="spiffe://{trustDomain}/ocm/cluster/{cluster}/agent/{role}"
+	// +kubebuilder:validation:MaxLength=512
+	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$`
+	AgentIDTemplate string `json:"agentIDTemplate,omitempty"`
+
+	// addOnAgentIDTemplate is the layout of add-on agent SPIFFE IDs. Path placeholders:
+	// {cluster}, {addon} and {agent} (required) and {namespace} (optional; the add-on's install
+	// namespace, never used for authorization). The rules of agentIDTemplate apply, and no
+	// SPIFFE ID may match both templates. The Klusterlets must use the same template.
+	// +optional
+	// +kubebuilder:default:="spiffe://{trustDomain}/ocm/cluster/{cluster}/addon/{addon}/agent/{agent}"
+	// +kubebuilder:validation:MaxLength=512
+	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$`
+	AddOnAgentIDTemplate string `json:"addOnAgentIDTemplate,omitempty"`
+
+	// serverSPIFFEID is the SPIFFE ID the hub gRPC server presents to agents. It must be in
+	// trustDomain; the cluster-manager operator otherwise sets Applied to False with reason
+	// InvalidSPIFFEConfiguration.
+	// If it is not set, spiffe://<trustDomain>/ocm/hub/grpc-server is used.
+	// +optional
+	// +kubebuilder:validation:MaxLength=512
+	// +kubebuilder:validation:Pattern=`^spiffe://[a-z0-9._-]+(/([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,}))+$`
+	ServerSPIFFEID string `json:"serverSPIFFEID,omitempty"`
+
+	// workloadAPISocket is the address of the local SPIRE agent's Workload API, as mounted
+	// into the gRPC server pod by the SPIFFE CSI driver.
+	// +optional
+	// +kubebuilder:default:="unix:///spiffe-workload-api/spire-agent.sock"
+	WorkloadAPISocket string `json:"workloadAPISocket,omitempty"`
+
+	// maxSVIDLifetime must be at least the longest SVID TTL SPIRE issues to OCM agents, in any
+	// of agentTrustDomains. When a ManagedCluster is deleted, the hub keeps it terminating for
+	// this long plus maxClockSkew, so no SVID issued before the deletion can recreate it.
+	// +optional
+	// +kubebuilder:default:="24h"
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:MaxLength=24
+	// +kubebuilder:validation:Pattern="^([0-9]{1,5}(s|m|h))+$"
+	// +kubebuilder:validation:XValidation:rule="duration(self) <= duration('99999h')",message="must be at most 99999h"
+	MaxSVIDLifetime *metav1.Duration `json:"maxSVIDLifetime,omitempty"`
+
+	// maxClockSkew is the allowed clock difference between the hub and the SPIRE servers of
+	// every trust domain. It is used by the SVID validity check and added to the delete
+	// guard's wait.
+	// +optional
+	// +kubebuilder:default:="5m"
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:MaxLength=24
+	// +kubebuilder:validation:Pattern="^([0-9]{1,5}(s|m|h))+$"
+	// +kubebuilder:validation:XValidation:rule="duration(self) <= duration('99999h')",message="must be at most 99999h"
+	MaxClockSkew *metav1.Duration `json:"maxClockSkew,omitempty"`
+
+	// autoApprovedIdentities are the SPIFFE IDs whose clusters are accepted automatically, as
+	// autoApprovedIdentities of the csr and grpc drivers are for their users. It applies only
+	// with the ManagedClusterAutoApproval feature gate, and only to a cluster's first join: the
+	// cluster is accepted if the SPIFFE ID of the agent that created it matches an entry. An
+	// entry is a SPIFFE ID in which "*" matches one whole path segment, for example
+	// spiffe://ocm-hub.example.org/ocm/cluster/*/agent/registration. With no entry, clusters
+	// of the spiffe driver are never accepted automatically.
+	// +optional
+	// +listType=set
+	// +kubebuilder:validation:MaxItems=64
+	// +kubebuilder:validation:items:MaxLength=512
+	// +kubebuilder:validation:items:Pattern=`^spiffe://[a-z0-9._-]+(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\*))+$`
+	AutoApprovedIdentities []string `json:"autoApprovedIdentities,omitempty"`
 }
 
 type ServerConfiguration struct {
@@ -208,13 +335,16 @@ type EndpointExposure struct {
 	// +optional
 	Usage string `json:"usage,omitempty"`
 
-	// protocol is the protocol used for the endpoint, could be https or grpc.
+	// protocol is the protocol used for the endpoint, could be https, grpc or grpc-spiffe.
+	// grpc-spiffe is the separate gRPC listener of the spiffe registration driver; its
+	// exposure is configured in the grpc field.
 	// +kubebuilder:default:=grpc
-	// +kubebuilder:validation:Enum=grpc;https
+	// +kubebuilder:validation:Enum=grpc;https;grpc-spiffe
 	// +required
 	Protocol string `json:"protocol"`
 
-	// grpc represents the configuration for grpc endpoint.
+	// grpc represents the configuration for grpc endpoint. It is also used for the
+	// grpc-spiffe endpoint.
 	GRPC *Endpoint `json:"grpc,omitempty"`
 
 	// https represents the configuration for https endpoint.
@@ -262,6 +392,29 @@ type LoadBalancerConfig struct {
 	// CABundle is a customized caBundle of the endpoint.
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty"`
+
+	// Service customizes the LoadBalancer Service generated by the operator.
+	// +optional
+	Service *LoadBalancerServiceConfig `json:"service,omitempty"`
+}
+
+// LoadBalancerServiceConfig customizes the generated LoadBalancer Service.
+type LoadBalancerServiceConfig struct {
+	// Metadata customizes the metadata of the generated Service.
+	// +optional
+	Metadata *LoadBalancerServiceMetadata `json:"metadata,omitempty"`
+}
+
+// LoadBalancerServiceMetadata defines the metadata applied to the generated LoadBalancer Service.
+type LoadBalancerServiceMetadata struct {
+	// Annotations are added to the generated Service. For example, on AWS,
+	// "service.beta.kubernetes.io/aws-load-balancer-scheme: internal" creates an internal load balancer.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Labels are added to the generated Service.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // RouteConfig references customized configuration for Route type.

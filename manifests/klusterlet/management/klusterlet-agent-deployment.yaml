@@ -24,6 +24,9 @@ spec:
         {{ end }}
       labels:
         app: klusterlet-agent
+        {{if eq .RegistrationDriver.AuthType "spiffe"}}
+        open-cluster-management.io/spiffe-role: klusterlet
+        {{end}}
         {{ if gt (len .Labels) 0 }}
         {{ range $key, $value := .Labels }}
         "{{ $key }}": "{{ $value }}"
@@ -65,6 +68,7 @@ spec:
           - "/registration-operator"
           - "agent"
           - "--spoke-cluster-name={{ .ClusterName }}"
+          {{if ne .RegistrationDriver.AuthType "spiffe"}}
           {{if .MultipleHubs}}
           {{range .BootStrapKubeConfigSecrets}}
           - "--bootstrap-kubeconfigs=/spoke/{{.}}/kubeconfig"
@@ -73,11 +77,14 @@ spec:
           {{else}}
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
           {{end}}
+          {{end}}
           - "--agent-id={{ .AgentID }}"
           {{if .HubClusterName}}
           - "--hub-cluster-name={{ .HubClusterName }}"
           {{end}}
-          {{if eq .RegistrationDriver.AuthType "grpc"}}
+          {{if eq .RegistrationDriver.AuthType "spiffe"}}
+          - "--cloudevents-client-id={{ .ClusterName }}-klusterlet-agent"
+          {{else if eq .RegistrationDriver.AuthType "grpc"}}
           - "--workload-source-driver=grpc"
           - "--workload-source-config=/spoke/hub-kubeconfig/config.yaml"
           - "--cloudevents-client-id={{ .ClusterName }}-klusterlet-agent"
@@ -160,6 +167,15 @@ spec:
           - "--grpc-bootstrap-config=/spoke/bootstrap/config.yaml"
           - "--grpc-config=/spoke/hub-kubeconfig/config.yaml"
           {{end}}
+          {{if eq .RegistrationDriver.AuthType "spiffe"}}
+          - "--registration-auth=spiffe"
+          - "--spiffe-hub-endpoint={{ .SPIFFEHubEndpoint }}"
+          - "--spiffe-hub-id={{ .SPIFFEHubID }}"
+          - "--spiffe-agent-id={{ .SPIFFEKlusterletAgentID }}"
+          - "--spiffe-trust-domain={{ .SPIFFETrustDomain }}"
+          - "--spiffe-addon-agent-id-template={{ .SPIFFEAddOnAgentIDTemplate }}"
+          - "--spiffe-workload-api-socket={{ .SPIFFEWorkloadAPISocket }}"
+          {{end}}
           {{if .TLSMinVersion}}
           - "--tls-min-version={{ .TLSMinVersion }}"
           {{end}}
@@ -180,6 +196,7 @@ spec:
           runAsNonRoot: true
           readOnlyRootFilesystem: true
         volumeMounts:
+        {{if ne .RegistrationDriver.AuthType "spiffe"}}
         {{if .MultipleHubs}}
         {{range .BootStrapKubeConfigSecrets}}
         - name: {{.}}
@@ -189,6 +206,12 @@ spec:
         {{else}}
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"
+          readOnly: true
+        {{end}}
+        {{end}}
+        {{if eq .RegistrationDriver.AuthType "spiffe"}}
+        - name: spiffe-workload-api
+          mountPath: /spiffe-workload-api
           readOnly: true
         {{end}}
         - name: hub-kubeconfig
@@ -249,6 +272,7 @@ spec:
       priorityClassName: "{{ .PriorityClassName }}"
       {{- end }}
       volumes:
+      {{if ne .RegistrationDriver.AuthType "spiffe"}}
       {{if .MultipleHubs}}
       {{range .BootStrapKubeConfigSecrets}}
       - name: {{.}}
@@ -259,6 +283,15 @@ spec:
       - name: bootstrap-secret
         secret:
           secretName: {{ .BootStrapKubeConfigSecret }}
+      {{end}}
+      {{end}}
+      {{if eq .RegistrationDriver.AuthType "spiffe"}}
+      # The local SPIRE agent's Workload API. The agent's SVID comes from it and stays in memory;
+      # no Secret holds a hub credential.
+      - name: spiffe-workload-api
+        csi:
+          driver: csi.spiffe.io
+          readOnly: true
       {{end}}
       - name: hub-kubeconfig
         emptyDir:

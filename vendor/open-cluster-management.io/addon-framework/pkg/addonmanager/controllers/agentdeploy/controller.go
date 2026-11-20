@@ -102,7 +102,7 @@ func NewAddonDeployControllerWithOptions(
 		managedClusterAddonLister:  addonInformers.Lister(),
 		managedClusterAddonIndexer: addonInformers.Informer().GetIndexer(),
 		workIndexer:                workInformers.Informer().GetIndexer(),
-		agentAddons:                agentAddons,
+		agentAddons:                withSPIFFE(agentAddons),
 		mcaFilterFunc:              mcaFilterFunc,
 	}
 	for _, option := range options {
@@ -586,4 +586,14 @@ func (c *addonDeployController) buildHookManifestWorkFunc(addonWorkBuilder *addo
 		}
 		return hookWork, nil
 	}
+}
+
+// withSPIFFE wraps every add-on so that its manifests are adapted to clusters whose add-ons use
+// the spiffe driver.
+func withSPIFFE(agentAddons map[string]agent.AgentAddon) map[string]agent.AgentAddon {
+	wrapped := make(map[string]agent.AgentAddon, len(agentAddons))
+	for name, a := range agentAddons {
+		wrapped[name] = agent.WithSPIFFE(a)
+	}
+	return wrapped
 }

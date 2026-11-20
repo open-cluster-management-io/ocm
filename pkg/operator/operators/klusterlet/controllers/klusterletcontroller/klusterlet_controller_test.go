@@ -194,12 +194,14 @@ func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, recor
 			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](fakeOperatorClient.OperatorV1().Klusterlets()),
 		kubeClient:        fakeKubeClient,
 		klusterletLister:  operatorInformers.Operator().V1().Klusterlets().Lister(),
+		klusterletClient:  fakeOperatorClient.OperatorV1().Klusterlets(),
 		kubeVersion:       kubeVersion,
 		operatorNamespace: "open-cluster-management",
 		cache:             resourceapply.NewResourceCache(),
 		managedClusterClientsBuilder: newManagedClusterClientsBuilder(fakeKubeClient, fakeAPIExtensionClient,
 			fakeWorkClient.WorkV1().AppliedManifestWorks()),
 		enableSyncLabels: enableSyncLabels,
+		spiffeWatch:      newSPIFFEAdmissionWatch(fakeKubeClient, operatorInformers.Operator().V1().Klusterlets().Lister()),
 	}
 
 	cleanupController := &klusterletCleanupController{
@@ -289,6 +291,7 @@ func newTestControllerHosted(
 			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](fakeOperatorClient.OperatorV1().Klusterlets()),
 		kubeClient:        fakeKubeClient,
 		klusterletLister:  operatorInformers.Operator().V1().Klusterlets().Lister(),
+		klusterletClient:  fakeOperatorClient.OperatorV1().Klusterlets(),
 		kubeVersion:       kubeVersion,
 		operatorNamespace: "open-cluster-management",
 		cache:             resourceapply.NewResourceCache(),
@@ -297,6 +300,7 @@ func newTestControllerHosted(
 			fakeAPIExtensionClient: fakeManagedAPIExtensionClient,
 			fakeKubeClient:         fakeManagedKubeClient,
 		},
+		spiffeWatch: newSPIFFEAdmissionWatch(fakeKubeClient, operatorInformers.Operator().V1().Klusterlets().Lister()),
 	}
 	cleanupController := &klusterletCleanupController{
 		patcher: patcher.NewPatcher[

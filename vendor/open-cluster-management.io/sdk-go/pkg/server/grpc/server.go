@@ -33,6 +33,10 @@ type GRPCServer struct {
 	authenticators    []authn.Authenticator
 	unaryAuthorizers  []authz.UnaryAuthorizer
 	streamAuthorizers []authz.StreamAuthorizer
+	// creds, when set, replaces the TLS setup from TLSCertFile, TLSKeyFile and ClientCAFile.
+	creds       credentials.TransportCredentials
+	extraUnary  []grpc.UnaryServerInterceptor
+	extraStream []grpc.StreamServerInterceptor
 }
 
 func NewGRPCServer(opt *GRPCServerOptions) *GRPCServer {
@@ -66,6 +70,22 @@ func (b *GRPCServer) WithStreamAuthorizer(authorizer authz.StreamAuthorizer) *GR
 	return b
 }
 
+// WithTransportCredentials makes the server use creds instead of building TLS from
+// TLSCertFile, TLSKeyFile and ClientCAFile. The TLS version and cipher options don't apply
+// then; creds own the TLS config. The SPIFFE listener uses this with credentials from the
+// Workload API.
+func (b *GRPCServer) WithTransportCredentials(creds credentials.TransportCredentials) *GRPCServer {
+	b.creds = creds
+	return b
+}
+
+// WithInterceptors appends interceptors that run after authentication and authorization.
+func (b *GRPCServer) WithInterceptors(unary []grpc.UnaryServerInterceptor, stream []grpc.StreamServerInterceptor) *GRPCServer {
+	b.extraUnary = append(b.extraUnary, unary...)
+	b.extraStream = append(b.extraStream, stream...)
+	return b
+}
+
 func (b *GRPCServer) Run(ctx context.Context) error {
 	if err := b.options.Validate(); err != nil {
 		return err
@@ -88,51 +108,14 @@ func (b *GRPCServer) Run(ctx context.Context) error {
 		Timeout:          b.options.ServerPingTimeout,
 	}))
 
-	// Set textlogger with verbosity level 4 for controller-runtime logging
-	log.SetLogger(textlogger.NewLogger(textlogger.NewConfig(textlogger.Verbosity(4))))
-	// Serve with TLS - use certwatcher for dynamic certificate reloading
-	certWatcher, err := certwatcher.New(b.options.TLSCertFile, b.options.TLSKeyFile)
-	if err != nil {
-		return fmt.Errorf("failed to create certificate watcher: %v", err)
-	}
-
-	// Configure watch interval from options (default is 1 minute, configurable via --grpc-cert-watch-interval flag or YAML config)
-	certWatcher.WithWatchInterval(b.options.CertWatchInterval)
-
-	// This uses fsnotify for immediate detection + polling fallback
-	go func() {
-		if err := certWatcher.Start(ctx); err != nil {
-			klog.FromContext(ctx).Error(err, "Certificate watcher stopped")
+	creds := b.creds
+	if creds == nil {
+		var err error
+		if creds, err = b.certFileCredentials(ctx); err != nil {
+			return err
 		}
-	}()
-
-	tlsConfig := &tls.Config{
-		// Use GetCertificate callback from certwatcher
-		// This allows dynamic certificate reloading on each TLS handshake
-		GetCertificate: certWatcher.GetCertificate,
-		MinVersion:     b.options.tlsMinVersion,
-		MaxVersion:     b.options.tlsMaxVersion,
 	}
-
-	// TLS 1.3 cipher suites are not configurable in Go — only set for TLS 1.2 and below.
-	if len(b.options.cipherSuiteIDs) > 0 && b.options.tlsMinVersion < tls.VersionTLS13 {
-		tlsConfig.CipherSuites = b.options.cipherSuiteIDs
-	}
-
-	if b.options.ClientCAFile != "" {
-		certPool := x509.NewCertPool()
-		caPEM, err := os.ReadFile(b.options.ClientCAFile)
-		if err != nil {
-			return fmt.Errorf("failed to read server client CA file: %v", err)
-		}
-		if ok := certPool.AppendCertsFromPEM(caPEM); !ok {
-			return fmt.Errorf("failed to append server client CA to cert pool")
-		}
-		tlsConfig.ClientCAs = certPool
-		tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
-	}
-
-	grpcServerOptions = append(grpcServerOptions, grpc.Creds(credentials.NewTLS(tlsConfig)))
+	grpcServerOptions = append(grpcServerOptions, grpc.Creds(creds))
 
 	// append the stats handler for metrics
 	grpcServerOptions = append(grpcServerOptions, grpc.StatsHandler(metrics.NewGRPCMetricsHandler()))
@@ -146,16 +129,16 @@ func (b *GRPCServer) Run(ctx context.Context) error {
 	)
 
 	grpcServerOptions = append(grpcServerOptions,
-		grpc.ChainUnaryInterceptor(
+		grpc.ChainUnaryInterceptor(append([]grpc.UnaryServerInterceptor{
 			metrics.NewGRPCMetricsUnaryInterceptor(promMiddleware),
 			newAuthnUnaryInterceptor(b.authenticators...),
 			newAuthzUnaryInterceptor(b.unaryAuthorizers...),
-		),
-		grpc.ChainStreamInterceptor(
+		}, b.extraUnary...)...),
+		grpc.ChainStreamInterceptor(append([]grpc.StreamServerInterceptor{
 			metrics.NewGRPCMetricsStreamInterceptor(promMiddleware),
 			newAuthnStreamInterceptor(b.authenticators...),
 			newAuthzStreamInterceptor(b.streamAuthorizers),
-		))
+		}, b.extraStream...)...))
 
 	grpcServer := grpc.NewServer(grpcServerOptions...)
 	// register all the general grpc server metrics
@@ -194,6 +177,52 @@ func (b *GRPCServer) Run(ctx context.Context) error {
 		// If Serve returns early with error, surface it
 		return err
 	}
+}
+
+// certFileCredentials builds TLS from TLSCertFile and TLSKeyFile, reloaded by a certificate
+// watcher, and an optional ClientCAFile.
+func (b *GRPCServer) certFileCredentials(ctx context.Context) (credentials.TransportCredentials, error) {
+	// Set textlogger with verbosity level 4 for controller-runtime logging
+	log.SetLogger(textlogger.NewLogger(textlogger.NewConfig(textlogger.Verbosity(4))))
+	// Serve with TLS - use certwatcher for dynamic certificate reloading
+	certWatcher, err := certwatcher.New(b.options.TLSCertFile, b.options.TLSKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create certificate watcher: %v", err)
+	}
+
+	// Configure watch interval from options (default is 1 minute, configurable via --grpc-cert-watch-interval flag or YAML config)
+	certWatcher.WithWatchInterval(b.options.CertWatchInterval)
+
+	// This uses fsnotify for immediate detection + polling fallback
+	go runCertWatcher(ctx, certWatcher)
+
+	tlsConfig := &tls.Config{
+		// Use GetCertificate callback from certwatcher
+		// This allows dynamic certificate reloading on each TLS handshake
+		GetCertificate: certWatcher.GetCertificate,
+		MinVersion:     b.options.tlsMinVersion,
+		MaxVersion:     b.options.tlsMaxVersion,
+	}
+
+	// TLS 1.3 cipher suites are not configurable in Go — only set for TLS 1.2 and below.
+	if len(b.options.cipherSuiteIDs) > 0 && b.options.tlsMinVersion < tls.VersionTLS13 {
+		tlsConfig.CipherSuites = b.options.cipherSuiteIDs
+	}
+
+	if b.options.ClientCAFile != "" {
+		certPool := x509.NewCertPool()
+		caPEM, err := os.ReadFile(b.options.ClientCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read server client CA file: %v", err)
+		}
+		if ok := certPool.AppendCertsFromPEM(caPEM); !ok {
+			return nil, fmt.Errorf("failed to append server client CA to cert pool")
+		}
+		tlsConfig.ClientCAs = certPool
+		tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
+	}
+
+	return credentials.NewTLS(tlsConfig), nil
 }
 
 func newAuthnUnaryInterceptor(authenticators ...authn.Authenticator) grpc.UnaryServerInterceptor {
@@ -330,5 +359,12 @@ func newAuthzStreamInterceptor(authorizers []authz.StreamAuthorizer) grpc.Stream
 		}
 
 		return status.Error(codes.Unauthenticated, fmt.Sprintf("no authorizer found for %s", info.FullMethod))
+	}
+}
+
+// runCertWatcher runs the certificate watcher until ctx ends, and logs why it stopped early.
+func runCertWatcher(ctx context.Context, w interface{ Start(context.Context) error }) {
+	if err := w.Start(ctx); err != nil {
+		klog.FromContext(ctx).Error(err, "Certificate watcher stopped")
 	}
 }

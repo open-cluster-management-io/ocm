@@ -6,7 +6,7 @@
 #
 # Covers:
 #   - registration/work/addon webhooks (apiserver admission calls)
-#   - grpc-server (spoke cluster connections, ports 8090/443)
+#   - grpc-server (spoke cluster connections, ports 8090/443; SPIFFE listener 8091)
 #   - placement debug server (port 9443)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -35,6 +35,8 @@ spec:
         - port: {{ .AddonWebhook.Port }}
           protocol: TCP
         - port: 8090
+          protocol: TCP
+        - port: 8091
           protocol: TCP
         - port: 443
           protocol: TCP

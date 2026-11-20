@@ -102,10 +102,14 @@ func (r *runtimeReconcile) installAgent(ctx context.Context, klusterlet *operato
 	//   because we still need work agent running even though the hub kubconfig is missing some certain permission.
 	//   It can ensure work agent to clean up the resources defined in manifestworks when cluster is detaching from the hub.
 	hubConnectionDegradedCondition := meta.FindStatusCondition(klusterlet.Status.Conditions, operatorapiv1.ConditionHubConnectionDegraded)
-	if hubConnectionDegradedCondition == nil {
+	switch {
+	case runtimeConfig.RegistrationDriver.AuthType == operatorapiv1.SPIFFEAuthType:
+		// The work agent has its own SVID and waits for it by itself; there is no hub kubeconfig
+		// Secret to wait for.
+	case hubConnectionDegradedCondition == nil:
 		workConfig.Replica = 0
-	} else if hubConnectionDegradedCondition.Status == metav1.ConditionTrue &&
-		strings.Contains(hubConnectionDegradedCondition.Reason, operatorapiv1.ReasonHubKubeConfigSecretMissing) {
+	case hubConnectionDegradedCondition.Status == metav1.ConditionTrue &&
+		strings.Contains(hubConnectionDegradedCondition.Reason, operatorapiv1.ReasonHubKubeConfigSecretMissing):
 		workConfig.Replica = 0
 	}
 

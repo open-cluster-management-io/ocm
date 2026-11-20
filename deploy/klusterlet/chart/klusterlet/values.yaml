@@ -129,6 +129,11 @@ externalManagedKubeConfig: ""
 # only install the klusterlet CR if set true.
 noOperator: false
 
+# Grant the operator the permissions of the spiffe registration driver (the klusterlet-spiffe
+# ClusterRole). They are granted anyway when klusterlet.registrationConfiguration uses the spiffe
+# driver; set this when the spiffe Klusterlet is created outside this chart.
+enableSPIFFE: false
+
 # priorityClassName is the name of the PriorityClass used by the klusterlet and operator
 priorityClassName: ""
 

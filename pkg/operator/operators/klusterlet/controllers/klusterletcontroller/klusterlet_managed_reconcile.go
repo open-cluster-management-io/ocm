@@ -61,11 +61,15 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 		// For now, whether in Default or Hosted mode, the addons will be deployed on the managed cluster.
 		// sync image pull secret from management cluster to managed cluster for addon namespace
 		// Ensure the addon namespace on the managed cluster
-		if err := ensureNamespace(
-			ctx,
-			r.managedClusterClients.kubeClient,
-			klusterlet, helpers.DefaultAddonNamespace, labels, r.recorder); err != nil {
-			return klusterlet, reconcileStop, err
+		// With the spiffe driver, the add-on namespace is created with its dedicated label by the
+		// SPIFFE admission reconcile, and never labeled when it already exists.
+		if config.RegistrationDriver.AuthType != operatorapiv1.SPIFFEAuthType {
+			if err := ensureNamespace(
+				ctx,
+				r.managedClusterClients.kubeClient,
+				klusterlet, helpers.DefaultAddonNamespace, labels, r.recorder); err != nil {
+				return klusterlet, reconcileStop, err
+			}
 		}
 
 		// Sync pull secret to the klusterlet addon namespace

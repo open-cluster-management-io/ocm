@@ -18,6 +18,7 @@ import (
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -190,7 +191,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: "test-install-namespace",
+					AgentInstallNamespace: ptr.To("test-install-namespace"),
 					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
@@ -292,7 +293,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: "test-install-namespace",
+					AgentInstallNamespace: ptr.To("test-install-namespace"),
 					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
@@ -515,7 +516,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: "test-install-namespace",
+					AgentInstallNamespace: ptr.To("test-install-namespace"),
 					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
@@ -744,7 +745,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: "test-install-namespace",
+					AgentInstallNamespace: ptr.To("test-install-namespace"),
 				},
 			},
 			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
@@ -855,7 +856,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: "test-install-namespace",
+					AgentInstallNamespace: ptr.To("test-install-namespace"),
 				},
 			},
 			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
@@ -890,7 +891,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: "",
+					AgentInstallNamespace: ptr.To(""),
 					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",

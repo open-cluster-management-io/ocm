@@ -2,23 +2,30 @@ package klusterletcontroller
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
@@ -30,6 +37,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
+	"open-cluster-management.io/sdk-go/pkg/spiffe/idtemplate"
 	sdktls "open-cluster-management.io/sdk-go/pkg/tls"
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
@@ -46,6 +54,11 @@ const (
 	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 	klusterletNamespaceLabelKey           = "operator.open-cluster-management.io/klusterlet"
 )
+
+// KlusterletNameClusterAnnotation is the ManagedCluster annotation in which a spiffe registration
+// agent reports its Klusterlet's name. The add-on framework reads it as
+// agent.KlusterletNameAnnotation.
+const KlusterletNameClusterAnnotation = "agent.open-cluster-management.io/klusterlet-name"
 
 // buildClusterAnnotationsString renders the ClusterAnnotations map into the
 // comma-separated "key1=value1,key2=value2" form consumed by the registration
@@ -76,6 +89,7 @@ func buildClusterLabelsString(labels map[string]string) string {
 type klusterletController struct {
 	patcher                       patcher.Patcher[*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus]
 	klusterletLister              operatorlister.KlusterletLister
+	klusterletClient              operatorv1client.KlusterletInterface
 	kubeClient                    kubernetes.Interface
 	kubeVersion                   *version.Version
 	operatorNamespace             string
@@ -85,6 +99,12 @@ type klusterletController struct {
 	deploymentReplicas            int32
 	disableAddonNamespace         bool
 	enableSyncLabels              bool
+	// spiffeWatch watches the spiffe driver's admission objects once a Klusterlet uses them.
+	spiffeWatch *spiffeAdmissionWatch
+	// spiffeWebhook serves the ValidatingWebhook enforcement once a Klusterlet uses it.
+	spiffeWebhook *spiffeWebhookServer
+	// spiffeWrites are the operator's own changes to the SPIFFE admission objects.
+	spiffeWrites *ownWrites
 }
 
 type klusterletReconcile interface {
@@ -119,6 +139,7 @@ func NewKlusterletController(
 		patcher: patcher.NewPatcher[
 			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient),
 		klusterletLister:              klusterletInformer.Lister(),
+		klusterletClient:              klusterletClient,
 		kubeVersion:                   kubeVersion,
 		operatorNamespace:             operatorNamespace,
 		cache:                         resourceapply.NewResourceCache(),
@@ -128,6 +149,9 @@ func NewKlusterletController(
 		disableAddonNamespace:         disableAddonNamespace,
 		enableSyncLabels:              enableSyncLabels,
 	}
+	controller.spiffeWatch = newSPIFFEAdmissionWatch(kubeClient, controller.klusterletLister)
+	controller.spiffeWebhook = newSPIFFEWebhookServer(operatorNamespace)
+	controller.spiffeWrites = newOwnWrites()
 
 	return factory.New().WithSync(controller.sync).
 		WithInformersQueueKeysFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
@@ -259,6 +283,23 @@ type klusterletConfig struct {
 	NetworkPoliciesEnabled bool
 	TLSMinVersion          string
 	TLSCipherSuites        string
+
+	// The spiffe registration driver's settings. The agents' SPIFFE IDs are rendered from the
+	// Klusterlet's agentIDTemplate; only the roles of the install mode are set.
+	SPIFFEHubEndpoint         string
+	SPIFFEHubID               string
+	SPIFFEWorkloadAPISocket   string
+	SPIFFERegistrationAgentID string
+	SPIFFEWorkAgentID         string
+	SPIFFEKlusterletAgentID   string
+	// SPIFFEWebhookID is the SPIFFE ID the operator's webhook serves with.
+	SPIFFEWebhookID string
+	// SPIFFEAdmissionEnforcement is the Klusterlet's admissionEnforcement; empty lets the operator
+	// choose by what the cluster serves.
+	SPIFFEAdmissionEnforcement operatorapiv1.SPIFFEAdmissionEnforcement
+	// The registration agent renders add-on agents' IDs from these.
+	SPIFFETrustDomain          string
+	SPIFFEAddOnAgentIDTemplate string
 }
 
 // If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.
@@ -295,6 +336,21 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return err
 	}
 	klusterlet := originalKlusterlet.DeepCopy()
+
+	// The spiffe driver supports only the Default and Singleton modes. Refuse the hosted modes
+	// before anything is rendered, also when the CRD's validation was skipped (an older CRD).
+	// A deleting Klusterlet is left to the cleanup controller.
+	if klusterlet.DeletionTimestamp.IsZero() && usesSPIFFE(klusterlet) &&
+		!SPIFFESupportsInstallMode(klusterlet.Spec.DeployOption.Mode) {
+		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
+			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse,
+			Reason: ReasonSPIFFEInstallModeNotSupported,
+			Message: fmt.Sprintf("registrationDriver.authType spiffe supports only the Default and Singleton install modes, "+
+				"not %s", klusterlet.Spec.DeployOption.Mode),
+		})
+		_, err := n.patcher.PatchStatus(ctx, klusterlet, klusterlet.Status, originalKlusterlet.Status)
+		return err
+	}
 
 	resourceRequirements, err := helpers.ResourceRequirements(ctx, klusterlet)
 	if err != nil {
@@ -441,6 +497,22 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			}
 		}
 
+		if config.RegistrationDriver.AuthType == operatorapiv1.SPIFFEAuthType {
+			agentIDs, err := fillSPIFFEConfig(&config, klusterlet)
+			if err != nil {
+				// Render no agents with an identity the hub would refuse.
+				meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
+					Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse,
+					Reason: ReasonInvalidSPIFFEConfiguration, Message: err.Error()})
+				_, updatedErr := n.patcher.PatchStatus(ctx, klusterlet, klusterlet.Status, originalKlusterlet.Status)
+				return updatedErr
+			}
+			if klusterlet.Status.SPIFFE == nil {
+				klusterlet.Status.SPIFFE = &operatorapiv1.KlusterletSPIFFEStatus{}
+			}
+			klusterlet.Status.SPIFFE.AgentIDs = agentIDs
+		}
+
 		// include clusterClaimConfig info if it exists
 		if klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration != nil {
 			config.MaxCustomClusterClaims = int(klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.MaxCustomClusterClaims)
@@ -448,7 +520,17 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 				klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.ReservedClusterClaimSuffixes, ",")
 		}
 
-		config.ClusterAnnotationsString = buildClusterAnnotationsString(klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations)
+		clusterAnnotations := klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations
+		if config.RegistrationDriver.AuthType == operatorapiv1.SPIFFEAuthType {
+			// The add-on manager labels dedicated add-on namespaces with the Klusterlet's name,
+			// which the admission policy matches; the agent reports it on the ManagedCluster.
+			clusterAnnotations = maps.Clone(clusterAnnotations)
+			if clusterAnnotations == nil {
+				clusterAnnotations = map[string]string{}
+			}
+			clusterAnnotations[KlusterletNameClusterAnnotation] = klusterlet.Name
+		}
+		config.ClusterAnnotationsString = buildClusterAnnotationsString(clusterAnnotations)
 		config.ClusterLabelsString = buildClusterLabelsString(klusterlet.Spec.RegistrationConfiguration.ClusterLabels)
 
 		// Set AddOnKubeClientRegistrationAuth from the Klusterlet spec
@@ -505,6 +587,19 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			managedClusterClients: managedClusterClients,
 			recorder:              controllerContext.Recorder(),
 			cache:                 n.cache},
+		// Before anything agent-related: with the spiffe driver, no agent runs until the operator
+		// trusts the agent and add-on namespaces.
+		&spiffeAdmissionReconcile{
+			managedClusterClients: managedClusterClients,
+			kubeClient:            n.kubeClient,
+			spiffeWorkAgents:      n.spiffeWorkAgents,
+			spiffeEnforcements:    spiffeEnforcementsFrom(n.klusterletLister),
+			watch:                 n.spiffeWatch,
+			queue:                 controllerContext.Queue(),
+			webhook:               n.spiffeWebhook,
+			storeStatus:           n.storeSPIFFEStatus,
+			writes:                n.spiffeWrites,
+		},
 		&managedReconcile{
 			managedClusterClients: managedClusterClients,
 			kubeClient:            n.kubeClient,
@@ -531,10 +626,18 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	var errs []error
+	// pending is set when a reconciler stops the pass to come back later (the SPIFFE admission
+	// reconcile, while the webhook, a switch or recovery is in progress): the later reconcilers
+	// did not run, so nothing is reported Applied yet.
+	pending := false
 	for _, reconciler := range reconcilers {
 		var state reconcileState
 		klusterlet, state, err = reconciler.reconcile(ctx, klusterlet, config)
-		if err != nil {
+		var rqe commonhelpers.RequeueError
+		if stderrors.As(err, &rqe) {
+			controllerContext.Queue().AddAfter(klusterletName, rqe.RequeueTime)
+			pending = state == reconcileStop
+		} else if err != nil {
 			errs = append(errs, err)
 		}
 		if state == reconcileStop {
@@ -544,7 +647,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	klusterlet.Status.ObservedGeneration = klusterlet.Generation
 
-	if len(errs) == 0 {
+	if len(errs) == 0 && !pending {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionTrue, Reason: operatorapiv1.ReasonKlusterletApplied,
 			Message: "Klusterlet Component Applied"})
@@ -556,10 +659,59 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	// If we get here, we have successfully applied everything.
 	_, updatedErr := n.patcher.PatchStatus(ctx, klusterlet, klusterlet.Status, originalKlusterlet.Status)
+	if errors.IsConflict(updatedErr) && spiffeStatusChanged(originalKlusterlet, klusterlet) {
+		// Other controllers write the status too. The SPIFFE admission record must not be lost:
+		// a lost record makes the next pass run recovery again and distrust the add-on namespace
+		// it just created.
+		updatedErr = n.storeSPIFFEStatus(ctx, klusterlet)
+	}
 	if updatedErr != nil {
 		errs = append(errs, updatedErr)
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+// spiffeConditionTypes are the conditions the SPIFFE admission reconcile owns.
+var spiffeConditionTypes = []string{operatorapiv1.ConditionSPIFFEAdmissionReady, ConditionAddOnNamespaceNotDedicated}
+
+func spiffeStatusChanged(old, updated *operatorapiv1.Klusterlet) bool {
+	if !equality.Semantic.DeepEqual(old.Status.SPIFFE, updated.Status.SPIFFE) {
+		return true
+	}
+	for _, t := range spiffeConditionTypes {
+		if !equality.Semantic.DeepEqual(meta.FindStatusCondition(old.Status.Conditions, t),
+			meta.FindStatusCondition(updated.Status.Conditions, t)) {
+			return true
+		}
+	}
+	return false
+}
+
+// storeSPIFFEStatus writes only the SPIFFE status fields onto the latest Klusterlet, retrying on
+// conflicts. The other fields are left to the next sync.
+func (n *klusterletController) storeSPIFFEStatus(ctx context.Context, desired *operatorapiv1.Klusterlet) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		latest, err := n.klusterletClient.Get(ctx, desired.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if latest.UID != desired.UID {
+			// The Klusterlet was replaced; the record belongs to the old one. The new one is
+			// reconciled from its own state.
+			return nil
+		}
+		status := latest.Status.DeepCopy()
+		status.SPIFFE = desired.Status.SPIFFE.DeepCopy()
+		for _, t := range spiffeConditionTypes {
+			if c := meta.FindStatusCondition(desired.Status.Conditions, t); c != nil {
+				meta.SetStatusCondition(&status.Conditions, *c)
+			} else {
+				meta.RemoveStatusCondition(&status.Conditions, t)
+			}
+		}
+		_, err = n.patcher.PatchStatus(ctx, latest, *status, latest.Status)
+		return err
+	})
 }
 
 // populateTLSConfig reads TLS configuration from ocm-tls-profile ConfigMap
@@ -676,4 +828,182 @@ func serviceAccountName(suffix string, klusterlet *operatorapiv1.Klusterlet) str
 		return fmt.Sprintf("%s-work-sa", klusterlet.Name)
 	}
 	return fmt.Sprintf("%s-%s", klusterlet.Name, suffix)
+}
+
+// ReasonInvalidSPIFFEConfiguration is the reason of a false Applied condition when the spiffe
+// driver's settings can't produce valid agent SPIFFE IDs.
+const ReasonInvalidSPIFFEConfiguration = "InvalidSPIFFEConfiguration"
+
+// ReasonSPIFFEInstallModeNotSupported is the reason of a false Applied condition when a Klusterlet
+// uses the spiffe driver in a hosted mode.
+const ReasonSPIFFEInstallModeNotSupported = "SPIFFEInstallModeNotSupported"
+
+// SPIFFESupportsInstallMode tells whether the spiffe driver supports the install mode: Default
+// (also when unset) and Singleton. Hosted and SingletonHosted are not
+// supported: their agents would need a stored credential for the managed cluster.
+func SPIFFESupportsInstallMode(mode operatorapiv1.InstallMode) bool {
+	return mode == "" || mode == operatorapiv1.InstallModeDefault || mode == operatorapiv1.InstallModeSingleton
+}
+
+func usesSPIFFE(klusterlet *operatorapiv1.Klusterlet) bool {
+	return klusterlet.Spec.RegistrationConfiguration != nil &&
+		klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == operatorapiv1.SPIFFEAuthType
+}
+
+// fillSPIFFEConfig fills the spiffe settings and renders each agent's SPIFFE ID from the
+// Klusterlet's agentIDTemplate. {trustDomain} is the agents' trust domain (spiffe.trustDomain, or
+// the trust domain of hubSPIFFEID), {cluster} the cluster name, {role} the agent's role, and
+// {namespace} the namespace the agent pods run in. It returns the IDs for status.spiffe.agentIDs.
+func fillSPIFFEConfig(config *klusterletConfig, klusterlet *operatorapiv1.Klusterlet) ([]operatorapiv1.SPIFFEAgentID, error) {
+	c := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.SPIFFE
+	if c == nil {
+		return nil, fmt.Errorf("spiffe is required when authType is spiffe")
+	}
+	if klusterlet.Spec.ClusterName == "" {
+		return nil, fmt.Errorf("clusterName is required when authType is spiffe")
+	}
+	switch c.AdmissionEnforcement {
+	case operatorapiv1.SPIFFEAdmissionValidatingAdmissionPolicy, operatorapiv1.SPIFFEAdmissionValidatingWebhook:
+	default:
+		// The CRD requires it; a Klusterlet created under an older CRD may lack it.
+		return nil, fmt.Errorf("admissionEnforcement %q: use ValidatingAdmissionPolicy (Kubernetes 1.30 or later) "+
+			"or ValidatingWebhook", c.AdmissionEnforcement)
+	}
+	hubID, err := spiffeid.FromString(c.HubSPIFFEID)
+	if err != nil {
+		return nil, fmt.Errorf("hubSPIFFEID %q: %w", c.HubSPIFFEID, err)
+	}
+	trustDomain := c.TrustDomain
+	if trustDomain == "" {
+		trustDomain = hubID.TrustDomain().Name()
+	}
+	agentTmpl, err := idtemplate.Compile(idtemplate.KindAgent, c.GetAgentIDTemplate())
+	if err != nil {
+		return nil, err
+	}
+	addOnTmpl, err := idtemplate.Compile(idtemplate.KindAddOnAgent, c.GetAddOnAgentIDTemplate())
+	if err != nil {
+		return nil, err
+	}
+	if idtemplate.Overlaps(agentTmpl, addOnTmpl) {
+		return nil, fmt.Errorf("agentIDTemplate %q and addOnAgentIDTemplate %q can match the same SPIFFE ID", agentTmpl, addOnTmpl)
+	}
+
+	roles := []string{"registration", "work"}
+	if helpers.IsSingleton(klusterlet.Spec.DeployOption.Mode) {
+		roles = []string{"klusterlet"}
+	}
+	var ids []operatorapiv1.SPIFFEAgentID
+	for _, role := range roles {
+		id, err := agentTmpl.Render(trustDomain, map[string]string{
+			idtemplate.Cluster:   klusterlet.Spec.ClusterName,
+			idtemplate.Role:      role,
+			idtemplate.Namespace: config.AgentNamespace,
+		})
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, operatorapiv1.SPIFFEAgentID{Role: role, SPIFFEID: id.String()})
+		switch role {
+		case "registration":
+			config.SPIFFERegistrationAgentID = id.String()
+		case "work":
+			config.SPIFFEWorkAgentID = id.String()
+		case "klusterlet":
+			config.SPIFFEKlusterletAgentID = id.String()
+		}
+	}
+
+	// The webhook of the ValidatingWebhook enforcement serves with the operator's SVID. The hub
+	// accepts no agent with the role operator, so that SVID can't act on the hub.
+	webhookID, err := agentTmpl.Render(trustDomain, map[string]string{
+		idtemplate.Cluster:   klusterlet.Spec.ClusterName,
+		idtemplate.Role:      spiffeWebhookRole,
+		idtemplate.Namespace: config.OperatorNamespace,
+	})
+	if err != nil {
+		return nil, err
+	}
+	config.SPIFFEWebhookID = webhookID.String()
+	config.SPIFFEAdmissionEnforcement = c.AdmissionEnforcement
+
+	config.SPIFFETrustDomain = trustDomain
+	config.SPIFFEAddOnAgentIDTemplate = addOnTmpl.String()
+	config.SPIFFEHubEndpoint = c.HubEndpoint
+	config.SPIFFEHubID = hubID.String()
+	config.SPIFFEWorkloadAPISocket = c.WorkloadAPISocket
+	if config.SPIFFEWorkloadAPISocket == "" {
+		config.SPIFFEWorkloadAPISocket = "unix:///spiffe-workload-api/spire-agent.sock"
+	}
+	return ids, nil
+}
+
+// spiffeWorkAgents maps every Klusterlet that uses the spiffe driver to its work agent's user on
+// the managed cluster, for the add-on namespace label policy.
+func (n *klusterletController) spiffeWorkAgents() (map[string]string, error) {
+	return spiffeWorkAgentsFrom(n.klusterletLister)
+}
+
+func spiffeWorkAgentsFrom(lister operatorlister.KlusterletLister) (map[string]string, error) {
+	klusterlets, err := lister.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	for _, k := range klusterlets {
+		if k.Spec.RegistrationConfiguration == nil ||
+			k.Spec.RegistrationConfiguration.RegistrationDriver.AuthType != operatorapiv1.SPIFFEAuthType {
+			continue
+		}
+		out[k.Name] = workAgentUser(helpers.KlusterletNamespace(k), serviceAccountName("work-sa", k))
+	}
+	return out, nil
+}
+
+// spiffeEnforcementsFrom maps every Klusterlet that uses the spiffe driver to the enforcement it
+// has on record, so a Klusterlet's removal keeps the shared namespace label object another one uses.
+func spiffeEnforcementsFrom(lister operatorlister.KlusterletLister) func() (map[string]operatorapiv1.SPIFFEAdmissionEnforcement, error) {
+	return func() (map[string]operatorapiv1.SPIFFEAdmissionEnforcement, error) {
+		klusterlets, err := lister.List(labels.Everything())
+		if err != nil {
+			return nil, err
+		}
+		out := map[string]operatorapiv1.SPIFFEAdmissionEnforcement{}
+		for _, k := range klusterlets {
+			if mode, _ := recordedEnforcement(k); mode != "" {
+				out[k.Name] = mode
+			}
+		}
+		return out, nil
+	}
+}
+
+// spiffeAdmissionQueueKeys maps a SPIFFE admission policy or binding to the Klusterlets it
+// belongs to, so that a change to it, for example its deletion, runs recovery at once rather than
+// at the next resync. The shared namespace label policy belongs to every spiffe Klusterlet.
+func spiffeAdmissionQueueKeys(lister operatorlister.KlusterletLister) func(runtime.Object) []string {
+	return func(obj runtime.Object) []string {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return nil
+		}
+		name := accessor.GetName()
+		for _, prefix := range []string{agentPolicyPrefix, addOnPolicyPrefix} {
+			if k, ok := strings.CutPrefix(name, prefix); ok {
+				return []string{k}
+			}
+		}
+		if name != namespaceLabelPolicyName {
+			return nil
+		}
+		agents, err := spiffeWorkAgentsFrom(lister)
+		if err != nil {
+			return nil
+		}
+		keys := make([]string, 0, len(agents))
+		for k := range agents {
+			keys = append(keys, k)
+		}
+		return keys
+	}
 }

@@ -108,13 +108,10 @@ func TestAgentConfigFields(t *testing.T) {
 		t.Error("workConfig should not be nil")
 	}
 
-	// Test HealthCheckers method delegates to registration config
+	// HealthCheckers combines the registration and work checks (the work agent's SVID).
 	healthCheckers := config.HealthCheckers()
-	// This should not panic and should return the same as the registration config
-	registrationHealthCheckers := config.registrationConfig.HealthCheckers()
-
-	if len(healthCheckers) != len(registrationHealthCheckers) {
-		t.Errorf("HealthCheckers delegation failed: expected %d, got %d",
-			len(registrationHealthCheckers), len(healthCheckers))
+	want := len(config.registrationConfig.HealthCheckers()) + len(config.workConfig.HealthCheckers())
+	if len(healthCheckers) != want {
+		t.Errorf("HealthCheckers: expected %d, got %d", want, len(healthCheckers))
 	}
 }

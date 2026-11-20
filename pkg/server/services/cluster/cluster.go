@@ -3,8 +3,10 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -19,7 +21,9 @@ import (
 	clusterce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
+	grpcauthn "open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 
+	spiffeguard "open-cluster-management.io/ocm/pkg/registration/hub/spiffe"
 	"open-cluster-management.io/ocm/pkg/server/services"
 )
 
@@ -81,6 +85,7 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 			return fmt.Errorf("unsupported subresource %s for cluster %s", eventType.SubResource, cluster.Name)
 		}
 		delete(cluster.Labels, clusterv1beta2.ClusterSetLabel)
+		pinTrustDomain(ctx, cluster)
 		_, err := c.clusterClient.ClusterV1().ManagedClusters().Create(ctx, cluster, metav1.CreateOptions{})
 		return err
 	case types.UpdateRequestAction:
@@ -101,6 +106,18 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 			cluster.Labels[clusterv1beta2.ClusterSetLabel] = clusterSet
 		} else {
 			delete(cluster.Labels, clusterv1beta2.ClusterSetLabel)
+		}
+		// Agents may not change the trust domain the cluster is pinned to, or who registered it;
+		// only hub users with update access to ManagedClusters can.
+		for _, key := range hubSetAnnotations {
+			if value, ok := current.Annotations[key]; ok {
+				if cluster.Annotations == nil {
+					cluster.Annotations = map[string]string{}
+				}
+				cluster.Annotations[key] = value
+			} else {
+				delete(cluster.Annotations, key)
+			}
 		}
 
 		_, err = c.clusterClient.ClusterV1().ManagedClusters().Update(ctx, cluster, metav1.UpdateOptions{})
@@ -164,5 +181,34 @@ func (c *ClusterService) EventHandlerFuncs(ctx context.Context, handler server.E
 				utilruntime.HandleErrorWithContext(ctx, err, "failed to update cluster", "clusterName", cluster.Name)
 			}
 		},
+	}
+}
+
+// hubSetAnnotations are set by the hub from the creating agent's SVID; agents can't set or
+// change them.
+var hubSetAnnotations = []string{clusterv1.SPIFFETrustDomainAnnotationKey, clusterv1.SPIFFERegisteredByAnnotationKey}
+
+// pinTrustDomain sets the annotations of a cluster an agent creates from the agent's SVID,
+// whatever the request says: the trust domain the cluster is pinned to, and the SPIFFE ID that
+// registered it, which auto-approval matches. Any other agent may not set them.
+func pinTrustDomain(ctx context.Context, cluster *clusterv1.ManagedCluster) {
+	for _, key := range hubSetAnnotations {
+		delete(cluster.Annotations, key)
+	}
+	id, ok := grpcauthn.OCMIdentityFromContext(ctx)
+	if !ok {
+		return
+	}
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+	cluster.Annotations[clusterv1.SPIFFETrustDomainAnnotationKey] = id.TrustDomain
+	if sid, ok := ctx.Value(grpcauthn.ContextSPIFFEIDKey).(spiffeid.ID); ok {
+		cluster.Annotations[clusterv1.SPIFFERegisteredByAnnotationKey] = sid.String()
+	}
+	// The delete guard's finalizer is set in the same write: a cluster deleted before the guard
+	// first sees it is still held until the SVIDs issued before the deletion have expired.
+	if !slices.Contains(cluster.Finalizers, spiffeguard.RevocationFinalizer) {
+		cluster.Finalizers = append(cluster.Finalizers, spiffeguard.RevocationFinalizer)
 	}
 }

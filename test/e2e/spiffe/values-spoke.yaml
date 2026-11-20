@@ -1,0 +1,6 @@
+# SPIRE on an e2e managed cluster: an agent and the CSI driver only. The agent attests to the
+# hub's server (address and port set by setup.sh); the hub publishes the trust bundle here.
+spire-server:
+  enabled: false
+spiffe-oidc-discovery-provider:
+  enabled: false

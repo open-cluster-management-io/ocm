@@ -3,9 +3,12 @@ package addon
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,8 +22,10 @@ import (
 	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
+	"open-cluster-management.io/sdk-go/pkg/spiffe/idtemplate"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	commonspiffe "open-cluster-management.io/ocm/pkg/common/spiffe"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
@@ -202,6 +207,10 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 		kubeClient = c.managementKubeClient
 	}
 
+	if c.addonAuthConfig.GetKubeClientAuth() == SPIFFEDriver {
+		return c.startSPIFFERegistration(ctx, kubeClient, config)
+	}
+
 	kubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
 		kubeClient, 10*time.Minute, informers.WithNamespace(config.InstallationNamespace))
 
@@ -325,4 +334,159 @@ func (c *addOnRegistrationController) cleanup(ctx context.Context, addOnName str
 
 	delete(c.addOnRegistrationConfigs, addOnName)
 	return nil
+}
+
+const (
+	// SPIFFEDriver is the add-on driver with which each add-on agent authenticates with its own
+	// SPIRE-issued SVID.
+	SPIFFEDriver = "spiffe"
+
+	ReasonCustomSignerNotSupported   = "CustomSignerNotSupported"
+	ReasonAddOnNamespaceNotDedicated = "AddOnNamespaceNotDedicated"
+	ReasonSPIFFERegistrationReady    = "SPIFFERegistrationReady"
+	ReasonSPIFFEConfigFailed         = "SPIFFEConfigFailed"
+	// addOnNamespaceLabel marks a dedicated add-on namespace; the Klusterlet's admission policy
+	// lets only the operator or the work agent set it, at creation.
+	addOnNamespaceLabel = "open-cluster-management.io/spiffe-addon-namespace"
+)
+
+// startSPIFFERegistration handles a registration with the spiffe add-on driver. There is no
+// credential to create: the add-on agent gets its own SVID from SPIRE. The registration agent only
+// refuses what the driver can't support, and reports it in the RegistrationApplied condition.
+func (c *addOnRegistrationController) startSPIFFERegistration(ctx context.Context, kubeClient kubernetes.Interface,
+	config registrationConfig) (context.CancelFunc, error) {
+	update := c.generateStatusUpdate(c.clusterName, config.addOnName)
+	cond := metav1.Condition{
+		Type:    addonv1beta1.ManagedClusterAddOnRegistrationApplied,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonSPIFFERegistrationReady,
+		Message: "the add-on agent authenticates with its own SVID",
+	}
+	switch {
+	case config.registration.Type != addonv1beta1.KubeClient:
+		cond.Status, cond.Reason = metav1.ConditionFalse, ReasonCustomSignerNotSupported
+		cond.Message = "customSigner registrations are not supported with the spiffe driver: the hub does not sign certificates"
+	default:
+		ns, err := kubeClient.CoreV1().Namespaces().Get(ctx, config.InstallationNamespace, metav1.GetOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return nil, err
+		}
+		if err != nil || ns.Labels[addOnNamespaceLabel] == "" {
+			cond.Status, cond.Reason = metav1.ConditionFalse, ReasonAddOnNamespaceNotDedicated
+			cond.Message = fmt.Sprintf("install namespace %s is not a dedicated add-on namespace; move %s to a namespace of its own",
+				config.InstallationNamespace, config.addOnName)
+		}
+	}
+
+	var cmName string
+	if cond.Status == metav1.ConditionTrue {
+		name, err := c.writeSPIFFEConfig(ctx, kubeClient, config)
+		if err != nil {
+			cond.Status, cond.Reason, cond.Message = metav1.ConditionFalse, ReasonSPIFFEConfigFailed, err.Error()
+		}
+		cmName = name
+		if err == nil {
+			// The add-on's hub kubeconfig from a previous driver: the add-on agent now uses its SVID.
+			legacy := fmt.Sprintf("%s-hub-kubeconfig", config.addOnName)
+			err := kubeClient.CoreV1().Secrets(config.InstallationNamespace).Delete(ctx, legacy, metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				return nil, err
+			}
+		}
+	}
+
+	// The hub's add-on manager owns the condition when all is well; replace it only with a refusal,
+	// or to clear a refusal this controller set earlier.
+	addOn, err := c.hubAddOnLister.ManagedClusterAddOns(c.clusterName).Get(config.addOnName)
+	if err != nil {
+		return nil, err
+	}
+	current := meta.FindStatusCondition(addOn.Status.Conditions, addonv1beta1.ManagedClusterAddOnRegistrationApplied)
+	ownRefusal := current != nil && (current.Reason == ReasonCustomSignerNotSupported ||
+		current.Reason == ReasonAddOnNamespaceNotDedicated || current.Reason == ReasonSPIFFEConfigFailed)
+	if cond.Status == metav1.ConditionFalse || ownRefusal {
+		if err := update(ctx, cond); err != nil {
+			return nil, err
+		}
+	}
+	if cond.Status == metav1.ConditionFalse && cond.Reason != ReasonCustomSignerNotSupported {
+		// It can clear (the namespace is dedicated later, the ConfigMap can be written): return an
+		// error so the registration isn't kept as done and is tried again.
+		return nil, fmt.Errorf("add-on %s: %s", config.addOnName, cond.Message)
+	}
+	return func() {
+		if cmName == "" {
+			return
+		}
+		// The registration is gone: remove the add-on's settings with it.
+		err := kubeClient.CoreV1().ConfigMaps(config.InstallationNamespace).Delete(context.Background(), cmName, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			klog.Errorf("failed to delete ConfigMap %s/%s: %v", config.InstallationNamespace, cmName, err)
+		}
+	}, nil
+}
+
+// SPIFFEConfigMapName is the ConfigMap holding an add-on agent's SPIFFE settings, in its install
+// namespace. Nothing in it is secret: the agent's SVID comes from the local Workload API.
+func SPIFFEConfigMapName(addonName string) string { return addonName + "-spiffe" }
+
+// The keys of the SPIFFE ConfigMap; the add-on framework reads them.
+const (
+	SPIFFEConfigHubEndpoint       = "hub-endpoint"
+	SPIFFEConfigHubSPIFFEID       = "hub-spiffe-id"
+	SPIFFEConfigAgentSPIFFEID     = "agent-spiffe-id"
+	SPIFFEConfigWorkloadAPISocket = "workload-api-socket"
+)
+
+// writeSPIFFEConfig writes the add-on agent's hub connection settings and its own SPIFFE ID,
+// rendered from the Klusterlet's addOnAgentIDTemplate: {cluster}, {addon}, {agent} (from the
+// registration's subject, system:...:addon:<addon>:agent:<agent>) and {namespace} (the install
+// namespace).
+func (c *addOnRegistrationController) writeSPIFFEConfig(ctx context.Context, kubeClient kubernetes.Interface,
+	config registrationConfig) (string, error) {
+	getter, ok := c.addonAuthConfig.(interface{ GetSPIFFEOption() *commonspiffe.Option })
+	if !ok || getter.GetSPIFFEOption() == nil {
+		return "", fmt.Errorf("no spiffe settings")
+	}
+	opt := getter.GetSPIFFEOption()
+	td, err := opt.AgentTrustDomain()
+	if err != nil {
+		return "", err
+	}
+	tmpl, err := idtemplate.Compile(idtemplate.KindAddOnAgent, opt.AddOnAgentIDTemplate)
+	if err != nil {
+		return "", err
+	}
+	agentName := config.addOnName + "-agent"
+	if config.registration.KubeClient != nil {
+		if _, name, found := strings.Cut(config.registration.KubeClient.Subject.User, ":agent:"); found && name != "" {
+			agentName = name
+		}
+	}
+	id, err := tmpl.Render(td, map[string]string{
+		idtemplate.Cluster: c.clusterName, idtemplate.AddOn: config.addOnName,
+		idtemplate.Agent: agentName, idtemplate.Namespace: config.InstallationNamespace,
+	})
+	if err != nil {
+		return "", err
+	}
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: SPIFFEConfigMapName(config.addOnName), Namespace: config.InstallationNamespace},
+		Data: map[string]string{
+			SPIFFEConfigHubEndpoint:       opt.HubEndpoint,
+			SPIFFEConfigHubSPIFFEID:       opt.HubSPIFFEID,
+			SPIFFEConfigAgentSPIFFEID:     id.String(),
+			SPIFFEConfigWorkloadAPISocket: opt.WorkloadAPISocket,
+		},
+	}
+	configMaps := kubeClient.CoreV1().ConfigMaps(config.InstallationNamespace)
+	existing, err := configMaps.Get(ctx, cm.Name, metav1.GetOptions{})
+	switch {
+	case errors.IsNotFound(err):
+		_, err = configMaps.Create(ctx, cm, metav1.CreateOptions{})
+	case err == nil && !equality.Semantic.DeepEqual(existing.Data, cm.Data):
+		existing.Data = cm.Data
+		_, err = configMaps.Update(ctx, existing, metav1.UpdateOptions{})
+	}
+	return cm.Name, err
 }

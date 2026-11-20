@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/pflag"
 
 	ocmfeature "open-cluster-management.io/api/feature"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
@@ -96,6 +97,10 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 // Validate verifies the inputs.
 func (o *SpokeAgentOptions) Validate() error {
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.MultipleHubs) {
+		// MultipleHubs picks one of several bootstrap kubeconfigs; spiffe has none.
+		if o.RegisterDriverOption.RegistrationAuth == operatorv1.SPIFFEAuthType {
+			return errors.New("the MultipleHubs feature is not supported with --registration-auth=spiffe")
+		}
 		// expect BootstrapKubeconfig is empty and BootstrapKubeconfigs has at least 2 items
 		if len(o.BootstrapKubeconfigs) < 2 {
 			return errors.New("expect at least 2 bootstrap kubeconfigs")

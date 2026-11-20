@@ -1,0 +1,31 @@
+{{- if or ( eq .Values.klusterlet.mode "Singleton") (eq .Values.klusterlet.mode "Default") }}
+{{- if and (not .Values.noOperator) (include "spiffeEnabled" .) }}
+# The permissions of the spiffe registration driver: the admission policies or webhook
+# configurations that guard the agent and add-on namespaces, and recovery, which deletes every
+# workload in those namespaces when they can no longer be trusted. Granted only where a Klusterlet
+# uses the spiffe driver.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: klusterlet-spiffe
+rules:
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["validatingadmissionpolicies", "validatingadmissionpolicybindings", "validatingwebhookconfigurations"]
+  verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["selfsubjectreviews"]
+  verbs: ["create"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+  verbs: ["list", "delete", "deletecollection"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create", "list", "delete", "deletecollection"]
+- apiGroups: ["batch"]
+  resources: ["cronjobs"]
+  verbs: ["list", "delete", "deletecollection"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list", "delete", "deletecollection"]
+{{- end }}
+{{- end }}

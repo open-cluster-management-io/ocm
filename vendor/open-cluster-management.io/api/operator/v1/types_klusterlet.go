@@ -3,6 +3,7 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // +genclient
@@ -28,6 +29,8 @@ type Klusterlet struct {
 }
 
 // KlusterletSpec represents the desired deployment configuration of Klusterlet agent.
+// +kubebuilder:validation:XValidation:rule="!has(self.registrationConfiguration) || !has(self.registrationConfiguration.registrationDriver) || !has(self.registrationConfiguration.registrationDriver.authType) || self.registrationConfiguration.registrationDriver.authType != 'spiffe' || (has(self.clusterName) && size(self.clusterName) > 0)",message="clusterName is required when registrationDriver.authType is spiffe"
+// +kubebuilder:validation:XValidation:rule="!has(self.registrationConfiguration) || !has(self.registrationConfiguration.registrationDriver) || !has(self.registrationConfiguration.registrationDriver.authType) || self.registrationConfiguration.registrationDriver.authType != 'spiffe' || !has(self.deployOption) || !has(self.deployOption.mode) || size(self.deployOption.mode) == 0 || self.deployOption.mode in ['Default', 'Singleton']",message="registrationDriver.authType spiffe supports only the Default and Singleton install modes"
 type KlusterletSpec struct {
 	// namespace is the namespace to deploy the agent on the managed cluster.
 	// The namespace must have a prefix of "open-cluster-management-", and if it is not set,
@@ -59,6 +62,8 @@ type KlusterletSpec struct {
 
 	// clusterName is the name of the managed cluster to be created on hub.
 	// The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.
+	// It is required when registrationConfiguration.registrationDriver.authType is spiffe, because the
+	// agents' SPIFFE IDs contain it.
 	// +optional
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
@@ -110,6 +115,28 @@ type KlusterletSpec struct {
 // AgentConfiguration represents customization of the klusterlet agents.
 type AgentConfiguration struct {
 	// BindConfiguration represents the server bind configuration of the klusterlet agents.
+	// It applies to the klusterlet-agent in Singleton mode. In Default mode, it applies to
+	// the registration and work agents that do not set their own bindConfiguration.
+	// +optional
+	BindConfiguration *AgentBindConfiguration `json:"bindConfiguration,omitempty"`
+
+	// RegistrationAgentConfiguration represents the configuration of the registration agent
+	// in Default mode. It is ignored in Singleton mode.
+	// +optional
+	RegistrationAgentConfiguration *AgentComponentConfiguration `json:"registrationAgentConfiguration,omitempty"`
+
+	// WorkAgentConfiguration represents the configuration of the work agent in Default mode.
+	// It is ignored in Singleton mode.
+	// +optional
+	WorkAgentConfiguration *AgentComponentConfiguration `json:"workAgentConfiguration,omitempty"`
+}
+
+// AgentComponentConfiguration represents customization of a single klusterlet agent.
+type AgentComponentConfiguration struct {
+	// BindConfiguration represents the server bind configuration of the agent.
+	// In Default mode the registration and work agents run as separate pods. When both
+	// use hostNetwork and can be scheduled on the same node, set a different
+	// healthProbePort for each of them.
 	// +optional
 	BindConfiguration *AgentBindConfiguration `json:"bindConfiguration,omitempty"`
 }
@@ -164,6 +191,8 @@ type HubApiServerHostAlias struct {
 	Hostname string `json:"hostname"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.registrationDriver) || !has(self.registrationDriver.authType) || self.registrationDriver.authType != 'spiffe' || (has(self.addOnKubeClientRegistrationDriver) && has(self.addOnKubeClientRegistrationDriver.authType) && self.addOnKubeClientRegistrationDriver.authType == 'spiffe')",message="addOnKubeClientRegistrationDriver.authType must be spiffe when registrationDriver.authType is spiffe"
+// +kubebuilder:validation:XValidation:rule="!has(self.addOnKubeClientRegistrationDriver) || !has(self.addOnKubeClientRegistrationDriver.authType) || self.addOnKubeClientRegistrationDriver.authType != 'spiffe' || (has(self.registrationDriver) && has(self.registrationDriver.authType) && self.registrationDriver.authType == 'spiffe')",message="registrationDriver.authType must be spiffe when addOnKubeClientRegistrationDriver.authType is spiffe"
 type RegistrationConfiguration struct {
 	// clientCertExpirationSeconds represents the seconds of a client certificate to expire. If it is not set or 0, the default
 	// duration seconds will be set by the hub cluster. If the value is larger than the max signing duration seconds set on
@@ -242,17 +271,102 @@ type ClusterClaimConfiguration struct {
 	ReservedClusterClaimSuffixes []string `json:"reservedClusterClaimSuffixes,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.authType) || self.authType != 'spiffe' || has(self.spiffe)",message="spiffe is required when authType is spiffe"
 type RegistrationDriver struct {
-	// Type of the authentication used by managedcluster to register as well as pull work from hub. Possible values are csr and awsirsa.
+	// Type of the authentication used by managedcluster to register as well as pull work from hub.
+	// Possible values are csr, awsirsa, grpc and spiffe.
 	// +required
 	// +kubebuilder:default:=csr
-	// +kubebuilder:validation:Enum=csr;awsirsa;grpc
+	// +kubebuilder:validation:Enum=csr;awsirsa;grpc;spiffe
 	AuthType string `json:"authType,omitempty"`
 
 	// Contain the details required for registering with hub cluster (ie: an EKS cluster) using AWS IAM roles for service account.
 	// This is required only when the authType is awsirsa.
 	AwsIrsa *AwsIrsa `json:"awsIrsa,omitempty"`
+
+	// spiffe contains what the agents need to reach the hub with their SPIRE-issued SVIDs.
+	// It is required when authType is spiffe, and nothing in it is secret.
+	// Effective only when the SPIFFERegistration feature gate is enabled.
+	// authType spiffe supports only the Default and Singleton install modes; Hosted and
+	// SingletonHosted are not supported yet.
+	// +optional
+	SPIFFE *KlusterletSPIFFEConfig `json:"spiffe,omitempty"`
 }
+
+// KlusterletSPIFFEConfig configures the spiffe registration driver on the managed cluster.
+// +kubebuilder:validation:XValidation:rule="!has(self.agentIDTemplate) || (self.agentIDTemplate.contains('/{cluster}') && self.agentIDTemplate.contains('/{role}'))",message="agentIDTemplate must contain {cluster} and {role}"
+// +kubebuilder:validation:XValidation:rule="!has(self.addOnAgentIDTemplate) || (self.addOnAgentIDTemplate.contains('/{cluster}') && self.addOnAgentIDTemplate.contains('/{addon}') && self.addOnAgentIDTemplate.contains('/{agent}'))",message="addOnAgentIDTemplate must contain {cluster}, {addon} and {agent}"
+type KlusterletSPIFFEConfig struct {
+	// hubEndpoint is host:port of the hub gRPC server's grpc-spiffe listener.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=512
+	HubEndpoint string `json:"hubEndpoint"`
+
+	// hubSPIFFEID is the only SPIFFE ID the agents accept from the hub, for example
+	// spiffe://ocm-hub.example.org/ocm/hub/grpc-server. It is in the hub's trust domain.
+	// +required
+	// +kubebuilder:validation:MaxLength=512
+	// +kubebuilder:validation:Pattern=`^spiffe://[a-z0-9._-]+(/([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,}))+$`
+	HubSPIFFEID string `json:"hubSPIFFEID"`
+
+	// trustDomain is the agents' own SPIFFE trust domain, for example east.example.org. The
+	// agents build their expected SPIFFE IDs in it, and the hub must list it in the
+	// ClusterManager's agentTrustDomains. If it is not set, the trust domain of hubSPIFFEID is used.
+	// +optional
+	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:Pattern=`^[a-z0-9._-]+$`
+	TrustDomain string `json:"trustDomain,omitempty"`
+
+	// workloadAPISocket is the address of the local SPIRE agent's Workload API, as mounted
+	// into the agent pods by the SPIFFE CSI driver.
+	// +optional
+	// +kubebuilder:default:="unix:///spiffe-workload-api/spire-agent.sock"
+	WorkloadAPISocket string `json:"workloadAPISocket,omitempty"`
+
+	// agentIDTemplate is the layout of this Klusterlet's agent SPIFFE IDs. It must equal the
+	// hub's ClusterManager agentIDTemplate, or the hub refuses the agents. The klusterlet
+	// operator fills it in for each agent and passes the result to the agent: {trustDomain} is
+	// trustDomain, {cluster} is clusterName, {role} is registration, work or klusterlet, and
+	// {namespace} is the namespace the agent runs in. Each placeholder fills a whole path
+	// segment.
+	// +optional
+	// +kubebuilder:default:="spiffe://{trustDomain}/ocm/cluster/{cluster}/agent/{role}"
+	// +kubebuilder:validation:MaxLength=512
+	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$`
+	AgentIDTemplate string `json:"agentIDTemplate,omitempty"`
+
+	// addOnAgentIDTemplate is the layout of add-on agent SPIFFE IDs on this cluster. It must
+	// equal the hub's ClusterManager addOnAgentIDTemplate. {addon} is the add-on name, {agent}
+	// the add-on agent name, and {namespace} the add-on's install namespace.
+	// +optional
+	// +kubebuilder:default:="spiffe://{trustDomain}/ocm/cluster/{cluster}/addon/{addon}/agent/{agent}"
+	// +kubebuilder:validation:MaxLength=512
+	// +kubebuilder:validation:Pattern=`^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$`
+	AddOnAgentIDTemplate string `json:"addOnAgentIDTemplate,omitempty"`
+
+	// admissionEnforcement is how the klusterlet operator enforces the admission rules that keep
+	// other workloads from getting the agents' SVIDs. ValidatingAdmissionPolicy needs Kubernetes
+	// 1.30 or later; the API server evaluates the rules itself, and on an older cluster the
+	// Klusterlet is refused as an unsupported Kubernetes version. ValidatingWebhook works on every
+	// version; the operator serves the webhook, with an SVID from SPIRE that carries the webhook
+	// Service's DNS name. Both enforce the same rules. When it changes, the operator puts the new
+	// enforcement in place before it removes the old one.
+	// +required
+	// +kubebuilder:validation:Enum=ValidatingAdmissionPolicy;ValidatingWebhook
+	AdmissionEnforcement SPIFFEAdmissionEnforcement `json:"admissionEnforcement"`
+}
+
+// SPIFFEAdmissionEnforcement is how the spiffe driver's admission rules are enforced.
+type SPIFFEAdmissionEnforcement string
+
+const (
+	// SPIFFEAdmissionValidatingAdmissionPolicy enforces the rules with ValidatingAdmissionPolicies.
+	SPIFFEAdmissionValidatingAdmissionPolicy SPIFFEAdmissionEnforcement = "ValidatingAdmissionPolicy"
+	// SPIFFEAdmissionValidatingWebhook enforces the rules with a validating webhook the klusterlet
+	// operator serves.
+	SPIFFEAdmissionValidatingWebhook SPIFFEAdmissionEnforcement = "ValidatingWebhook"
+)
 
 type AwsIrsa struct {
 	// The arn of the hub cluster (ie: an EKS cluster). This will be required to pass information to hub, which hub will use to create IAM identities for this klusterlet.
@@ -281,11 +395,14 @@ type AwsIrsa struct {
 
 type AddOnRegistrationDriver struct {
 	// AuthType is the authentication driver used for add-on registration.
-	// Possible values are csr and token.
-	// Currently, this field only affects kubeClient type add-on registration. The csr type add-on registration always uses csr driver.
+	// Possible values are csr, token and spiffe. With spiffe, each add-on agent authenticates
+	// with its own SPIRE-issued SVID and no add-on credential is created.
+	// Currently, this field only affects kubeClient type add-on registration. The csr type add-on registration always uses csr driver,
+	// except with spiffe: the hub signs no certificates then, so a customSigner registration is refused, with the
+	// RegistrationApplied condition False and reason CustomSignerNotSupported on the ManagedClusterAddOn.
 	// In the future, this may be extended to customize authentication for csr type add-on registration as well.
 	// +optional
-	// +kubebuilder:validation:Enum=csr;token
+	// +kubebuilder:validation:Enum=csr;token;spiffe
 	AuthType string `json:"authType,omitempty"`
 
 	// Token contains the configuration for token-based registration.
@@ -476,6 +593,143 @@ type KlusterletStatus struct {
 	// RelatedResources are used to track the resources that are related to this Klusterlet.
 	// +optional
 	RelatedResources []RelatedResourceMeta `json:"relatedResources,omitempty"`
+
+	// spiffe records the state the klusterlet operator has made trusted when the
+	// registration driver is spiffe. It holds only names, UIDs and generations.
+	// +optional
+	SPIFFE *KlusterletSPIFFEStatus `json:"spiffe,omitempty"`
+}
+
+const (
+	// ConditionSPIFFEAdmissionReady is True once the klusterlet operator has finished its first
+	// recovery of the agent and add-on namespaces and recorded the admission enforcement it trusts.
+	// The platform should create the cluster's SPIRE registration entries only after that.
+	ConditionSPIFFEAdmissionReady = "SPIFFEAdmissionReady"
+)
+
+// KlusterletSPIFFEStatus is the trusted state of a Klusterlet that uses the spiffe driver.
+type KlusterletSPIFFEStatus struct {
+	// admissionPolicies are the ValidatingAdmissionPolicies and their bindings the operator
+	// ran recovery for. When a live policy or binding no longer matches its entry, the
+	// operator runs recovery again before any agent runs.
+	// +optional
+	// +listType=map
+	// +listMapKey=policyName
+	// +kubebuilder:validation:MaxItems=16
+	AdmissionPolicies []SPIFFEAdmissionPolicyStatus `json:"admissionPolicies,omitempty"`
+
+	// admissionEnforcement is the enforcement the operator has put in place and recorded:
+	// ValidatingAdmissionPolicy, with admissionPolicies, or ValidatingWebhook, with
+	// admissionWebhooks.
+	// +optional
+	// +kubebuilder:validation:Enum=ValidatingAdmissionPolicy;ValidatingWebhook
+	AdmissionEnforcement SPIFFEAdmissionEnforcement `json:"admissionEnforcement,omitempty"`
+
+	// admissionWebhooks are the ValidatingWebhookConfigurations the operator ran recovery for,
+	// with ValidatingWebhook enforcement. When a live configuration no longer matches its entry,
+	// the operator runs recovery again before any agent runs.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=16
+	AdmissionWebhooks []SPIFFEAdmissionWebhookStatus `json:"admissionWebhooks,omitempty"`
+
+	// webhookDNSName is the DNS name the operator's webhook serves on, with ValidatingWebhook
+	// enforcement. The operator's SVID must carry it, so the platform's SPIRE registration entry
+	// for the operator sets it.
+	// +optional
+	// +kubebuilder:validation:MaxLength=253
+	WebhookDNSName string `json:"webhookDNSName,omitempty"`
+
+	// webhookSPIFFEID is the SPIFFE ID the operator's webhook SVID must have, with
+	// ValidatingWebhook enforcement: agentIDTemplate rendered with the role operator. The hub
+	// accepts no agent with that role, so the SVID is good only for serving the webhook.
+	// +optional
+	// +kubebuilder:validation:MaxLength=2048
+	WebhookSPIFFEID string `json:"webhookSPIFFEID,omitempty"`
+
+	// addOnNamespace is the add-on namespace the operator created itself, recorded by name and
+	// UID so recovery only cleans that exact namespace.
+	// +optional
+	AddOnNamespace *SPIFFENamespaceRef `json:"addOnNamespace,omitempty"`
+
+	// agentIDs are the SPIFFE IDs the operator rendered for this Klusterlet's agents from
+	// agentIDTemplate, one per agent role the install mode runs. The platform's SPIRE
+	// registration entries must issue exactly these IDs.
+	// +optional
+	// +listType=map
+	// +listMapKey=role
+	// +kubebuilder:validation:MaxItems=3
+	AgentIDs []SPIFFEAgentID `json:"agentIDs,omitempty"`
+}
+
+// SPIFFEAgentID is the SPIFFE ID of one Klusterlet agent.
+type SPIFFEAgentID struct {
+	// role is the agent role: registration, work or klusterlet.
+	// +required
+	// +kubebuilder:validation:Enum=registration;work;klusterlet
+	Role string `json:"role"`
+
+	// spiffeID is the SPIFFE ID the agent expects from the Workload API.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=2048
+	SPIFFEID string `json:"spiffeID"`
+}
+
+// SPIFFEAdmissionPolicyStatus records one ValidatingAdmissionPolicy and its binding.
+type SPIFFEAdmissionPolicyStatus struct {
+	// policyName is the name of the ValidatingAdmissionPolicy and of its binding.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	PolicyName string `json:"policyName"`
+
+	// policyUID is the UID of the policy.
+	// +required
+	PolicyUID types.UID `json:"policyUID"`
+
+	// policyGeneration is the generation of the policy.
+	// +required
+	PolicyGeneration int64 `json:"policyGeneration"`
+
+	// bindingUID is the UID of the policy binding.
+	// +required
+	BindingUID types.UID `json:"bindingUID"`
+
+	// bindingGeneration is the generation of the policy binding.
+	// +required
+	BindingGeneration int64 `json:"bindingGeneration"`
+}
+
+// SPIFFEAdmissionWebhookStatus records one ValidatingWebhookConfiguration.
+type SPIFFEAdmissionWebhookStatus struct {
+	// name is the name of the ValidatingWebhookConfiguration.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	Name string `json:"name"`
+
+	// uid is the UID of the configuration.
+	// +required
+	UID types.UID `json:"uid"`
+
+	// generation is the generation of the configuration.
+	// +required
+	Generation int64 `json:"generation"`
+}
+
+// SPIFFENamespaceRef identifies a namespace by name and UID.
+type SPIFFENamespaceRef struct {
+	// name is the name of the namespace.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	Name string `json:"name"`
+
+	// uid is the UID of the namespace.
+	// +required
+	UID types.UID `json:"uid"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -60,7 +60,7 @@ type AddOnDeploymentConfigSpec struct {
 	// +kubebuilder:default=open-cluster-management-agent-addon
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern=^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$
-	AgentInstallNamespace string `json:"agentInstallNamespace,omitempty"`
+	AgentInstallNamespace *string `json:"agentInstallNamespace,omitempty"`
 
 	// ResourceRequirements specify the resources required by add-on agents.
 	// If a container matches multiple ContainerResourceRequirements, the last matched configuration in the

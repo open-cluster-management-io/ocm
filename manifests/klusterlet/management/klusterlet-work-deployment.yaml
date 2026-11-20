@@ -24,6 +24,9 @@ spec:
         {{ end }}
       labels:
         app: klusterlet-manifestwork-agent
+        {{if eq .RegistrationDriver.AuthType "spiffe"}}
+        open-cluster-management.io/spiffe-role: work
+        {{end}}
         {{ if gt (len .Labels) 0 }}
         {{ range $key, $value := .Labels }}
         "{{ $key }}": "{{ $value }}"
@@ -65,7 +68,13 @@ spec:
           - "/work"
           - "agent"
           - "--spoke-cluster-name={{ .ClusterName }}"
-          {{if eq .RegistrationDriver.AuthType "grpc"}}
+          {{if eq .RegistrationDriver.AuthType "spiffe"}}
+          - "--cloudevents-client-id={{ .ClusterName }}-work-agent"
+          - "--spiffe-hub-endpoint={{ .SPIFFEHubEndpoint }}"
+          - "--spiffe-hub-id={{ .SPIFFEHubID }}"
+          - "--spiffe-agent-id={{ .SPIFFEWorkAgentID }}"
+          - "--spiffe-workload-api-socket={{ .SPIFFEWorkloadAPISocket }}"
+          {{else if eq .RegistrationDriver.AuthType "grpc"}}
           - "--workload-source-driver=grpc"
           - "--workload-source-config=/spoke/hub-kubeconfig/config.yaml"
           - "--cloudevents-client-id={{ .ClusterName }}-work-agent"
@@ -86,7 +95,9 @@ spec:
           - "--spoke-kubeconfig=/spoke/config/kubeconfig"
           - "--terminate-on-files=/spoke/config/kubeconfig"
           {{end}}
+          {{if ne .RegistrationDriver.AuthType "spiffe"}}
           - "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig"
+          {{end}}
           {{if .WorkStatusSyncInterval}}
           - "--status-sync-interval={{ .WorkStatusSyncInterval }}"
           {{else if eq .Replica 1}}
@@ -127,9 +138,16 @@ spec:
           runAsNonRoot: true
           readOnlyRootFilesystem: true
         volumeMounts:
+        {{if ne .RegistrationDriver.AuthType "spiffe"}}
         - name: hub-kubeconfig-secret
           mountPath: "/spoke/hub-kubeconfig"
           readOnly: true
+        {{end}}
+        {{if eq .RegistrationDriver.AuthType "spiffe"}}
+        - name: spiffe-workload-api
+          mountPath: /spiffe-workload-api
+          readOnly: true
+        {{end}}
         - name: tmpdir
           mountPath: /tmp
         {{if eq .RegistrationDriver.AuthType "awsirsa"}}
@@ -186,9 +204,19 @@ spec:
       priorityClassName: "{{ .PriorityClassName }}"
       {{- end }}
       volumes:
+      {{if ne .RegistrationDriver.AuthType "spiffe"}}
       - name: hub-kubeconfig-secret
         secret:
           secretName: {{ .HubKubeConfigSecret }}
+      {{end}}
+      {{if eq .RegistrationDriver.AuthType "spiffe"}}
+      # The local SPIRE agent's Workload API. The agent's SVID comes from it and stays in memory;
+      # no Secret holds a hub credential.
+      - name: spiffe-workload-api
+        csi:
+          driver: csi.spiffe.io
+          readOnly: true
+      {{end}}
       - name: tmpdir
         emptyDir: { }
       {{if eq .RegistrationDriver.AuthType "awsirsa"}}

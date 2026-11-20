@@ -1,0 +1,36 @@
+# The klusterlet operator with the spiffe registration driver: the default install, plus the
+# klusterlet-spiffe ClusterRole, the webhook Service and, on the operator, the SPIFFE Workload API
+# volume and the webhook port. Apply it with "kubectl apply -k" instead of the parent directory
+# where a Klusterlet uses the spiffe driver; without it, the operator has none of these.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../config
+- cluster_role.yaml
+- cluster_role_binding.yaml
+- service.yaml
+
+patches:
+- target:
+    kind: Deployment
+    name: klusterlet
+  patch: |-
+    - op: add
+      path: /spec/template/spec/containers/0/ports
+      value:
+      - name: spiffe-webhook
+        containerPort: 9443
+    - op: add
+      path: /spec/template/spec/containers/0/volumeMounts/-
+      value:
+        name: spiffe-workload-api
+        mountPath: /spiffe-workload-api
+        readOnly: true
+    - op: add
+      path: /spec/template/spec/volumes/-
+      value:
+        name: spiffe-workload-api
+        csi:
+          driver: csi.spiffe.io
+          readOnly: true

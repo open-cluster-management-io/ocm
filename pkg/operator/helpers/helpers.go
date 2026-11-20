@@ -14,6 +14,7 @@ import (
 	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -43,6 +44,7 @@ import (
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	grpcauthn "open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 
 	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 )
@@ -1055,4 +1057,67 @@ func GRPCServerEndpointType(cm *operatorapiv1.ClusterManager) string {
 	}
 
 	return string(operatorapiv1.EndpointTypeHostname)
+}
+
+// SPIFFEConfig returns the settings of the spiffe registration driver, or nil when spiffe is not
+// a registration driver of the ClusterManager.
+func SPIFFEConfig(cm *operatorapiv1.ClusterManager) *operatorapiv1.SPIFFERegistrationConfig {
+	if cm.Spec.RegistrationConfiguration == nil {
+		return nil
+	}
+	for _, d := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
+		if d.AuthType == operatorapiv1.SPIFFEAuthType {
+			if d.SPIFFE == nil {
+				return &operatorapiv1.SPIFFERegistrationConfig{}
+			}
+			return d.SPIFFE
+		}
+	}
+	return nil
+}
+
+// SPIFFEServerEndpointType returns how the SPIFFE listener is exposed, from the grpc-spiffe
+// endpoint exposure. The default is hostname, as for the grpc listener.
+func SPIFFEServerEndpointType(cm *operatorapiv1.ClusterManager) string {
+	if cm.Spec.ServerConfiguration != nil {
+		for _, endpoint := range cm.Spec.ServerConfiguration.EndpointsExposure {
+			if endpoint.Protocol != operatorapiv1.GRPCSPIFFEProtocol {
+				continue
+			}
+			if endpoint.GRPC == nil {
+				return string(operatorapiv1.EndpointTypeHostname)
+			}
+			return string(endpoint.GRPC.Type)
+		}
+	}
+	return string(operatorapiv1.EndpointTypeHostname)
+}
+
+// SPIFFEServerID returns the SPIFFE ID the hub gRPC server presents, after checking what the
+// CRD can't: that it is in the trust domain, that the ID templates are valid and can't match the
+// same ID, and that no agent could present the server's ID.
+func SPIFFEServerID(c *operatorapiv1.SPIFFERegistrationConfig) (string, error) {
+	td, err := spiffeid.TrustDomainFromString(c.TrustDomain)
+	if err != nil {
+		return "", fmt.Errorf("trustDomain %q: %w", c.TrustDomain, err)
+	}
+	serverID := c.ServerSPIFFEID
+	if serverID == "" {
+		serverID = "spiffe://" + td.Name() + "/ocm/hub/grpc-server"
+	}
+	sid, err := spiffeid.FromString(serverID)
+	if err != nil {
+		return "", fmt.Errorf("serverSPIFFEID %q: %w", serverID, err)
+	}
+	if !sid.MemberOf(td) {
+		return "", fmt.Errorf("serverSPIFFEID %s is not in trust domain %s", sid, td.Name())
+	}
+	scheme, err := grpcauthn.NewIDScheme(c.GetAgentIDTemplate(), c.GetAddOnAgentIDTemplate(), c.GetAgentTrustDomains())
+	if err != nil {
+		return "", err
+	}
+	if err := scheme.CheckServerID(sid); err != nil {
+		return "", err
+	}
+	return sid.String(), nil
 }

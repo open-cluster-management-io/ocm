@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -918,7 +919,7 @@ func prepareInstallNamespaceAlpha(ctx context.Context, namespace, installNamespa
 					Namespace: namespace,
 				},
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: installNamespace,
+					AgentInstallNamespace: ptr.To(installNamespace),
 				},
 			},
 			metav1.CreateOptions{},
@@ -945,7 +946,7 @@ func prepareImageOverrideAddOnDeploymentConfigAlpha(ctx context.Context, namespa
 				},
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 					Registries:            registriesAlpha,
-					AgentInstallNamespace: installNamespace,
+					AgentInstallNamespace: ptr.To(installNamespace),
 				},
 			},
 			metav1.CreateOptions{},
@@ -976,7 +977,7 @@ func prepareNodePlacementAddOnDeploymentConfigAlpha(ctx context.Context, namespa
 						Tolerations:  tolerations,
 						Affinity:     affinity,
 					},
-					AgentInstallNamespace: installNamespace,
+					AgentInstallNamespace: ptr.To(installNamespace),
 				},
 			},
 			metav1.CreateOptions{},
@@ -1006,7 +1007,7 @@ func prepareProxyAddOnDeploymentConfigAlpha(ctx context.Context, namespace, inst
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
 					},
-					AgentInstallNamespace: installNamespace,
+					AgentInstallNamespace: ptr.To(installNamespace),
 					ProxyConfig:           proxyConfigAlpha,
 				},
 			},
@@ -1033,7 +1034,7 @@ func prepareResourceRequirementsAddOnDeploymentConfigAlpha(ctx context.Context, 
 					Namespace: namespace,
 				},
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: installNamespace,
+					AgentInstallNamespace: ptr.To(installNamespace),
 					ProxyConfig:           proxyConfigAlpha,
 					ResourceRequirements:  resourceRequirementsConfigAlpha,
 				},

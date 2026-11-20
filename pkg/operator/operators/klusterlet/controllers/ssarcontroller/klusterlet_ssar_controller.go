@@ -103,6 +103,22 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 	}
 	klusterlet = klusterlet.DeepCopy()
 
+	// With the spiffe driver there is no bootstrap or hub kubeconfig Secret to check: the agents
+	// reach the hub with their SPIRE-issued SVIDs, which the operator never sees.
+	if klusterlet.Spec.RegistrationConfiguration != nil &&
+		klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == operatorapiv1.SPIFFEAuthType {
+		newKlusterlet := klusterlet.DeepCopy()
+		meta.SetStatusCondition(&newKlusterlet.Status.Conditions, metav1.Condition{
+			Type:               operatorapiv1.ConditionHubConnectionDegraded,
+			Status:             metav1.ConditionFalse,
+			ObservedGeneration: klusterlet.Generation,
+			Reason:             ReasonHubConnectionSPIFFE,
+			Message:            "The agents connect to the hub with their SPIFFE identities; there is no hub kubeconfig to check",
+		})
+		_, err := c.patcher.PatchStatus(ctx, newKlusterlet, newKlusterlet.Status, klusterlet.Status)
+		return err
+	}
+
 	// if the ssar checking is already processing, requeue it after 30s.
 	if c.inSSARChecking(klusterletName) {
 		logger.V(4).Info("Reconciling Klusterlet is already processing now", "name", klusterletName)
@@ -358,3 +374,7 @@ func buildKubeClientWithSecret(secret *corev1.Secret) (kubernetes.Interface, str
 
 	return client, restConfig.Host, nil
 }
+
+// ReasonHubConnectionSPIFFE is the reason of the HubConnectionDegraded condition with the spiffe
+// driver.
+const ReasonHubConnectionSPIFFE = "HubConnectionSPIFFE"

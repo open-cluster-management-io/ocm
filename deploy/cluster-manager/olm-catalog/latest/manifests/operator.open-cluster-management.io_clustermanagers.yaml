@@ -503,11 +503,12 @@ spec:
                           default: csr
                           description: |-
                             authType is the type of the authentication used by hub to initialize the Hub cluster.
-                            Possible values are csr, awsirsa and grpc.
+                            Possible values are csr, awsirsa, grpc and spiffe.
                           enum:
                           - csr
                           - awsirsa
                           - grpc
+                          - spiffe
                           type: string
                         awsirsa:
                           description: awsirsa represents the configuration for awsirsa
@@ -575,9 +576,125 @@ spec:
                                 type: string
                               type: array
                           type: object
+                        spiffe:
+                          description: |-
+                            spiffe represents the configuration for the spiffe driver. It is required when
+                            authType is spiffe. Effective only when the SPIFFERegistration feature gate is enabled.
+                          properties:
+                            addOnAgentIDTemplate:
+                              default: spiffe://{trustDomain}/ocm/cluster/{cluster}/addon/{addon}/agent/{agent}
+                              description: |-
+                                addOnAgentIDTemplate is the layout of add-on agent SPIFFE IDs. Path placeholders:
+                                {cluster}, {addon} and {agent} (required) and {namespace} (optional; the add-on's install
+                                namespace, never used for authorization). The rules of agentIDTemplate apply, and no
+                                SPIFFE ID may match both templates. The Klusterlets must use the same template.
+                              maxLength: 512
+                              pattern: ^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$
+                              type: string
+                            agentIDTemplate:
+                              default: spiffe://{trustDomain}/ocm/cluster/{cluster}/agent/{role}
+                              description: |-
+                                agentIDTemplate is the layout of Klusterlet agent SPIFFE IDs. The hub reads the cluster
+                                name and the agent role from an agent's SPIFFE ID with it. It must start with
+                                spiffe://{trustDomain}/, where {trustDomain} stands for any of the accepted agent trust
+                                domains. Path placeholders: {cluster} and {role} (required; role is registration, work or
+                                klusterlet) and {namespace} (optional; the namespace the agent runs in, never used for
+                                authorization). Each placeholder fills a whole path segment and appears at most once, and
+                                at least one segment is fixed text. The Klusterlets must use the same template. The
+                                cluster-manager operator checks these rules and otherwise sets Applied to False with reason
+                                InvalidSPIFFEConfiguration.
+                              maxLength: 512
+                              pattern: ^spiffe://\{trustDomain\}(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\{[A-Za-z]+\}))+$
+                              type: string
+                            agentTrustDomains:
+                              description: |-
+                                agentTrustDomains are the trust domains the hub accepts Klusterlet and add-on agents
+                                from. An agent whose SVID comes from any other trust domain is refused. Each managed
+                                cluster is pinned to one of them with the open-cluster-management.io/spiffe-trust-domain
+                                annotation. The hub's SPIRE must federate with every trust domain listed here other than
+                                its own. The hub's own trustDomain is always accepted, whether or not it is listed here;
+                                if this is empty, only trustDomain is accepted. GetAgentTrustDomains returns the full set.
+                              items:
+                                maxLength: 255
+                                minLength: 1
+                                pattern: ^[a-z0-9._-]+$
+                                type: string
+                              maxItems: 64
+                              type: array
+                              x-kubernetes-list-type: set
+                            autoApprovedIdentities:
+                              description: |-
+                                autoApprovedIdentities are the SPIFFE IDs whose clusters are accepted automatically, as
+                                autoApprovedIdentities of the csr and grpc drivers are for their users. It applies only
+                                with the ManagedClusterAutoApproval feature gate, and only to a cluster's first join: the
+                                cluster is accepted if the SPIFFE ID of the agent that created it matches an entry. An
+                                entry is a SPIFFE ID in which "*" matches one whole path segment, for example
+                                spiffe://ocm-hub.example.org/ocm/cluster/*/agent/registration. With no entry, clusters
+                                of the spiffe driver are never accepted automatically.
+                              items:
+                                maxLength: 512
+                                pattern: ^spiffe://[a-z0-9._-]+(/(([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,})|\*))+$
+                                type: string
+                              maxItems: 64
+                              type: array
+                              x-kubernetes-list-type: set
+                            maxClockSkew:
+                              default: 5m
+                              description: |-
+                                maxClockSkew is the allowed clock difference between the hub and the SPIRE servers of
+                                every trust domain. It is used by the SVID validity check and added to the delete
+                                guard's wait.
+                              maxLength: 24
+                              pattern: ^([0-9]{1,5}(s|m|h))+$
+                              type: string
+                              x-kubernetes-validations:
+                              - message: must be at most 99999h
+                                rule: duration(self) <= duration('99999h')
+                            maxSVIDLifetime:
+                              default: 24h
+                              description: |-
+                                maxSVIDLifetime must be at least the longest SVID TTL SPIRE issues to OCM agents, in any
+                                of agentTrustDomains. When a ManagedCluster is deleted, the hub keeps it terminating for
+                                this long plus maxClockSkew, so no SVID issued before the deletion can recreate it.
+                              maxLength: 24
+                              pattern: ^([0-9]{1,5}(s|m|h))+$
+                              type: string
+                              x-kubernetes-validations:
+                              - message: must be at most 99999h
+                                rule: duration(self) <= duration('99999h')
+                            serverSPIFFEID:
+                              description: |-
+                                serverSPIFFEID is the SPIFFE ID the hub gRPC server presents to agents. It must be in
+                                trustDomain; the cluster-manager operator otherwise sets Applied to False with reason
+                                InvalidSPIFFEConfiguration.
+                                If it is not set, spiffe://<trustDomain>/ocm/hub/grpc-server is used.
+                              maxLength: 512
+                              pattern: ^spiffe://[a-z0-9._-]+(/([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|[.]{3,}))+$
+                              type: string
+                            trustDomain:
+                              description: |-
+                                trustDomain is the hub's own SPIFFE trust domain, for example ocm-hub.example.org. The
+                                hub gRPC server's SVID is in it. Agents may be in other trust domains; see
+                                agentTrustDomains.
+                              maxLength: 255
+                              minLength: 1
+                              pattern: ^[a-z0-9._-]+$
+                              type: string
+                            workloadAPISocket:
+                              default: unix:///spiffe-workload-api/spire-agent.sock
+                              description: |-
+                                workloadAPISocket is the address of the local SPIRE agent's Workload API, as mounted
+                                into the gRPC server pod by the SPIFFE CSI driver.
+                              type: string
+                          required:
+                          - trustDomain
+                          type: object
                       required:
                       - authType
                       type: object
+                      x-kubernetes-validations:
+                      - message: spiffe is required when authType is spiffe
+                        rule: self.authType != 'spiffe' || has(self.spiffe)
                     type: array
                     x-kubernetes-list-map-keys:
                     - authType
@@ -671,8 +788,9 @@ spec:
                     items:
                       properties:
                         grpc:
-                          description: grpc represents the configuration for grpc
-                            endpoint.
+                          description: |-
+                            grpc represents the configuration for grpc endpoint. It is also used for the
+                            grpc-spiffe endpoint.
                           properties:
                             hostname:
                               description: hostname points to a fixed hostname for
@@ -701,6 +819,29 @@ spec:
                                   description: Host is the customized host name of
                                     the endpoint.
                                   type: string
+                                service:
+                                  description: Service customizes the LoadBalancer
+                                    Service generated by the operator.
+                                  properties:
+                                    metadata:
+                                      description: Metadata customizes the metadata
+                                        of the generated Service.
+                                      properties:
+                                        annotations:
+                                          additionalProperties:
+                                            type: string
+                                          description: |-
+                                            Annotations are added to the generated Service. For example, on AWS,
+                                            "service.beta.kubernetes.io/aws-load-balancer-scheme: internal" creates an internal load balancer.
+                                          type: object
+                                        labels:
+                                          additionalProperties:
+                                            type: string
+                                          description: Labels are added to the generated
+                                            Service.
+                                          type: object
+                                      type: object
+                                  type: object
                               type: object
                             route:
                               description: Route points customized configuration for
@@ -760,6 +901,29 @@ spec:
                                   description: Host is the customized host name of
                                     the endpoint.
                                   type: string
+                                service:
+                                  description: Service customizes the LoadBalancer
+                                    Service generated by the operator.
+                                  properties:
+                                    metadata:
+                                      description: Metadata customizes the metadata
+                                        of the generated Service.
+                                      properties:
+                                        annotations:
+                                          additionalProperties:
+                                            type: string
+                                          description: |-
+                                            Annotations are added to the generated Service. For example, on AWS,
+                                            "service.beta.kubernetes.io/aws-load-balancer-scheme: internal" creates an internal load balancer.
+                                          type: object
+                                        labels:
+                                          additionalProperties:
+                                            type: string
+                                          description: Labels are added to the generated
+                                            Service.
+                                          type: object
+                                      type: object
+                                  type: object
                               type: object
                             route:
                               description: Route points customized configuration for
@@ -790,11 +954,14 @@ spec:
                           type: object
                         protocol:
                           default: grpc
-                          description: protocol is the protocol used for the endpoint,
-                            could be https or grpc.
+                          description: |-
+                            protocol is the protocol used for the endpoint, could be https, grpc or grpc-spiffe.
+                            grpc-spiffe is the separate gRPC listener of the spiffe registration driver; its
+                            exposure is configured in the grpc field.
                           enum:
                           - grpc
                           - https
+                          - grpc-spiffe
                           type: string
                         usage:
                           description: |-

@@ -79,3 +79,11 @@ Create secret to access docker registry
 {{- printf "open-cluster-management-agent" }}
 {{- end }}
 {{- end }}
+
+{{/*
+"true" when the operator needs the permissions of the spiffe registration driver.
+*/}}
+{{- define "spiffeEnabled" }}
+{{- $driver := dig "registrationDriver" "authType" "" (.Values.klusterlet.registrationConfiguration | default dict) }}
+{{- if or .Values.enableSPIFFE (eq $driver "spiffe") }}true{{- end }}
+{{- end }}

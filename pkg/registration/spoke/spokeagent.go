@@ -3,6 +3,7 @@ package spoke
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -24,6 +25,7 @@ import (
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	ocmfeature "open-cluster-management.io/api/feature"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
@@ -257,13 +259,18 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		return err
 	}
 
-	hubKubeconfigSecretController := registration.NewHubKubeconfigSecretController(
-		o.agentOptions.HubKubeconfigDir, o.agentOptions.ComponentNamespace, o.registrationOption.HubKubeconfigSecret,
-		// the hub kubeconfig secret stored in the cluster where the agent pod runs
-		managementKubeClient.CoreV1(),
-		secretInformer,
-	)
-	go hubKubeconfigSecretController.Run(ctx, 1)
+	// A secretless driver (spiffe) keeps no hub credential in a Secret: there is no hub kubeconfig
+	// Secret to sync, no bootstrap phase and no credential rotation.
+	secretless := register.IsSecretless(o.driver)
+	if !secretless {
+		hubKubeconfigSecretController := registration.NewHubKubeconfigSecretController(
+			o.agentOptions.HubKubeconfigDir, o.agentOptions.ComponentNamespace, o.registrationOption.HubKubeconfigSecret,
+			// the hub kubeconfig secret stored in the cluster where the agent pod runs
+			managementKubeClient.CoreV1(),
+			secretInformer,
+		)
+		go hubKubeconfigSecretController.Run(ctx, 1)
+	}
 	go namespacedManagementKubeInformerFactory.Start(ctx.Done())
 
 	// check if there already exists a valid client config for hub
@@ -278,7 +285,14 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	// exists a valid client config for hub or not, the controller will be started and then stopped immediately
 	// in scenario #2 and #3, which results in an error message in log: 'Observed a panic: timeout waiting for
 	// informer cache'
-	if !ok {
+	if !ok && secretless {
+		// Wait for the agent's identity, for example until the platform creates its SPIRE
+		// registration entry. The cluster is created with the hub clients below.
+		logger.Info("Waiting for the agent's identity")
+		if stop, err := waitForIdentity(ctx, o.internalHubConfigValidFunc); stop {
+			return err
+		}
+	} else if !ok {
 		// create a ClientCertForHubController for spoke agent bootstrap
 		// the bootstrap informers are supposed to be terminated after completing the bootstrap process.
 		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
@@ -345,16 +359,31 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	hubDriverInformer, _ := o.driver.InformerHandler()
 
 	recorder.Event(ctx, "HubClientConfigReady", "Client config for hub is ready.")
-	// create another RegisterController for registration credential rotation
-	controllerName := fmt.Sprintf("RegisterController@cluster:%s", o.agentOptions.SpokeClusterName)
-	secretController := register.NewSecretController(
-		secretOption, o.driver, register.GenerateStatusUpdater(
+	var secretController, spokeClusterCreatingController factory.Controller
+	if secretless {
+		// Without a bootstrap phase, the agent makes sure its cluster exists with the hub clients.
+		spokeClusterCreatingController = registration.NewManagedClusterCreatingController(
+			o.agentOptions.SpokeClusterName,
+			[]registration.ManagedClusterDecorator{
+				registration.AnnotationDecorator(o.registrationOption.ClusterAnnotations),
+				registration.LabelDecorator(o.registrationOption.ClusterLabels),
+				registration.ClientConfigDecorator(o.registrationOption.SpokeExternalServerURLs, spokeClusterCABundle),
+				o.driver.ManagedClusterDecorator,
+			},
 			hubClient.ClusterClient,
-			hubClient.ClusterInformer.Lister(),
-			o.agentOptions.SpokeClusterName),
-		managementKubeClient.CoreV1(),
-		namespacedManagementKubeInformerFactory.Core().V1().Secrets().Informer(),
-		controllerName)
+		)
+	} else {
+		// create another RegisterController for registration credential rotation
+		controllerName := fmt.Sprintf("RegisterController@cluster:%s", o.agentOptions.SpokeClusterName)
+		secretController = register.NewSecretController(
+			secretOption, o.driver, register.GenerateStatusUpdater(
+				hubClient.ClusterClient,
+				hubClient.ClusterInformer.Lister(),
+				o.agentOptions.SpokeClusterName),
+			managementKubeClient.CoreV1(),
+			namespacedManagementKubeInformerFactory.Core().V1().Secrets().Informer(),
+			controllerName)
+	}
 
 	// create ManagedClusterLeaseController to keep the spoke cluster heartbeat
 	managedClusterLeaseController := lease.NewManagedClusterLeaseController(
@@ -473,6 +502,13 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		go hubDriverInformer.Run(ctx.Done())
 	}
 	go hubClient.ClusterInformer.Informer().Run(ctx.Done())
+	if secretless {
+		// Once the cluster is reachable with the new identity, the Secrets of a previous driver
+		// are no longer needed; none may stay on the cluster.
+		go registration.CleanupLegacyHubCredentials(ctx, o.agentOptions.SpokeClusterName, hubClient.ClusterInformer,
+			managementKubeClient.CoreV1().Secrets(o.agentOptions.ComponentNamespace),
+			o.registrationOption.HubKubeconfigSecret, o.registrationOption.BootstrapKubeconfigSecret)
+	}
 	go namespacedManagementKubeInformerFactory.Start(ctx.Done())
 	go hubClient.AddonInformer.Informer().Run(ctx.Done())
 
@@ -486,7 +522,12 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		go aboutInformers.Start(ctx.Done())
 	}
 
-	go secretController.Run(ctx, 1)
+	if secretController != nil {
+		go secretController.Run(ctx, 1)
+	}
+	if spokeClusterCreatingController != nil {
+		go spokeClusterCreatingController.Run(ctx, 1)
+	}
 	go managedClusterLeaseController.Run(ctx, 1)
 	go managedClusterHealthCheckController.Run(ctx, 1)
 	if o.registrationOption.ReportHostingCluster {
@@ -538,9 +579,32 @@ func (o *SpokeAgentConfig) getSpokeClusterCABundle(kubeConfig *rest.Config) ([]b
 }
 
 func (o *SpokeAgentConfig) getHubHash() (string, error) {
+	// A spiffe agent has no bootstrap kubeconfig; the hub's SPIFFE endpoint names the hub.
+	if o.registrationOption.RegisterDriverOption.RegistrationAuth == operatorv1.SPIFFEAuthType {
+		endpoint := o.registrationOption.RegisterDriverOption.SPIFFEOption.HubEndpoint
+		return fmt.Sprintf("%x", sha256.Sum256([]byte(endpoint))), nil
+	}
 	kubeConfig, err := clientcmd.BuildConfigFromFlags("", o.currentBootstrapKubeConfig)
 	if err != nil {
 		return "", fmt.Errorf("unable to load bootstrap kubeconfig: %w", err)
 	}
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(kubeConfig.Host))), nil
+}
+
+// identityPollInterval is how often a secretless agent checks for its identity.
+var identityPollInterval = 5 * time.Second
+
+// waitForIdentity waits until valid reports the agent's identity, for example until the platform
+// creates its SPIRE registration entry. stop is true when the agent must stop instead: with no
+// error when ctx ended, or with the error valid returned.
+func waitForIdentity(ctx context.Context, valid wait.ConditionWithContextFunc) (stop bool, err error) {
+	err = wait.PollUntilContextCancel(ctx, identityPollInterval, true, valid)
+	switch {
+	case err == nil:
+		return false, nil
+	case errors.Is(err, context.Canceled):
+		return true, nil
+	default:
+		return true, fmt.Errorf("failed to wait for the agent's identity: %w", err)
+	}
 }

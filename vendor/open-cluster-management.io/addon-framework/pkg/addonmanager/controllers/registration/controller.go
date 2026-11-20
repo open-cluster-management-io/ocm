@@ -115,6 +115,10 @@ func findExistingRegistration(config *addonapiv1beta1.RegistrationConfig, index 
 //   - "csr": uses subject from newConfigs, or sets default if empty
 //
 // For CustomSigner type, always uses subject from newConfigs.
+// ReasonSubjectNotSupportedBySPIFFE is the RegistrationApplied reason when an add-on on a spiffe
+// cluster asks for a kubeClient subject its agents' SVIDs don't map to.
+const ReasonSubjectNotSupportedBySPIFFE = "SubjectNotSupportedBySPIFFE"
+
 func buildRegistrationConfigs(newConfigs []agent.RegistrationConfig, existingRegistrations []addonapiv1beta1.RegistrationConfig,
 	clusterName, addonName string) []addonapiv1beta1.RegistrationConfig {
 	result := []addonapiv1beta1.RegistrationConfig{}
@@ -160,8 +164,8 @@ func buildRegistrationConfigs(newConfigs []agent.RegistrationConfig, existingReg
 				// If no matching existing registration found, clear subject (agent will set it).
 				config.KubeClient.Subject = addonapiv1beta1.KubeClientSubject{}
 			}
-		case "csr":
-			// CSR driver - use subject from newConfigs, or set default if empty
+		case "csr", agent.SPIFFEDriver:
+			// CSR and spiffe drivers - use subject from newConfigs, or set default if empty
 			if equality.Semantic.DeepEqual(config.KubeClient.Subject, addonapiv1beta1.KubeClientSubject{}) {
 				config.KubeClient.Subject = addonapiv1beta1.KubeClientSubject{
 					BaseSubject: addonapiv1beta1.BaseSubject{
@@ -329,6 +333,26 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 		}
 		if len(ns) > 0 {
 			managedClusterAddonCopy.Status.Namespace = ns
+		}
+	}
+
+	// With the spiffe driver the agent's identity on the hub comes from its SVID, so a custom
+	// kubeClient subject can't be honored.
+	if agent.UsesSPIFFE(managedClusterAddonCopy) {
+		for _, reg := range managedClusterAddonCopy.Status.Registrations {
+			if reg.Type != addonapiv1beta1.KubeClient || reg.KubeClient == nil ||
+				agent.SubjectCarriedBySVID(clusterName, addonName, reg.KubeClient.Subject) {
+				continue
+			}
+			meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
+				Type:   addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
+				Status: metav1.ConditionFalse,
+				Reason: ReasonSubjectNotSupportedBySPIFFE,
+				Message: fmt.Sprintf("kubeClient subject %q is not the identity an add-on SVID maps to on the hub; "+
+					"with the spiffe driver use the default subject", reg.KubeClient.Subject.User),
+			})
+			_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
+			return err
 		}
 	}
 

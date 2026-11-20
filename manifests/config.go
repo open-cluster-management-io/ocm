@@ -56,6 +56,22 @@ type HubConfig struct {
 	GRPCServerImage                   string
 	GRPCAutoApprovedUsers             string
 	GRPCEndpointType                  string
+	// GRPCServerEnabled renders the gRPC server: grpc or spiffe is a registration driver.
+	GRPCServerEnabled bool
+	// SPIFFEAuthEnabled renders the SPIFFE listener of the gRPC server: spiffe is a registration
+	// driver, the SPIFFERegistration feature gate is on, and its settings are valid.
+	SPIFFEAuthEnabled          bool
+	SPIFFETrustDomain          string
+	SPIFFEAgentTrustDomains    string
+	SPIFFEServerID             string
+	SPIFFEWorkloadAPISocket    string
+	SPIFFEAgentIDTemplate      string
+	SPIFFEAddOnAgentIDTemplate string
+	SPIFFEMaxSVIDLifetime      string
+	SPIFFEMaxClockSkew         string
+	// SPIFFEAutoApprovedIdentities is a comma-separated list of SPIFFE ID patterns.
+	SPIFFEAutoApprovedIdentities string
+	SPIFFEEndpointType           string
 	// TLS configuration injected into all managed hub component deployments
 	TLSMinVersion   string
 	TLSCipherSuites string

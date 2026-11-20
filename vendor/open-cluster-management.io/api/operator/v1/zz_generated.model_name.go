@@ -22,6 +22,11 @@ func (in AgentBindConfiguration) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AgentComponentConfiguration) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.AgentComponentConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in AgentConfiguration) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.operator.v1.AgentConfiguration"
 }
@@ -162,6 +167,16 @@ func (in KlusterletList) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in KlusterletSPIFFEConfig) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.KlusterletSPIFFEConfig"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in KlusterletSPIFFEStatus) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.KlusterletSPIFFEStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in KlusterletSpec) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.operator.v1.KlusterletSpec"
 }
@@ -179,6 +194,16 @@ func (in KubeConfigSecret) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in LoadBalancerConfig) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.operator.v1.LoadBalancerConfig"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in LoadBalancerServiceConfig) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.LoadBalancerServiceConfig"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in LoadBalancerServiceMetadata) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.LoadBalancerServiceMetadata"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -229,6 +254,26 @@ func (in ResourceRequirement) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in RouteConfig) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.operator.v1.RouteConfig"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in SPIFFEAdmissionPolicyStatus) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.SPIFFEAdmissionPolicyStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in SPIFFEAgentID) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.SPIFFEAgentID"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in SPIFFENamespaceRef) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.SPIFFENamespaceRef"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in SPIFFERegistrationConfig) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.SPIFFERegistrationConfig"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

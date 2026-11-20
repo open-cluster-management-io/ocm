@@ -1,0 +1,15 @@
+# Test only: kind has no load balancer, so the managed cluster reaches the hub's SPIFFE listener
+# through a NodePort on the hub node.
+apiVersion: v1
+kind: Service
+metadata:
+  name: cluster-manager-grpc-server-spiffe-e2e
+  namespace: open-cluster-management-hub
+spec:
+  type: NodePort
+  selector:
+    app: cluster-manager-grpc-server
+  ports:
+  - port: 8091
+    targetPort: 8091
+    nodePort: 30091

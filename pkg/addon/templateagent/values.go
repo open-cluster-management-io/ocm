@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -38,11 +39,13 @@ func ToAddOnRegistriesPrivateValues(config addonapiv1beta1.AddOnDeploymentConfig
 }
 
 func ToAddOnInstallNamespacePrivateValues(config addonapiv1beta1.AddOnDeploymentConfig) (addonfactory.Values, error) {
-	if len(config.Spec.AgentInstallNamespace) == 0 {
+	// nil reads as "", as the field did when it was a string.
+	namespace := ptr.Deref(config.Spec.AgentInstallNamespace, "")
+	if len(namespace) == 0 {
 		return nil, nil
 	}
 	return addonfactory.Values{
-		InstallNamespacePrivateValueKey: config.Spec.AgentInstallNamespace,
+		InstallNamespacePrivateValueKey: namespace,
 	}, nil
 }
 

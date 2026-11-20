@@ -60,7 +60,21 @@ spec:
         args:
           - "/server"
           - "grpc"
+        {{ if .GRPCAuthEnabled }}
           - "--server-config=/var/run/secrets/hub/grpc/config/config.yaml"
+        {{ else }}
+          - "--grpc-enabled=false"
+        {{ end }}
+        {{ if .SPIFFEAuthEnabled }}
+          - "--spiffe-enabled"
+          - "--spiffe-listen-address=:8091"
+          - "--spiffe-trust-domain={{ .SPIFFETrustDomain }}"
+          - "--spiffe-agent-trust-domains={{ .SPIFFEAgentTrustDomains }}"
+          - "--spiffe-server-id={{ .SPIFFEServerID }}"
+          - "--spiffe-workload-api-socket={{ .SPIFFEWorkloadAPISocket }}"
+          - "--spiffe-agent-id-template={{ .SPIFFEAgentIDTemplate }}"
+          - "--spiffe-addon-agent-id-template={{ .SPIFFEAddOnAgentIDTemplate }}"
+        {{ end }}
         {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
         {{ end }}
@@ -116,6 +130,7 @@ spec:
         volumeMounts:
         - name: tmpdir
           mountPath: /tmp
+      {{ if .GRPCAuthEnabled }}
         - name: grpc-server-config
           mountPath: "/var/run/secrets/hub/grpc/config"
           readOnly: true
@@ -125,6 +140,12 @@ spec:
         - name: grpc-server-serving-cert
           mountPath: "/var/run/secrets/hub/grpc/serving-cert"
           readOnly: true
+      {{ end }}
+      {{ if .SPIFFEAuthEnabled }}
+        - name: spiffe-workload-api
+          mountPath: /spiffe-workload-api
+          readOnly: true
+      {{ end }}
       {{ if .HostedMode }}
         - mountPath: /var/run/secrets/hub
           name: kubeconfig
@@ -133,6 +154,7 @@ spec:
       volumes:
       - name: tmpdir
         emptyDir: { }
+      {{ if .GRPCAuthEnabled }}
       - name: grpc-server-config
         configMap:
             name: grpc-server-config
@@ -143,6 +165,15 @@ spec:
       - name: grpc-server-serving-cert
         secret:
           secretName: grpc-server-serving-cert
+      {{ end }}
+      {{ if .SPIFFEAuthEnabled }}
+      # The local SPIRE agent's Workload API. The server's SVID and the trust bundles come from it
+      # and stay in memory; no Secret holds a key or certificate.
+      - name: spiffe-workload-api
+        csi:
+          driver: csi.spiffe.io
+          readOnly: true
+      {{ end }}
       {{ if .HostedMode }}
       - name: kubeconfig
         secret:

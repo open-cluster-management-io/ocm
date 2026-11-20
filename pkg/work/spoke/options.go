@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	commonspiffe "open-cluster-management.io/ocm/pkg/common/spiffe"
 	"open-cluster-management.io/ocm/pkg/work/spoke/objectreader"
 )
 
@@ -29,6 +30,11 @@ type WorkloadAgentOptions struct {
 	HubClusterName string
 
 	ObjectReaderOption *objectreader.Options
+
+	// SPIFFE, when its hub endpoint is set, makes the agent reach the hub's SPIFFE listener with
+	// its own SVID instead of loading --workload-source-config. The singleton agent shares the
+	// registration agent's settings.
+	SPIFFE *commonspiffe.Option
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
@@ -42,6 +48,7 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 		DefaultUserAgent:                       defaultUserAgent,
 		ObjectReaderOption:                     objectreader.NewOptions(),
 		WorkloadAgentWorkers:                   10,
+		SPIFFE:                                 commonspiffe.NewOption(),
 	}
 }
 
@@ -76,5 +83,14 @@ func (o *WorkloadAgentOptions) Validate() error {
 	if o.WorkloadAgentWorkers < 1 {
 		return fmt.Errorf("workload-agent-workers must be >= 1, got %d", o.WorkloadAgentWorkers)
 	}
+	if o.SPIFFE.Enabled() {
+		return o.SPIFFE.Validate()
+	}
 	return nil
+}
+
+// AddSPIFFEFlags adds the SPIFFE flags of the work agent. The singleton agent doesn't call it:
+// it shares the registration agent's flags.
+func (o *WorkloadAgentOptions) AddSPIFFEFlags(fs *pflag.FlagSet) {
+	o.SPIFFE.AddFlags(fs)
 }
