@@ -5,12 +5,86 @@ import (
 )
 
 func TestGetAwsAccountIdAndClusterName(t *testing.T) {
-
-	awsAccountId, clusterName := GetAwsAccountIdAndClusterName("arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster")
-	if awsAccountId != "123456789012" && clusterName != "hub-cluster" {
-		t.Errorf("awsAccountId and cluster id are not valid")
+	cases := []struct {
+		name              string
+		clusterArn        string
+		expectedAccountId string
+		expectedCluster   string
+	}{
+		{
+			name:              "valid arn",
+			clusterArn:        "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+			expectedAccountId: "123456789012",
+			expectedCluster:   "hub-cluster",
+		},
+		{
+			name:              "valid govcloud arn",
+			clusterArn:        "arn:aws-us-gov:eks:us-gov-west-1:123456789012:cluster/hub-cluster",
+			expectedAccountId: "123456789012",
+			expectedCluster:   "hub-cluster",
+		},
+		{
+			name:              "empty arn returns empty values instead of panicking",
+			clusterArn:        "",
+			expectedAccountId: "",
+			expectedCluster:   "",
+		},
+		{
+			name:              "malformed arn returns empty values instead of panicking",
+			clusterArn:        "not-an-arn",
+			expectedAccountId: "",
+			expectedCluster:   "",
+		},
 	}
 
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			awsAccountId, clusterName := GetAwsAccountIdAndClusterName(c.clusterArn)
+			if awsAccountId != c.expectedAccountId {
+				t.Errorf("expected accountId %q, but got %q", c.expectedAccountId, awsAccountId)
+			}
+			if clusterName != c.expectedCluster {
+				t.Errorf("expected clusterName %q, but got %q", c.expectedCluster, clusterName)
+			}
+		})
+	}
+}
+
+func TestGetAwsRegion(t *testing.T) {
+	cases := []struct {
+		name       string
+		clusterArn string
+		expected   string
+	}{
+		{
+			name:       "valid arn",
+			clusterArn: "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+			expected:   "us-west-2",
+		},
+		{
+			name:       "valid govcloud arn",
+			clusterArn: "arn:aws-us-gov:eks:us-gov-west-1:123456789012:cluster/hub-cluster",
+			expected:   "us-gov-west-1",
+		},
+		{
+			name:       "empty arn returns empty string instead of panicking",
+			clusterArn: "",
+			expected:   "",
+		},
+		{
+			name:       "malformed arn returns empty string instead of panicking",
+			clusterArn: "not-an-arn",
+			expected:   "",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if region := GetAwsRegion(c.clusterArn); region != c.expected {
+				t.Errorf("expected region %q, but got %q", c.expected, region)
+			}
+		})
+	}
 }
 
 func TestGetAwsPartition(t *testing.T) {
