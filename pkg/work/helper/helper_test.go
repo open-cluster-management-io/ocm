@@ -525,6 +525,112 @@ func TestFindManifestConfiguration(t *testing.T) {
 				UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeUpdate},
 			},
 		},
+		{
+			name: "scrape type of the first option is used when no option has rules",
+			options: []workapiv1.ManifestConfigOption{
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+					UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeServerSideApply},
+					FeedbackScrapeType: workapiv1.FeedbackWatchType},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "*", Namespace: "*"},
+					UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeUpdate},
+					FeedbackScrapeType: workapiv1.FeedbackPollType},
+			},
+			resourceMeta: workapiv1.ManifestResourceMeta{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+			expectedOption: &workapiv1.ManifestConfigOption{
+				ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+				UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeServerSideApply},
+				FeedbackScrapeType: workapiv1.FeedbackWatchType,
+			},
+		},
+		{
+			name: "scrape type is not reset by a later catch-all option with only an update strategy",
+			options: []workapiv1.ManifestConfigOption{
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+					FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+					FeedbackScrapeType: workapiv1.FeedbackWatchType},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "*", Namespace: "*"},
+					UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeServerSideApply},
+					FeedbackScrapeType: workapiv1.FeedbackPollType},
+			},
+			resourceMeta: workapiv1.ManifestResourceMeta{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+			expectedOption: &workapiv1.ManifestConfigOption{
+				ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+				FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+				UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeServerSideApply},
+				FeedbackScrapeType: workapiv1.FeedbackWatchType,
+			},
+		},
+		{
+			name: "scrape type is not taken from an earlier catch-all option with only an update strategy",
+			options: []workapiv1.ManifestConfigOption{
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "*", Namespace: "*"},
+					UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeServerSideApply},
+					FeedbackScrapeType: workapiv1.FeedbackPollType},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+					FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+					FeedbackScrapeType: workapiv1.FeedbackWatchType},
+			},
+			resourceMeta: workapiv1.ManifestResourceMeta{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+			expectedOption: &workapiv1.ManifestConfigOption{
+				ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+				FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+				UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeServerSideApply},
+				FeedbackScrapeType: workapiv1.FeedbackWatchType,
+			},
+		},
+		{
+			name: "scrape type comes from the option whose feedback rules are used",
+			options: []workapiv1.ManifestConfigOption{
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+					FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.JSONPathsType}},
+					FeedbackScrapeType: workapiv1.FeedbackPollType},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "*", Namespace: "*"},
+					FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+					FeedbackScrapeType: workapiv1.FeedbackWatchType},
+			},
+			resourceMeta: workapiv1.ManifestResourceMeta{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+			expectedOption: &workapiv1.ManifestConfigOption{
+				ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+				FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.JSONPathsType}},
+				FeedbackScrapeType: workapiv1.FeedbackPollType,
+			},
+		},
+		{
+			name: "watch is kept for an option with only condition rules",
+			options: []workapiv1.ManifestConfigOption{
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+					ConditionRules:     []workapiv1.ConditionRule{{Type: workapiv1.WellKnownConditionsType, Condition: "Completed"}},
+					FeedbackScrapeType: workapiv1.FeedbackWatchType},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "*", Namespace: "*"},
+					UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeServerSideApply},
+					FeedbackScrapeType: workapiv1.FeedbackPollType},
+			},
+			resourceMeta: workapiv1.ManifestResourceMeta{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+			expectedOption: &workapiv1.ManifestConfigOption{
+				ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+				ConditionRules:     []workapiv1.ConditionRule{{Type: workapiv1.WellKnownConditionsType, Condition: "Completed"}},
+				UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeServerSideApply},
+				FeedbackScrapeType: workapiv1.FeedbackWatchType,
+			},
+		},
+		{
+			name: "watch is kept when a later poll option adds condition rules",
+			options: []workapiv1.ManifestConfigOption{
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+					FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+					FeedbackScrapeType: workapiv1.FeedbackWatchType},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "*", Namespace: "*"},
+					ConditionRules:     []workapiv1.ConditionRule{{Type: workapiv1.WellKnownConditionsType, Condition: "Completed"}},
+					FeedbackScrapeType: workapiv1.FeedbackPollType},
+			},
+			resourceMeta: workapiv1.ManifestResourceMeta{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+			expectedOption: &workapiv1.ManifestConfigOption{
+				ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "test", Namespace: "testns"},
+				FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+				ConditionRules:     []workapiv1.ConditionRule{{Type: workapiv1.WellKnownConditionsType, Condition: "Completed"}},
+				FeedbackScrapeType: workapiv1.FeedbackWatchType,
+			},
+		},
 	}
 
 	for _, c := range cases {
