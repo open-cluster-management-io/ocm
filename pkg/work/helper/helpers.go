@@ -396,7 +396,12 @@ func resourceMatch(resourceMeta workapiv1.ManifestResourceMeta, resource workapi
 
 func FindManifestConfiguration(resourceMeta workapiv1.ManifestResourceMeta,
 	manifestOptions []workapiv1.ManifestConfigOption) *workapiv1.ManifestConfigOption {
-	// return the first matched FeedbackRules and UpdateStrategy
+	// return the first matched ConditionRules, FeedbackRules and UpdateStrategy. The
+	// FeedbackScrapeType comes from the options whose ConditionRules or FeedbackRules are
+	// used, and Watch is kept once it is selected, so another option that matches the same
+	// resource (for example a catch-all option that only sets an UpdateStrategy, whose
+	// FeedbackScrapeType defaults to Poll) does not change how the resource is monitored.
+	// If no matched option has rules, the FeedbackScrapeType of the first matched option is used.
 	rstOption := &workapiv1.ManifestConfigOption{
 		ResourceIdentifier: workapiv1.ResourceIdentifier{
 			Group:     resourceMeta.Group,
@@ -406,22 +411,33 @@ func FindManifestConfiguration(resourceMeta workapiv1.ManifestResourceMeta,
 		},
 	}
 
+	matched, scrapeTypeFromRules := false, false
 	for i := range len(manifestOptions) {
 		option := manifestOptions[i]
 		if !resourceMatch(resourceMeta, option.ResourceIdentifier) {
 			continue
 		}
 
+		rulesAdopted := false
 		if len(rstOption.ConditionRules) == 0 && len(option.ConditionRules) != 0 {
 			rstOption.ConditionRules = option.ConditionRules
+			rulesAdopted = true
 		}
 		if len(rstOption.FeedbackRules) == 0 && len(option.FeedbackRules) != 0 {
 			rstOption.FeedbackRules = option.FeedbackRules
+			rulesAdopted = true
 		}
 		if rstOption.UpdateStrategy == nil && option.UpdateStrategy != nil {
 			rstOption.UpdateStrategy = option.UpdateStrategy
 		}
-		rstOption.FeedbackScrapeType = option.FeedbackScrapeType
+		switch {
+		case rulesAdopted && (!scrapeTypeFromRules || option.FeedbackScrapeType == workapiv1.FeedbackWatchType):
+			rstOption.FeedbackScrapeType = option.FeedbackScrapeType
+			scrapeTypeFromRules = true
+		case !matched:
+			rstOption.FeedbackScrapeType = option.FeedbackScrapeType
+		}
+		matched = true
 	}
 
 	if len(rstOption.FeedbackRules) == 0 && len(rstOption.ConditionRules) == 0 && rstOption.UpdateStrategy == nil {
