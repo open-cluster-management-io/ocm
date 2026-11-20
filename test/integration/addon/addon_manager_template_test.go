@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -116,7 +117,7 @@ var _ = Describe("Template deploy Beta", func() {
 				Namespace: addonDeployConfigNamespace,
 			},
 			Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-				AgentInstallNamespace: "test-install-namespace",
+				AgentInstallNamespace: ptr.To("test-install-namespace"),
 				CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 					{Name: "LOG_LEVEL", Value: "4"},
 				},
