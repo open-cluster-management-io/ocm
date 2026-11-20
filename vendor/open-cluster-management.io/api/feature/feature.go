@@ -107,7 +107,7 @@ const (
 
 	// SIGPlacementDecision will start a new controller in the placement controller to sync
 	// PlacementDecision to the SIG Multicluster ClusterInventory PlacementDecision.
-	// API definition: https://github.com/kubernetes-sigs/cluster-inventory-api/blob/main/apis/v1alpha1/placementdecision_types.go
+	// API definition: https://github.com/kubernetes-sigs/cluster-inventory-api/blob/v0.2.0/apis/v1alpha2/placementdecision_types.go
 	// KEP: https://github.com/kubernetes/enhancements/tree/master/keps/sig-multicluster/5313-placement-decision-api
 	SIGPlacementDecision featuregate.Feature = "SIGPlacementDecision"
 
@@ -115,6 +115,10 @@ const (
 	// When enabled, a debug-server container will be added to the placement pod, providing
 	// /debug/placements/* endpoints for placement scheduling simulation and debugging.
 	PlacementDebugServer featuregate.Feature = "PlacementDebugServer"
+
+	// PlacementDecisionScoreStatus enables recording computed cluster scores in placement decisions.
+	// When enabled, the placement may optionally be configured to sort decisions by Score, instead of the default ClusterName.
+	PlacementDecisionScoreStatus featuregate.Feature = "PlacementDecisionScoreStatus"
 )
 
 // DefaultSpokeRegistrationFeatureGates consists of all known ocm-registration
@@ -147,8 +151,9 @@ var DefaultHubAddonManagerFeatureGates = map[featuregate.Feature]featuregate.Fea
 // DefaultHubPlacementFeatureGates consists of all known placement feature keys.
 // To add a new feature, define a key for it above and add it here.
 var DefaultHubPlacementFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	SIGPlacementDecision: {Default: false, PreRelease: featuregate.Alpha},
-	PlacementDebugServer: {Default: false, PreRelease: featuregate.Alpha},
+	SIGPlacementDecision:         {Default: false, PreRelease: featuregate.Alpha},
+	PlacementDebugServer:         {Default: false, PreRelease: featuregate.Alpha},
+	PlacementDecisionScoreStatus: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // DefaultHubWorkFeatureGates consists of all known acm work wehbook feature keys.

@@ -106,7 +106,7 @@ var _ = Describe("Template deploy Alpha", func() {
 				Namespace: addonDeployConfigNamespace,
 			},
 			Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-				AgentInstallNamespace: "test-install-namespace",
+				AgentInstallNamespace: new("test-install-namespace"),
 				CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 					{Name: "LOG_LEVEL", Value: "4"},
 				},
