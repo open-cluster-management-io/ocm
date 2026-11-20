@@ -1,0 +1,21 @@
+# Spoke with a two-level rack/block topology: 2 racks x 2 nodes in one block.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+featureGates:
+  GenericWorkload: true
+  TopologyAwareWorkloadScheduling: true
+  # Lets the Job controller turn a batch/v1 Job's spec.scheduling into a Workload + PodGroup.
+  WorkloadWithJob: true
+# Workload and PodGroup are served at a beta version that is off by default.
+runtimeConfig:
+  scheduling.k8s.io/v1beta1: "true"
+nodes:
+- role: control-plane
+- role: worker
+  labels: {topology.example.io/block: block-1, topology.example.io/rack: rack-a}
+- role: worker
+  labels: {topology.example.io/block: block-1, topology.example.io/rack: rack-a}
+- role: worker
+  labels: {topology.example.io/block: block-1, topology.example.io/rack: rack-b}
+- role: worker
+  labels: {topology.example.io/block: block-1, topology.example.io/rack: rack-b}

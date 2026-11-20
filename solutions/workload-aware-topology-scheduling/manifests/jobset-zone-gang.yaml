@@ -1,0 +1,62 @@
+apiVersion: work.open-cluster-management.io/v1alpha1
+kind: ManifestWorkReplicaSet
+metadata:
+  name: zone-gang
+  namespace: was-demo
+spec:
+  placementRefs:
+  - name: zone-topology
+  manifestWorkTemplate:
+    workload:
+      manifests:
+      - apiVersion: jobset.x-k8s.io/v1alpha2
+        kind: JobSet
+        metadata:
+          name: zone-gang
+          namespace: default
+        spec:
+          successPolicy:
+            operator: All
+          scheduling:
+            # One PodGroup for the whole JobSet: all 2 pods are bound together or none are.
+            schedulingPolicy:
+              gang: {}
+            disruptionMode:
+              all: {}
+            # Every pod in the gang must land in the same topology.kubernetes.io/zone domain.
+            schedulingConstraints:
+              topology:
+              - key: topology.kubernetes.io/zone
+          replicatedJobs:
+          - name: worker
+            replicas: 1
+            template:
+              spec:
+                parallelism: 2
+                completions: 2
+                completionMode: Indexed
+                backoffLimit: 0
+                template:
+                  spec:
+                    restartPolicy: Never
+                    containers:
+                    - name: worker
+                      image: gcr.io/k8s-staging-perf-tests/sleep:v0.1.0
+                      args: ["120s"]
+                      resources:
+                        requests: {cpu: 100m, memory: 32Mi}
+    manifestConfigs:
+    - resourceIdentifier:
+        group: jobset.x-k8s.io
+        resource: jobsets
+        name: zone-gang
+        namespace: default
+      feedbackRules:
+      - type: JSONPaths
+        jsonPaths:
+        - name: ready
+          path: .status.replicatedJobsStatus[0].ready
+        - name: active
+          path: .status.replicatedJobsStatus[0].active
+        - name: succeeded
+          path: .status.replicatedJobsStatus[0].succeeded

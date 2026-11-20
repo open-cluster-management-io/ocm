@@ -1,0 +1,5 @@
+# Helm values for oci://registry.k8s.io/jobset/charts/jobset.
+controller:
+  featureGates:
+    # Lets JobSet translate spec.scheduling into native Workload/PodGroup objects.
+    JobSetWorkloadAwareSchedulingAPI: true

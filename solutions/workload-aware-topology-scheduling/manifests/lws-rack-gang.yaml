@@ -1,0 +1,59 @@
+apiVersion: work.open-cluster-management.io/v1alpha1
+kind: ManifestWorkReplicaSet
+metadata:
+  name: rack-lws
+  namespace: was-demo
+spec:
+  placementRefs:
+  - name: rack-lws-topology
+  manifestWorkTemplate:
+    workload:
+      manifests:
+      - apiVersion: leaderworkerset.x-k8s.io/v1
+        kind: LeaderWorkerSet
+        metadata:
+          name: rack-lws
+          namespace: default
+        spec:
+          replicas: 2
+          scheduling:
+            # Replica mode: one gang PodGroup per replica (leader + workers), minCount = size.
+            # Each replica is bound all at once, inside one rack; different replicas
+            # may use different racks.
+            replica:
+              schedulingPolicy:
+                gang: {}
+              disruptionMode:
+                all: {}
+              schedulingConstraints:
+                topology:
+                - key: topology.example.io/rack
+          leaderWorkerTemplate:
+            size: 3
+            leaderTemplate:
+              spec:
+                containers:
+                - name: leader
+                  image: registry.k8s.io/pause:3.10
+                  resources:
+                    requests: {cpu: 100m, memory: 32Mi}
+            workerTemplate:
+              spec:
+                containers:
+                - name: worker
+                  image: registry.k8s.io/pause:3.10
+                  resources:
+                    requests: {cpu: 100m, memory: 32Mi}
+    manifestConfigs:
+    - resourceIdentifier:
+        group: leaderworkerset.x-k8s.io
+        resource: leaderworkersets
+        name: rack-lws
+        namespace: default
+      feedbackRules:
+      - type: JSONPaths
+        jsonPaths:
+        - name: replicas
+          path: .status.replicas
+        - name: readyReplicas
+          path: .status.readyReplicas
