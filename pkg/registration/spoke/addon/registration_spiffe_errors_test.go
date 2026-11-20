@@ -110,10 +110,10 @@ func TestSPIFFEAddOnConfigFailures(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			r := runSPIFFERegistration(t, c.cluster, c.auth, true, nil)
-			if r.err != nil {
-				t.Fatal(r.err)
+			// Returned, so the registration is tried again.
+			if r.err == nil || !strings.Contains(r.err.Error(), c.want) {
+				t.Fatalf("error %v, want one mentioning %q", r.err, c.want)
 			}
-			defer r.stop()
 			got, err := r.addOnClient.AddonV1beta1().ManagedClusterAddOns(c.cluster).Get(context.TODO(), "my-addon", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)

@@ -71,10 +71,16 @@ func TestSPIFFEAddOnRegistration(t *testing.T) {
 						User: "system:open-cluster-management:cluster:cluster1:addon:my-addon:agent:my-agent"}}}},
 				addonInstallOption: addonInstallOption{InstallationNamespace: c.namespace},
 			})
-			if err != nil {
+			if c.wantReason == ReasonAddOnNamespaceNotDedicated {
+				// Not kept as done: tried again until the namespace is dedicated.
+				if err == nil || stop != nil {
+					t.Fatalf("a refusal that can clear returned %v", err)
+				}
+			} else if err != nil {
 				t.Fatal(err)
+			} else {
+				defer stop()
 			}
-			defer stop()
 
 			for _, a := range kubeClient.Actions() {
 				if a.GetVerb() == "create" && a.GetResource().Resource != "configmaps" {

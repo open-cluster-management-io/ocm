@@ -409,6 +409,11 @@ func (c *addOnRegistrationController) startSPIFFERegistration(ctx context.Contex
 			return nil, err
 		}
 	}
+	if cond.Status == metav1.ConditionFalse && cond.Reason != ReasonCustomSignerNotSupported {
+		// It can clear (the namespace is dedicated later, the ConfigMap can be written): return an
+		// error so the registration isn't kept as done and is tried again.
+		return nil, fmt.Errorf("add-on %s: %s", config.addOnName, cond.Message)
+	}
 	return func() {
 		if cmName == "" {
 			return

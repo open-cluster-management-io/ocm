@@ -36,16 +36,30 @@ func CleanupLegacyHubCredentials(ctx context.Context, clusterName string, cluste
 	if err != nil {
 		return
 	}
+	pending := map[string]bool{}
 	for _, name := range names {
-		if name == "" {
-			continue
-		}
-		err := secrets.Delete(ctx, name, metav1.DeleteOptions{})
-		switch {
-		case err == nil:
-			logger.Info("Deleted the hub credential of the previous registration driver", "secret", name)
-		case !errors.IsNotFound(err):
-			logger.Error(err, "Failed to delete the hub credential of the previous registration driver", "secret", name)
+		if name != "" {
+			pending[name] = true
 		}
 	}
+	// A failed delete is tried again until it succeeds or the agent stops: the old credential
+	// must not stay behind.
+	_ = wait.PollUntilContextCancel(ctx, legacyCredentialsPollInterval, true, func(ctx context.Context) (bool, error) {
+		for _, name := range names {
+			if !pending[name] {
+				continue
+			}
+			err := secrets.Delete(ctx, name, metav1.DeleteOptions{})
+			switch {
+			case err == nil:
+				logger.Info("Deleted the hub credential of the previous registration driver", "secret", name)
+				delete(pending, name)
+			case errors.IsNotFound(err):
+				delete(pending, name)
+			default:
+				logger.Error(err, "Failed to delete the hub credential of the previous registration driver; trying again", "secret", name)
+			}
+		}
+		return len(pending) == 0, nil
+	})
 }

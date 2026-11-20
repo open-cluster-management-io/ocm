@@ -122,9 +122,12 @@ func TestCleanupLegacyHubCredentialsClusterCreatedLater(t *testing.T) {
 func TestCleanupLegacyHubCredentialsDeleteError(t *testing.T) {
 	legacyCredentialsPollInterval = 10 * time.Millisecond
 	const ns = "open-cluster-management-agent"
-	kubeClient := kubefake.NewSimpleClientset(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "bootstrap-hub-kubeconfig", Namespace: ns}})
+	kubeClient := kubefake.NewSimpleClientset(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "bootstrap-hub-kubeconfig", Namespace: ns}},
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "hub-kubeconfig-secret", Namespace: ns}})
+	failures := 0
 	kubeClient.PrependReactor("delete", "secrets", func(a clienttesting.Action) (bool, runtime.Object, error) {
-		if a.(clienttesting.DeleteAction).GetName() == "hub-kubeconfig-secret" {
+		if a.(clienttesting.DeleteAction).GetName() == "hub-kubeconfig-secret" && failures < 2 {
+			failures++
 			return true, nil, errors.NewForbidden(corev1.Resource("secrets"), "hub-kubeconfig-secret", nil)
 		}
 		return false, nil, nil
@@ -140,5 +143,34 @@ func TestCleanupLegacyHubCredentialsDeleteError(t *testing.T) {
 		"hub-kubeconfig-secret", "bootstrap-hub-kubeconfig")
 	if _, err := kubeClient.CoreV1().Secrets(ns).Get(context.TODO(), "bootstrap-hub-kubeconfig", metav1.GetOptions{}); err == nil {
 		t.Error("the second Secret wasn't deleted after the first failed")
+	}
+	if _, err := kubeClient.CoreV1().Secrets(ns).Get(context.TODO(), "hub-kubeconfig-secret", metav1.GetOptions{}); err == nil {
+		t.Error("the Secret whose delete failed wasn't deleted on a later try")
+	}
+	if failures != 2 {
+		t.Errorf("%d failed tries, want 2 before it succeeded", failures)
+	}
+}
+
+// A delete that keeps failing is tried until the agent stops.
+func TestCleanupLegacyHubCredentialsStoppedWhileFailing(t *testing.T) {
+	legacyCredentialsPollInterval = 10 * time.Millisecond
+	const ns = "open-cluster-management-agent"
+	kubeClient := kubefake.NewSimpleClientset()
+	tries := 0
+	kubeClient.PrependReactor("delete", "secrets", func(clienttesting.Action) (bool, runtime.Object, error) {
+		tries++
+		return true, nil, errors.NewForbidden(corev1.Resource("secrets"), "hub-kubeconfig-secret", nil)
+	})
+	cluster := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1"}, Spec: clusterv1.ManagedClusterSpec{HubAcceptsClient: true}}
+	informers := clusterinformers.NewSharedInformerFactory(clusterfake.NewSimpleClientset(cluster), 0)
+	clusterInformer := informers.Cluster().V1().ManagedClusters()
+	clusterInformer.Informer()
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	informers.Start(ctx.Done())
+	CleanupLegacyHubCredentials(ctx, "cluster1", clusterInformer, kubeClient.CoreV1().Secrets(ns), "hub-kubeconfig-secret")
+	if tries < 2 {
+		t.Errorf("tried %d times, want it tried again until the agent stops", tries)
 	}
 }
