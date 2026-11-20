@@ -23,7 +23,7 @@ webhooks() { k get validatingwebhookconfigurations -o jsonpath='{range .items[*]
 
 version=$(k version -o json 2>/dev/null | jq -r .serverVersion.gitVersion)
 echo "== Kubernetes $version"
-if k api-resources --api-group=admissionregistration.k8s.io -o name | grep -qx validatingadmissionpolicies.admissionregistration.k8s.io; then
+if k get --raw /apis/admissionregistration.k8s.io/v1 | jq -e '.resources[] | select(.name == "validatingadmissionpolicies")' >/dev/null; then
   fail "the cluster serves ValidatingAdmissionPolicy: this check is for clusters older than 1.30"
 fi
 [[ "$(jp '{.status.spiffe.admissionEnforcement}')" == ValidatingWebhook ]] || fail "not on the webhook"

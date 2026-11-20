@@ -1,31 +1,36 @@
 #!/usr/bin/env bash
-# Checks that a pod on the managed cluster that looks like cluster1's work agent gets its SVID.
+# Checks that a pod on the managed cluster that looks like a work agent gets its SVID. It uses a
+# cluster name, namespace and SPIRE entries of its own (cluster "smoke", namespace spiffe-smoke),
+# so it never touches an installed Klusterlet's agent namespace or entries, and it removes what it
+# created however it ends.
 set -euo pipefail
 source "$(dirname "$0")/env.sh"
-ns=open-cluster-management-agent
+cluster=smoke ns=spiffe-smoke
+k() { kubectl --context "$SPOKE_CTX" "$@"; }
+entries() { CLUSTER=$cluster AGENT_NAMESPACE=$ns KLUSTERLET=$cluster envsubst '${CLUSTER} ${AGENT_NAMESPACE} ${KLUSTERLET}' \
+  < "$SPIFFE_E2E_DIR/entries-spoke.yaml.tmpl"; }
+cleanup() {
+  local status=$?
+  k delete namespace "$ns" --ignore-not-found --wait=false >/dev/null || true
+  entries | k delete -f - --ignore-not-found >/dev/null || true
+  exit $status
+}
+trap cleanup EXIT
 
-kubectl --context "$SPOKE_CTX" create namespace "$ns" --dry-run=client -o yaml | kubectl --context "$SPOKE_CTX" apply -f -
-kubectl --context "$SPOKE_CTX" -n "$ns" create serviceaccount klusterlet-work-sa --dry-run=client -o yaml |
-  kubectl --context "$SPOKE_CTX" apply -f -
-CLUSTER=cluster1 AGENT_NAMESPACE=$ns KLUSTERLET=klusterlet envsubst '${CLUSTER} ${AGENT_NAMESPACE} ${KLUSTERLET}' \
-  < "$SPIFFE_E2E_DIR/entries-spoke.yaml.tmpl" | kubectl --context "$SPOKE_CTX" apply -f -
-kubectl --context "$SPOKE_CTX" -n "$ns" delete pod svid-check --ignore-not-found
-kubectl --context "$SPOKE_CTX" apply -f "$SPIFFE_E2E_DIR/svid-check-pod.yaml"
+k create namespace "$ns" --dry-run=client -o yaml | k apply -f -
+k -n "$ns" create serviceaccount klusterlet-work-sa --dry-run=client -o yaml | k apply -f -
+entries | k apply -f -
+k -n "$ns" delete pod svid-check --ignore-not-found
+sed "s/namespace: open-cluster-management-agent/namespace: $ns/" "$SPIFFE_E2E_DIR/svid-check-pod.yaml" | k apply -f -
 
-want="spiffe://${TRUST_DOMAIN}/ocm/cluster/cluster1/agent/work"
+want="spiffe://${TRUST_DOMAIN}/ocm/cluster/${cluster}/agent/work"
 for _ in $(seq 60); do
-  phase=$(kubectl --context "$SPOKE_CTX" -n "$ns" get pod svid-check -o jsonpath='{.status.phase}')
+  phase=$(k -n "$ns" get pod svid-check -o jsonpath='{.status.phase}')
   if [[ "$phase" == Succeeded ]]; then break; fi
   sleep 5
 done
-out=$(kubectl --context "$SPOKE_CTX" -n "$ns" logs svid-check)
+out=$(k -n "$ns" logs svid-check)
 echo "$out"
-
-# Clean up: the real agents come with the Klusterlet, and its admission policies need a namespace
-# the operator trusts.
-kubectl --context "$SPOKE_CTX" delete namespace "$ns" --wait=false
-CLUSTER=cluster1 AGENT_NAMESPACE=$ns KLUSTERLET=klusterlet envsubst '${CLUSTER} ${AGENT_NAMESPACE} ${KLUSTERLET}' \
-  < "$SPIFFE_E2E_DIR/entries-spoke.yaml.tmpl" | kubectl --context "$SPOKE_CTX" delete -f - --ignore-not-found
 
 if ! grep -q "SPIFFE ID:.*${want}" <<<"$out"; then
   echo "FAIL: the pod didn't get ${want}" >&2

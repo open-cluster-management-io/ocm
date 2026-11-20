@@ -26,7 +26,7 @@ endpoint (`https_spiffe`, a NodePort on the kind network), and each has a
 | Script | Does |
 | --- | --- |
 | `setup.sh` | creates the clusters, installs SPIRE, runs `smoke.sh` |
-| `smoke.sh` | a pod that looks like cluster1's work agent gets its SVID |
+| `smoke.sh` | a pod that looks like a work agent gets its SVID, in a namespace and with SPIRE entries of its own |
 | `images.sh` | builds the OCM images from this checkout and loads them into both clusters |
 | `install-ocm.sh` | hub with the spiffe driver, join with no token, entries after `SPIFFEAdmissionReady`, accept; `SPIFFE_ADMISSION_ENFORCEMENT` is `ValidatingAdmissionPolicy` (default here) or `ValidatingWebhook`, whose operator SPIRE entry (`entries-operator.yaml.tmpl`) it applies first |
 | `install-ocm-policy-first.sh` | on a cluster older than 1.30: join with `ValidatingAdmissionPolicy` is refused, a Klusterlet created with it anyway is refused with `UnsupportedKubernetesVersion` and deploys nothing, then `ValidatingWebhook` finishes the join |

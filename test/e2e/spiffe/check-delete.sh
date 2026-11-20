@@ -21,19 +21,6 @@ spiffe=$(kubectl --context "$HUB_CTX" get clustermanager cluster-manager \
 hold=$(( $(seconds "$(jq -r .maxSVIDLifetime <<<"$spiffe")") + $(seconds "$(jq -r .maxClockSkew <<<"$spiffe")") ))
 echo "the delete guard should hold the cluster for ${hold}s"
 
-# wait_agents_lead: after the agents restart, wait until the new work agent holds its leader lease;
-# an old pod that didn't release it makes the new one wait for the lease to expire.
-wait_agents_lead() {
-  local pod holder
-  for _ in $(seq 60); do
-    pod=$(kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent get pods -o name | grep -m1 work-agent || true)
-    holder=$(kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent get lease work-agent-lock \
-      -o jsonpath='{.spec.holderIdentity}' 2>/dev/null || true)
-    [[ -n "$pod" && "$holder" == "${pod#pod/}"_* ]] && return 0
-    sleep 5
-  done
-  echo "FAIL: the new work agent didn't become leader"; exit 1
-}
 # Start from fresh agents: a new connection and a new SVID. Otherwise, after short SVIDs (for
 # example check-rotation's), the hub may close the connection at the old SVID's expiry just as the
 # entries go, and the agent's reconnect backoff can outlast its last SVID, so it can't clean up.
@@ -67,16 +54,24 @@ start=$(date +%s)
 kubectl --context "$HUB_CTX" delete managedcluster "$CLUSTER" --wait=false | cat
 
 fail=0
-for _ in $(seq 120); do on_spoke || break; sleep 1; done
+# gone_at is when the cluster was first seen gone, watched from the delete on, also while the
+# work agent cleans up, so an early release is caught however long the cleanup takes.
+gone_at=""
+note_gone() {
+  [[ -n "$gone_at" ]] && return 0
+  kubectl --context "$HUB_CTX" get managedcluster "$CLUSTER" >/dev/null 2>&1 || gone_at=$(date +%s)
+}
+for _ in $(seq 120); do note_gone; on_spoke || break; sleep 1; done
 if on_spoke; then echo "FAIL: the ManifestWork's ConfigMap is still on the managed cluster"; fail=1
 else echo "OK: the work agent removed the ManifestWork's ConfigMap after $(( $(date +%s) - start ))s"; fi
 
 for _ in $(seq $((hold + 120))); do
-  kubectl --context "$HUB_CTX" get managedcluster "$CLUSTER" >/dev/null 2>&1 || break
+  note_gone
+  [[ -n "$gone_at" ]] && break
   sleep 1
 done
-took=$(( $(date +%s) - start ))
-if kubectl --context "$HUB_CTX" get managedcluster "$CLUSTER" >/dev/null 2>&1; then
+took=$(( ${gone_at:-$(date +%s)} - start ))
+if [[ -z "$gone_at" ]]; then
   echo "FAIL: the cluster is still there after ${took}s, finalizers:" \
     "$(kubectl --context "$HUB_CTX" get managedcluster "$CLUSTER" -o jsonpath='{.metadata.finalizers}')"
   kubectl --context "$HUB_CTX" -n "$CLUSTER" get manifestworks 2>&1 | cat

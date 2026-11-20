@@ -20,7 +20,7 @@ wait_for() { # wait_for <description> <command...>
   fail "$what"
 }
 count() { k get "$1" -o name 2>/dev/null | grep -c "ocm-spiffe-.*$KLUSTERLET\|ocm-spiffe-addon-namespace-label" || true; }
-served() { k api-resources --api-group=admissionregistration.k8s.io -o name | grep -qx validatingadmissionpolicies.admissionregistration.k8s.io; }
+served() { k get --raw /apis/admissionregistration.k8s.io/v1 | jq -e '.resources[] | select(.name == "validatingadmissionpolicies")' >/dev/null; }
 recorded() { [[ "$(jp '{.status.spiffe.admissionEnforcement}')" == "$1" && "$(cond SPIFFEAdmissionReady status)" == True ]]; }
 in_place() { # in_place <enforcement>: its three objects exist and the other's are gone
   if [[ $1 == ValidatingAdmissionPolicy ]]; then
@@ -73,12 +73,14 @@ from=$(jp '{.spec.registrationConfiguration.registrationDriver.spiffe.admissionE
 [[ "$from" != "$to" ]] || fail "already $to"
 before=$(agent_pods)
 echo "== migrate from $from to $to; agents: $before"
+# Only this migration's logs count: an earlier recovery is no concern of this one.
+since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 k patch klusterlet "$KLUSTERLET" --type merge -p \
   "{\"spec\":{\"registrationConfiguration\":{\"registrationDriver\":{\"spiffe\":{\"admissionEnforcement\":\"$to\"}}}}}" >/dev/null
 check "$to"
 [[ "$(agent_pods)" == "$before" ]] || fail "the migration restarted agents: $(agent_pods)"
 echo "the agents were not restarted"
-if k -n open-cluster-management logs deploy/klusterlet --since=10m | grep -q "waiting for pods to go before recording"; then
+if k -n open-cluster-management logs deploy/klusterlet --since-time="$since" | grep -q "waiting for pods to go before recording"; then
   fail "the migration ran recovery"
 fi
 echo "no recovery ran"

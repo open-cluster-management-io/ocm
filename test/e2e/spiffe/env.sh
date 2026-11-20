@@ -20,3 +20,29 @@ SPIRE_CLASS=spire-server-spire
 node_ip() {
   docker inspect -f '{{.NetworkSettings.Networks.kind.IPAddress}}' "$1-control-plane"
 }
+
+# work_agent prints the Deployment and leader lease of the agent that runs the work agent:
+# klusterlet-agent in Singleton mode, the work agent in Default mode.
+work_agent() {
+  if kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent get deployment klusterlet-agent >/dev/null 2>&1; then
+    echo "klusterlet-agent klusterlet-agent-lock"
+  else
+    echo "work-agent work-agent-lock"
+  fi
+}
+
+# wait_agents_lead: after the agents restart, wait until the new pod of the agent that runs the
+# work agent holds its leader lease; an old pod that didn't release it makes the new one wait for
+# the lease to expire.
+wait_agents_lead() {
+  local name lease pod holder
+  read -r name lease < <(work_agent)
+  for _ in $(seq 60); do
+    pod=$(kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent get pods -o name | grep -m1 "$name" || true)
+    holder=$(kubectl --context "$SPOKE_CTX" -n open-cluster-management-agent get lease "$lease" \
+      -o jsonpath='{.spec.holderIdentity}' 2>/dev/null || true)
+    [[ -n "$pod" && "$holder" == "${pod#pod/}"_* ]] && return 0
+    sleep 5
+  done
+  echo "FAIL: the new $name pod didn't become leader (lease $lease)"; exit 1
+}

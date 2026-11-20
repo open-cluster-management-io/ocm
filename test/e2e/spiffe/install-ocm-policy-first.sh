@@ -27,7 +27,7 @@ join() { # join <enforcement> [extra flags]
 }
 
 version=$(k version -o json 2>/dev/null | jq -r .serverVersion.gitVersion)
-if k api-resources --api-group=admissionregistration.k8s.io -o name | grep -qx validatingadmissionpolicies.admissionregistration.k8s.io; then
+if k get --raw /apis/admissionregistration.k8s.io/v1 | jq -e '.resources[] | select(.name == "validatingadmissionpolicies")' >/dev/null; then
   fail "Kubernetes $version serves ValidatingAdmissionPolicy: this is for clusters older than 1.30"
 fi
 

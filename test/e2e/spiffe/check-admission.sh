@@ -45,7 +45,7 @@ in_place() { # in_place <enforcement>: its three objects exist and the other's a
     [[ $(count validatingwebhookconfigurations) == 3 ]] && { ! served || policies_gone; }
   fi
 }
-served() { k api-resources --api-group=admissionregistration.k8s.io -o name | grep -qx validatingadmissionpolicies.admissionregistration.k8s.io; }
+served() { k get --raw /apis/admissionregistration.k8s.io/v1 | jq -e '.resources[] | select(.name == "validatingadmissionpolicies")' >/dev/null; }
 other() { [[ $1 == ValidatingAdmissionPolicy ]] && echo ValidatingWebhook || echo ValidatingAdmissionPolicy; }
 show_webhook() { echo "the webhook serves as $(jp '{.status.spiffe.webhookSPIFFEID}') at $(jp '{.status.spiffe.webhookDNSName}')"; }
 
