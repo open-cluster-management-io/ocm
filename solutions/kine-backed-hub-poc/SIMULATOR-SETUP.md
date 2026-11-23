@@ -43,7 +43,7 @@ go run ./solutions/manifestwork-simulator \
 
 Open <http://127.0.0.1:8080>. The simulator binds to loopback. Load generation is explicitly enabled above, but it creates no simulator resources until `RUN` is typed in the dashboard. Start with small values and confirm the dashboard is connected to the disposable Kine OCM API before starting. The simulator relies on the POC's registration auto-approval and client-certificate signer.
 
-The hosting kubeconfig is used for hosting API and container metrics; the OCM kubeconfig is used for simulator resources and the Kine-backed API metrics. Missing optional metrics may appear blank. The direct-hub comparison is an estimate unless calibrated with a separate etcd-backed baseline; do not present it as measured savings.
+The hosting kubeconfig is used for hosting API and container metrics; the OCM kubeconfig is used for simulator resources and the Kine-backed API metrics. Missing optional metrics may appear blank. The direct-hub comparison is an estimate unless calibrated with a separate etcd-backed baseline; do not present it as measured savings. A recorded calibration from an etcd-backed direct hub and the measured comparison results are in [LOAD-COMPARISON-RESULTS.md](LOAD-COMPARISON-RESULTS.md) — pass its [`direct-hub-baseline.csv`](direct-hub-baseline.csv) via `--baseline-csv` to reproduce the calibrated dashboard comparison.
 
 For permissions, dashboard behavior, recovery by run ID, and simulator safety boundaries, see the [simulator README](../manifestwork-simulator/README.md).
 

@@ -125,11 +125,15 @@ in this worktree at `solutions/manifestwork-simulator`. It generates synthetic
 fleet load (registration, leases, ManifestWork create/update/watch/status)
 against the Kine-backed OCM API and collects API-server, etcd, Kine and
 PostgreSQL metrics in a loopback-only dashboard. See
-[SIMULATOR-SETUP.md](SIMULATOR-SETUP.md) for running it against this POC. The
+[SIMULATOR-SETUP.md](SIMULATOR-SETUP.md) for running it against this POC, and
+[LOAD-COMPARISON-RESULTS.md](LOAD-COMPARISON-RESULTS.md) for the recorded
+measured comparison against an etcd-backed direct hub, including the
+calibration data in [direct-hub-baseline.csv](direct-hub-baseline.csv). The
 simulator writes nothing until it is started with `--enable-load` and the
 operator types `RUN` in the dashboard; point it only at a disposable test API.
-Its direct-hub comparison is a modeled estimate unless calibrated against a
-measured etcd-backed baseline; do not present it as measured savings.
+Its direct-hub comparison is a calibrated model when a baseline CSV is
+supplied and a modeled estimate otherwise; do not present it as measured
+savings.
 
 ## Proof-of-technology results
 
