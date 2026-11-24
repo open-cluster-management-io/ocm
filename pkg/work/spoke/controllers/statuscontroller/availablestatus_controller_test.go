@@ -1,6 +1,7 @@
 package statuscontroller
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/workqueue"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
@@ -996,10 +998,25 @@ func TestRegisterUnregisterInformersBasedOnFeedbackType(t *testing.T) {
 			},
 		})
 
+	specificDeployment := workapiv1.ResourceIdentifier{
+		Group:     "apps",
+		Resource:  "deployments",
+		Name:      "test-deployment",
+		Namespace: "default",
+	}
+	allDeployments := workapiv1.ResourceIdentifier{
+		Group:     "apps",
+		Resource:  "deployments",
+		Name:      "*",
+		Namespace: "*",
+	}
+
 	cases := []struct {
-		name            string
-		manifestConfigs []workapiv1.ManifestConfigOption
-		manifests       []workapiv1.Manifest
+		name               string
+		manifestConfigs    []workapiv1.ManifestConfigOption
+		manifests          []workapiv1.Manifest
+		expectedRegister   int
+		expectedUnregister int
 	}{
 		{
 			name: "Register informer for FeedbackWatchType",
@@ -1020,6 +1037,7 @@ func TestRegisterUnregisterInformersBasedOnFeedbackType(t *testing.T) {
 			manifests: []workapiv1.Manifest{
 				util.ToManifest(deployment),
 			},
+			expectedRegister: 1,
 		},
 		{
 			name: "Do not register informer for FeedbackPollType",
@@ -1040,6 +1058,7 @@ func TestRegisterUnregisterInformersBasedOnFeedbackType(t *testing.T) {
 			manifests: []workapiv1.Manifest{
 				util.ToManifest(deployment),
 			},
+			expectedUnregister: 1,
 		},
 		{
 			name: "Do not register informer when FeedbackScrapeType is empty",
@@ -1059,6 +1078,76 @@ func TestRegisterUnregisterInformersBasedOnFeedbackType(t *testing.T) {
 			manifests: []workapiv1.Manifest{
 				util.ToManifest(deployment),
 			},
+			expectedUnregister: 1,
+		},
+		{
+			name: "Register informer when a later catch-all option only sets the update strategy",
+			manifestConfigs: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: specificDeployment,
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{Type: workapiv1.WellKnownStatusType},
+					},
+					FeedbackScrapeType: workapiv1.FeedbackWatchType,
+				},
+				{
+					ResourceIdentifier: allDeployments,
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeServerSideApply,
+					},
+					FeedbackScrapeType: workapiv1.FeedbackPollType,
+				},
+			},
+			manifests: []workapiv1.Manifest{
+				util.ToManifest(deployment),
+			},
+			expectedRegister: 1,
+		},
+		{
+			name: "Register informer when an earlier catch-all option only sets the update strategy",
+			manifestConfigs: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: allDeployments,
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeServerSideApply,
+					},
+					FeedbackScrapeType: workapiv1.FeedbackPollType,
+				},
+				{
+					ResourceIdentifier: specificDeployment,
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{Type: workapiv1.WellKnownStatusType},
+					},
+					FeedbackScrapeType: workapiv1.FeedbackWatchType,
+				},
+			},
+			manifests: []workapiv1.Manifest{
+				util.ToManifest(deployment),
+			},
+			expectedRegister: 1,
+		},
+		{
+			name: "Do not register informer when the feedback rules in use come from a Poll option",
+			manifestConfigs: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: specificDeployment,
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{Type: workapiv1.JSONPathsType},
+					},
+					FeedbackScrapeType: workapiv1.FeedbackPollType,
+				},
+				{
+					ResourceIdentifier: allDeployments,
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{Type: workapiv1.WellKnownStatusType},
+					},
+					FeedbackScrapeType: workapiv1.FeedbackWatchType,
+				},
+			},
+			manifests: []workapiv1.Manifest{
+				util.ToManifest(deployment),
+			},
+			expectedUnregister: 1,
 		},
 	}
 
@@ -1070,10 +1159,11 @@ func TestRegisterUnregisterInformersBasedOnFeedbackType(t *testing.T) {
 			fakeClient := fakeworkclient.NewSimpleClientset()
 			informerFactory := workinformers.NewSharedInformerFactory(fakeClient, 10*time.Minute)
 
-			r, err := objectreader.NewOptions().NewObjectReader(fakeDynamicClient, informerFactory.Work().V1().ManifestWorks())
+			reader, err := objectreader.NewOptions().NewObjectReader(fakeDynamicClient, informerFactory.Work().V1().ManifestWorks())
 			if err != nil {
 				t.Fatal(err)
 			}
+			r := &countingObjectReader{ObjectReader: reader}
 
 			conditionReader, err := conditions.NewConditionReader()
 			if err != nil {
@@ -1084,6 +1174,12 @@ func TestRegisterUnregisterInformersBasedOnFeedbackType(t *testing.T) {
 			testingWork.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
 			testingWork.Spec.Workload.Manifests = c.manifests
 			testingWork.Spec.ManifestConfigs = c.manifestConfigs
+			testingWork.Status.Conditions = []metav1.Condition{
+				{
+					Type:   workapiv1.WorkApplied,
+					Status: metav1.ConditionTrue,
+				},
+			}
 			testingWork.Status.ResourceStatus.Manifests = []workapiv1.ManifestCondition{
 				{
 					ResourceMeta: workapiv1.ManifestResourceMeta{
@@ -1101,6 +1197,9 @@ func TestRegisterUnregisterInformersBasedOnFeedbackType(t *testing.T) {
 					},
 				},
 			}
+			if err := fakeClient.Tracker().Add(testingWork); err != nil {
+				t.Fatal(err)
+			}
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, testingWork.Namespace)
 			controller := AvailableStatusController{
@@ -1117,9 +1216,28 @@ func TestRegisterUnregisterInformersBasedOnFeedbackType(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// Note: We cannot directly verify internal informer state from tests
-			// since objectReader is now private. The test verifies that the sync
-			// completes without error, which indirectly validates the registration logic.
+			if r.register != c.expectedRegister || r.unregister != c.expectedUnregister {
+				t.Errorf("expected register=%d unregister=%d, but got register=%d unregister=%d",
+					c.expectedRegister, c.expectedUnregister, r.register, r.unregister)
+			}
 		})
 	}
+}
+
+// countingObjectReader counts the informer registrations made through the wrapped ObjectReader.
+type countingObjectReader struct {
+	objectreader.ObjectReader
+	register   int
+	unregister int
+}
+
+func (r *countingObjectReader) RegisterInformer(ctx context.Context, workName string,
+	resourceMeta workapiv1.ManifestResourceMeta, queue workqueue.TypedRateLimitingInterface[string]) error {
+	r.register++
+	return r.ObjectReader.RegisterInformer(ctx, workName, resourceMeta, queue)
+}
+
+func (r *countingObjectReader) UnRegisterInformer(workName string, resourceMeta workapiv1.ManifestResourceMeta) error {
+	r.unregister++
+	return r.ObjectReader.UnRegisterInformer(workName, resourceMeta)
 }
