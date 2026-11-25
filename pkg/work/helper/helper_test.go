@@ -895,11 +895,17 @@ func TestNameMatch(t *testing.T) {
 
 func TestDeleteAppliedResourcesWithHostingOwner(t *testing.T) {
 	owner := metav1.OwnerReference{APIVersion: "work.open-cluster-management.io/v1", Kind: "AppliedManifestWork", Name: "amw", UID: "a"}
+	// A second owner that is not an AppliedManifestWork, so the ownerReference-only path is taken
+	// because of the annotation, and the patch must keep this owner.
+	other := metav1.OwnerReference{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "ClusterRole", Name: "keeper", UID: "k"}
 	gvr := schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterroles"}
+	// annotation "" means the ownership annotation is absent.
 	clusterRole := func(annotation string) *unstructured.Unstructured {
-		u := testingcommon.NewUnstructured("rbac.authorization.k8s.io/v1", "ClusterRole", "", "proto192", owner)
+		u := testingcommon.NewUnstructured("rbac.authorization.k8s.io/v1", "ClusterRole", "", "proto192", owner, other)
 		u.SetUID("cr-uid")
-		u.SetAnnotations(map[string]string{hostingAddonAnnotation: annotation})
+		if annotation != "" {
+			u.SetAnnotations(map[string]string{hostingAddonAnnotation: annotation})
+		}
 		return u
 	}
 	tracked := []workapiv1.AppliedManifestResourceMeta{{Version: "v1", UID: "cr-uid", ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -914,6 +920,8 @@ func TestDeleteAppliedResourcesWithHostingOwner(t *testing.T) {
 		{name: "owner still matches: deleted", live: "cluster-a/proto192", expected: "cluster-a/proto192", verbs: []string{"get", "delete"}},
 		{name: "owner annotation changed: kept, only our owner reference removed", live: "cluster-b/proto192",
 			expected: "cluster-a/proto192", verbs: []string{"get", "patch"}},
+		{name: "owner annotation removed: kept, only our owner reference removed", live: "",
+			expected: "cluster-a/proto192", verbs: []string{"get", "patch"}},
 		{name: "not enforced: deleted as before", live: "cluster-b/proto192", expected: "", verbs: []string{"get", "delete"}},
 	}
 	for _, c := range cases {
@@ -923,7 +931,22 @@ func TestDeleteAppliedResourcesWithHostingOwner(t *testing.T) {
 			if len(errs) != 0 {
 				t.Fatalf("errors: %v", errs)
 			}
-			testingcommon.AssertActions(t, client.Actions(), c.verbs...)
+			actions := client.Actions()
+			testingcommon.AssertActions(t, actions, c.verbs...)
+			if c.verbs[1] != "patch" {
+				return
+			}
+			patch, ok := actions[1].(clienttesting.PatchAction)
+			if !ok {
+				t.Fatalf("want a patch of ownerReferences, got %T", actions[1])
+			}
+			patched := &metav1.PartialObjectMetadata{}
+			if err := json.Unmarshal(patch.GetPatch(), patched); err != nil {
+				t.Fatalf("decode patch: %v", err)
+			}
+			if want := []metav1.OwnerReference{other}; !equality.Semantic.DeepEqual(want, patched.GetOwnerReferences()) {
+				t.Errorf("want ownerReferences %v, got %v", want, patched.GetOwnerReferences())
+			}
 		})
 	}
 }
