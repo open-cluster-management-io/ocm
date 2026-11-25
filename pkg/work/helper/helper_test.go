@@ -927,7 +927,7 @@ func TestDeleteAppliedResourcesWithHostingOwner(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			client := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), clusterRole(c.live))
-			_, errs := DeleteAppliedResourcesWithHostingOwner(context.TODO(), tracked, "test", client, owner, c.expected)
+			_, errs := DeleteAppliedResourcesWithHostingOwner(t.Context(), tracked, "test", client, owner, c.expected)
 			if len(errs) != 0 {
 				t.Fatalf("errors: %v", errs)
 			}

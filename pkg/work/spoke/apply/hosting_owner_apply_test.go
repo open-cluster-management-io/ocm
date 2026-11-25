@@ -1,7 +1,6 @@
 package apply
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -135,7 +134,7 @@ func TestHostingOwnerApply(t *testing.T) {
 			})
 
 			_, err := NewHostingOwnerApply(client, expected).Apply(
-				context.TODO(), gvr, c.required, c.owner, ssa, testingcommon.NewFakeSyncContext(t, "test").Recorder())
+				t.Context(), gvr, c.required, c.owner, ssa, testingcommon.NewFakeSyncContext(t, "test").Recorder())
 
 			var conflict *HostingOwnerConflictError
 			switch {
