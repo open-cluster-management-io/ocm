@@ -1,0 +1,8 @@
+# Helm values for oci://registry.k8s.io/lws/charts/lws.
+# LWS creates Workload/PodGroup objects for spec.scheduling only when the upstream
+# scheduling.k8s.io provider is selected and its WAS gate is on; without both, the
+# LWS webhook rejects any LeaderWorkerSet that sets spec.scheduling.
+gangSchedulingManagement:
+  schedulerProvider: kubernetes
+featureGates:
+  WorkloadAwareScheduling: true

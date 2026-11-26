@@ -1,0 +1,15 @@
+# Picks a cluster with zone topology domains for a zone-constrained gang.
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: zone-topology
+  namespace: was-demo
+spec:
+  clusterSets: ["was-demo"]
+  numberOfClusters: 1
+  predicates:
+  - requiredClusterSelector:
+      labelSelector:
+        matchExpressions:
+        - {key: scheduling.example.io/workload-aware, operator: In, values: ["true"]}
+        - {key: topology.kubernetes.io/zone, operator: Exists}

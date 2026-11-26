@@ -1,0 +1,17 @@
+# Picks a cluster whose Job controller creates Workloads/PodGroups for plain batch/v1
+# Jobs (WorkloadWithJob) and whose nodes expose a rack topology domain.
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: rack-job-topology
+  namespace: was-demo
+spec:
+  clusterSets: ["was-demo"]
+  numberOfClusters: 1
+  predicates:
+  - requiredClusterSelector:
+      labelSelector:
+        matchExpressions:
+        - {key: scheduling.example.io/workload-aware, operator: In, values: ["true"]}
+        - {key: scheduling.example.io/job-workload, operator: In, values: ["true"]}
+        - {key: topology.example.io/rack, operator: Exists}

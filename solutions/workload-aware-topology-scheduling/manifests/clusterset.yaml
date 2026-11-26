@@ -1,0 +1,20 @@
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSet
+metadata:
+  name: was-demo
+spec:
+  clusterSelector:
+    selectorType: ExclusiveClusterSetLabel
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: was-demo
+---
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: was-demo
+  namespace: was-demo
+spec:
+  clusterSet: was-demo
