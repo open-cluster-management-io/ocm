@@ -2050,7 +2050,7 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 		expectedLastTransition *metav1.Time
 	}{
 		{
-			name: "no progressing condition - should return ToApply",
+			name: "no conditions at all - should return ToApply",
 			manifestWork: &workapiv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-mw",
@@ -2064,6 +2064,69 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 			},
 			expectedStatus:         clustersdkv1alpha1.ToApply,
 			expectedLastTransition: nil,
+		},
+		{
+			// An agent that has finished reconciling reports Applied and Available only.
+			name: "applied and available but no progressing condition - should return Succeeded",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        1,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 1,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
+							Type:               workapiv1.WorkAvailable,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 1,
+							LastTransitionTime: now,
+							Reason:             "Available",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.Succeeded,
+			expectedLastTransition: &now,
+		},
+		{
+			name: "degraded but no progressing condition - should return Failed",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        1,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 1,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
+							Type:               workapiv1.WorkDegraded,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 1,
+							LastTransitionTime: now,
+							Reason:             "Degraded",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.Failed,
+			expectedLastTransition: &now,
 		},
 		{
 			name: "progressing condition with unobserved generation - should return ToApply",
@@ -2190,7 +2253,9 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 			expectedLastTransition: &now,
 		},
 		{
-			name: "progressing false - should return Succeeded",
+			// Succeeded requires Available, so an applied work with no Available condition
+			// is still rolling out.
+			name: "progressing false but not available - should return Progressing",
 			manifestWork: &workapiv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-mw",
@@ -2217,11 +2282,50 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 					},
 				},
 			},
+			expectedStatus:         clustersdkv1alpha1.Progressing,
+			expectedLastTransition: &now,
+		},
+		{
+			name: "progressing false and available - should return Succeeded",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionFalse,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Completed",
+						},
+						{
+							Type:               workapiv1.WorkAvailable,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Available",
+						},
+					},
+				},
+			},
 			expectedStatus:         clustersdkv1alpha1.Succeeded,
 			expectedLastTransition: &now,
 		},
 		{
-			name: "progressing false with degraded true - should return Succeeded",
+			// Degraded is terminal regardless of Progressing, so maxFailures can see it.
+			name: "progressing false with degraded true - should return Failed",
 			manifestWork: &workapiv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-mw",
@@ -2255,7 +2359,7 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 					},
 				},
 			},
-			expectedStatus:         clustersdkv1alpha1.Succeeded,
+			expectedStatus:         clustersdkv1alpha1.Failed,
 			expectedLastTransition: &now,
 		},
 		{
@@ -2290,7 +2394,49 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 			expectedLastTransition: &now,
 		},
 		{
-			name: "WorkApplied Status=False with current generation - should return ToApply",
+			// Condition rules aggregate Progressing to Unknown when a resource's state cannot be
+			// read, so Available=True alone must not advance the rollout.
+			name: "progressing unknown and available - should return Progressing",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionUnknown,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "ConditionRulesAggregated",
+						},
+						{
+							Type:               workapiv1.WorkAvailable,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "ResourcesAvailable",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.Progressing,
+			expectedLastTransition: &now,
+		},
+		{
+			// The agent observed this spec and could not apply it, so the work has failed
+			// rather than being still pending.
+			name: "WorkApplied Status=False with current generation - should return Failed",
 			manifestWork: &workapiv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-mw",
@@ -2317,8 +2463,8 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 					},
 				},
 			},
-			expectedStatus:         clustersdkv1alpha1.ToApply,
-			expectedLastTransition: nil,
+			expectedStatus:         clustersdkv1alpha1.Failed,
+			expectedLastTransition: &now,
 		},
 		{
 			name: "WorkApplied Status=Unknown with current generation - should return ToApply",
@@ -2520,7 +2666,7 @@ func TestShouldReturnToApply(t *testing.T) {
 			description:  "When Applied condition is False, work failed to apply",
 		},
 		{
-			name:       "progressing condition is nil - should return true",
+			name:       "progressing condition is nil - should return false",
 			generation: generation,
 			appliedCond: &metav1.Condition{
 				Type:               workapiv1.WorkApplied,
@@ -2530,8 +2676,8 @@ func TestShouldReturnToApply(t *testing.T) {
 			},
 			progressCond: nil,
 			degradedCond: nil,
-			expected:     true,
-			description:  "When Progressing condition doesn't exist, work hasn't been reconciled by agent yet",
+			expected:     false,
+			description:  "Progressing is optional, so an applied work without it has settled and is not ToApply",
 		},
 		{
 			name:       "progressing condition has stale generation - should return true",
