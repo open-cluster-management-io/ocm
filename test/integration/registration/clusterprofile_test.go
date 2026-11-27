@@ -175,7 +175,8 @@ var _ = Describe("ClusterProfile", func() {
 		legacyProfile, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Patch(
 			ctx, clusterName, types.MergePatchType,
 			[]byte(`{"status":{"accessProviders":[{"name":"kubeconfig","cluster":{"server":"https://api.example.com:6443","tls-server-name":"kubernetes","disable-compression":true}}]}}`),
-			metav1.PatchOptions{}, "status")
+			// Without a field manager this test would write as the hub's earlier releases did.
+			metav1.PatchOptions{FieldManager: "access-provider"}, "status")
 		Expect(err).NotTo(HaveOccurred())
 		_, err = clusterClient.ClusterV1().ManagedClusters().Patch(ctx, clusterName, types.MergePatchType,
 			[]byte(`{"status":{"version":{"kubernetes":"v1.26.0"}}}`), metav1.PatchOptions{}, "status")
@@ -844,6 +845,108 @@ var _ = Describe("ClusterProfile", func() {
 
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+		By("Publish additional status from another field manager")
+		profiles := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace)
+		applyProfileStatus := func(manager, status string) (*cpv1alpha2.ClusterProfile, error) {
+			return profiles.Patch(ctx, clusterName, types.ApplyPatchType, []byte(fmt.Sprintf(
+				`{"apiVersion":%q,"kind":%q,"metadata":{"name":%q,"namespace":%q},"status":%s}`,
+				cpv1alpha2.GroupVersion.String(), cpv1alpha2.ClusterProfileKind, clusterName, namespace, status)),
+				metav1.PatchOptions{FieldManager: manager}, "status")
+		}
+		patchClusterStatus := func(status string) {
+			GinkgoHelper()
+			_, err := clusterClient.ClusterV1().ManagedClusters().Patch(ctx, clusterName, types.MergePatchType,
+				[]byte(`{"status":`+status+`}`), metav1.PatchOptions{}, "status")
+			Expect(err).NotTo(HaveOccurred())
+		}
+		publishPlatformClaim := func() {
+			GinkgoHelper()
+			patchClusterStatus(`{"clusterClaims":[{"name":"platform","value":"aws"}]}`)
+			Eventually(func(g Gomega) {
+				profile, err := profiles.Get(ctx, clusterName, metav1.GetOptions{})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(profile.Status.Properties).To(ContainElement(cpv1alpha2.Property{Name: "platform", Value: "aws"}))
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+		}
+		external, err := applyProfileStatus("tenant-controller", `{
+			"properties":[{"name":"tenant","value":"blue"}],
+			"conditions":[{"type":"TenantReady","status":"True","reason":"Configured","message":"","lastTransitionTime":"2025-06-01T00:00:00Z"}],
+			"accessProviders":[{"name":"tenant","cluster":{"server":"https://tenant.example.com"}}]
+		}`)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Add, update and remove claims while keeping the other manager's entries")
+		patchClusterStatus(`{"clusterClaims":[{"name":"platform","value":"aws"},{"name":"zone","value":"west"}]}`)
+		Eventually(func(g Gomega) {
+			profile, err := profiles.Get(ctx, clusterName, metav1.GetOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(profile.Status.Properties).To(ConsistOf(
+				cpv1alpha2.Property{Name: "platform", Value: "aws"},
+				cpv1alpha2.Property{Name: "zone", Value: "west"},
+				cpv1alpha2.Property{Name: "tenant", Value: "blue"},
+			))
+			g.Expect(meta.FindStatusCondition(profile.Status.Conditions, "TenantReady")).To(Equal(
+				meta.FindStatusCondition(external.Status.Conditions, "TenantReady")))
+			g.Expect(profile.Status.AccessProviders).To(Equal(external.Status.AccessProviders))
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+		By("Reject a different writer changing an OCM claim")
+		_, err = applyProfileStatus("another-controller", `{"properties":[{"name":"platform","value":"other"}]}`)
+		Expect(errors.IsConflict(err)).To(BeTrue(), "unexpected error: %v", err)
+
+		By("Remove the last OCM claims while preserving the external property")
+		patchClusterStatus(`{"clusterClaims":[]}`)
+		Eventually(func(g Gomega) {
+			profile, err := profiles.Get(ctx, clusterName, metav1.GetOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(profile.Status.Properties).To(ConsistOf(cpv1alpha2.Property{Name: "tenant", Value: "blue"}))
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+		By("Take over and prune status written by the merge patches of earlier releases")
+		// Like the earlier controller, this request has no field manager, so the API server
+		// names it after the default user agent this test shares with the hub.
+		_, err = profiles.Patch(ctx, clusterName, types.MergePatchType,
+			[]byte(`{"status":{"version":{"kubernetes":"v1.25.0"},"properties":[{"name":"tenant","value":"blue"},{"name":"legacy","value":"stale"}]}}`),
+			metav1.PatchOptions{}, "status")
+		Expect(err).NotTo(HaveOccurred())
+		Eventually(func(g Gomega) {
+			profile, err := profiles.Get(ctx, clusterName, metav1.GetOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(profile.Status.Version.Kubernetes).To(Equal("v1.26.0"))
+			g.Expect(profile.Status.Properties).To(ConsistOf(cpv1alpha2.Property{Name: "tenant", Value: "blue"}))
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+		By("Remove a claim whose property another manager shares without its value")
+		publishPlatformClaim()
+		_, err = applyProfileStatus("observer", `{"properties":[{"name":"platform","lastObservedTime":"2025-06-01T00:00:00Z"}]}`)
+		Expect(err).NotTo(HaveOccurred())
+		patchClusterStatus(`{"clusterClaims":[],"version":{"kubernetes":"v1.27.0"}}`)
+		Eventually(func(g Gomega) {
+			profile, err := profiles.Get(ctx, clusterName, metav1.GetOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(profile.Status.Version.Kubernetes).To(Equal("v1.27.0"))
+			g.Expect(profile.Status.Properties).To(ConsistOf(cpv1alpha2.Property{Name: "tenant", Value: "blue"}))
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+		By("Leave a removed claim's property to another manager that applies the same value")
+		publishPlatformClaim()
+		_, err = applyProfileStatus("mirror", `{"properties":[{"name":"platform","value":"aws"}]}`)
+		Expect(err).NotTo(HaveOccurred())
+		patchClusterStatus(`{"clusterClaims":[],"version":{"kubernetes":"v1.28.0"}}`)
+		Eventually(func(g Gomega) {
+			profile, err := profiles.Get(ctx, clusterName, metav1.GetOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(profile.Status.Version.Kubernetes).To(Equal("v1.28.0"))
+			g.Expect(profile.Status.Properties).To(ConsistOf(
+				cpv1alpha2.Property{Name: "tenant", Value: "blue"},
+				cpv1alpha2.Property{Name: "platform", Value: "aws"},
+			))
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+		By("Let the other manager change the property once OCM releases it")
+		_, err = applyProfileStatus("mirror", `{"properties":[{"name":"platform","value":"azure"}]}`)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should create ClusterProfiles with global clusterset (empty LabelSelector)", func(ctx SpecContext) {
