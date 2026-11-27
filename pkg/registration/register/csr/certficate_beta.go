@@ -88,7 +88,11 @@ func (v *v1beta1CSRControl) get(name string) (metav1.Object, error) {
 		// fallback to fetching csr from hub apiserver in case it is not cached by informer yet
 		csr, err = v.hubCSRClient.Get(context.Background(), name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("unable to get csr %q. It might have already been deleted", name)
+			return nil, fmt.Errorf("unable to get csr %q. It might have already been deleted: %w", name, err)
+		} else if err != nil {
+			// Without this the hub failure is swallowed and the caller reads the empty
+			// result as an unapproved csr, hiding the outage instead of retrying.
+			return nil, err
 		}
 	case err != nil:
 		return nil, err

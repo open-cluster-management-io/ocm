@@ -15,6 +15,7 @@ import (
 	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -42,6 +43,11 @@ const (
 	// TLSCertFile is the name of the tls cert file in kubeconfigSecret
 	TLSCertFile = "tls.crt"
 
+	// PendingCSRNameFile and PendingCSRKeyFile are defined in the register package so
+	// secretController can recognise a pending-state save without importing this one.
+	PendingCSRNameFile = register.PendingCSRNameFile
+	PendingCSRKeyFile  = register.PendingCSRKeyFile
+
 	// ClusterCertificateRotatedCondition is a condition type that client certificate is rotated
 	ClusterCertificateRotatedCondition = "ClusterCertificateRotated"
 
@@ -52,6 +58,10 @@ const (
 	clusterCSRThreshold = 10
 	addonCSRThreshold   = 10
 )
+
+// errPendingCSRKeyMismatch means the issued certificate cannot be used with the
+// saved pending private key. Retrying the same CSR cannot succeed.
+var errPendingCSRKeyMismatch = errors.New("pending private key does not match issued certificate")
 
 type CSRDriver struct {
 	// csrName is the name of csr created by controller and waiting for approval.
@@ -87,6 +97,19 @@ func (c *CSRDriver) Process(
 	recorder events.Recorder) (*corev1.Secret, *metav1.Condition, error) {
 	logger := klog.FromContext(ctx)
 
+	if secret.Data == nil {
+		secret.Data = map[string][]byte{}
+	}
+
+	// Restore pending CSR state from the secret so a restart can resume the same CSR
+	// instead of orphaning it (private key was previously only held in memory).
+	c.restorePendingCSRState(logger, secret)
+
+	// Set when stale pending state is dropped from secret.Data. secretController.sync only
+	// writes the secret back when Process returns it, so a path that clears and then returns
+	// nil loses the drop and reads the same dead csr back on the next reconcile.
+	pendingCleared := false
+
 	// reconcile pending csr if exists
 	if len(c.csrName) > 0 {
 		// build a secret data map if the csr is approved
@@ -117,11 +140,11 @@ func (c *CSRDriver) Process(
 			logger.Info("Sync csr", "name", c.csrName)
 			// check if cert in csr status matches with the corresponding private key
 			if c.keyData == nil {
-				return nil, fmt.Errorf("no private key found for certificate in csr: %s", c.csrName)
+				return nil, fmt.Errorf("%w: no private key found for csr %s", errPendingCSRKeyMismatch, c.csrName)
 			}
 			_, err = tls.X509KeyPair(certData, c.keyData)
 			if err != nil {
-				return nil, fmt.Errorf("private key does not match with the certificate in csr: %s", c.csrName)
+				return nil, fmt.Errorf("%w: csr %s: %v", errPendingCSRKeyMismatch, c.csrName, err)
 			}
 
 			data := map[string][]byte{
@@ -133,43 +156,69 @@ func (c *CSRDriver) Process(
 		}()
 
 		if err != nil {
-			c.reset()
-			return secret, &metav1.Condition{
-				Type:    "ClusterCertificateRotated",
-				Status:  metav1.ConditionFalse,
-				Reason:  "ClientCertificateUpdateFailed",
-				Message: fmt.Sprintf("Failed to rotated client certificate %v", err),
-			}, err
-		}
-		if len(newSecretConfig) == 0 {
-			return nil, nil, nil
-		}
-		// append additional data into client certificate secret
-		for k, v := range newSecretConfig {
-			secret.Data[k] = v
-		}
-
-		notBefore, notAfter, err := getCertValidityPeriod(secret)
-
-		cond := &metav1.Condition{
-			Type:    "ClusterCertificateRotated",
-			Status:  metav1.ConditionTrue,
-			Reason:  "ClientCertificateUpdated",
-			Message: fmt.Sprintf("client certificate rotated starting from %v to %v", *notBefore, *notAfter),
-		}
-
-		if err != nil {
-			cond = &metav1.Condition{
-				Type:    "ClusterCertificateRotated",
-				Status:  metav1.ConditionFalse,
-				Reason:  "ClientCertificateUpdateFailed",
-				Message: fmt.Sprintf("Failed to rotated client certificate %v", err),
+			if apierrors.IsNotFound(err) {
+				// Confirmed by the hub GET inside CSRControl.get. A watcher-cache
+				// miss alone does not return NotFound and must not clear pending state.
+				recorder.Eventf(ctx, "PendingCSRNotFound",
+					"Pending CSR %s for %s was not found on the hub; recreating", c.csrName, controllerName)
+				clearPendingCSRState(secret)
+				pendingCleared = true
+				c.reset()
+				// fall through to create a new CSR
+			} else if errors.Is(err, errPendingCSRKeyMismatch) {
+				// Terminal: the saved key can never use this certificate. Return no
+				// error so secretController.sync persists the cleared pending state
+				// before the next reconcile creates a replacement.
+				clearPendingCSRState(secret)
+				c.reset()
+				return secret, &metav1.Condition{
+					Type:    "ClusterCertificateRotated",
+					Status:  metav1.ConditionFalse,
+					Reason:  "ClientCertificateUpdateFailed",
+					Message: fmt.Sprintf("Failed to rotated client certificate %v", err),
+				}, nil
+			} else {
+				// Transient lookup failure. Leave the saved name and key in place.
+				return nil, &metav1.Condition{
+					Type:    "ClusterCertificateRotated",
+					Status:  metav1.ConditionFalse,
+					Reason:  "ClientCertificateUpdateFailed",
+					Message: fmt.Sprintf("Failed to rotated client certificate %v", err),
+				}, err
 			}
 		} else {
-			recorder.Eventf(ctx, "ClientCertificateCreated", "A new client certificate for %s is available", controllerName)
+			if len(newSecretConfig) == 0 {
+				// still waiting for approval/issuance; pending state already persisted
+				return nil, nil, nil
+			}
+			// append additional data into client certificate secret
+			for k, v := range newSecretConfig {
+				secret.Data[k] = v
+			}
+			clearPendingCSRState(secret)
+
+			notBefore, notAfter, err := getCertValidityPeriod(secret)
+
+			var cond *metav1.Condition
+			if err != nil {
+				cond = &metav1.Condition{
+					Type:    "ClusterCertificateRotated",
+					Status:  metav1.ConditionFalse,
+					Reason:  "ClientCertificateUpdateFailed",
+					Message: fmt.Sprintf("Failed to rotated client certificate %v", err),
+				}
+			} else {
+				cond = &metav1.Condition{
+					Type:    "ClusterCertificateRotated",
+					Status:  metav1.ConditionTrue,
+					Reason:  "ClientCertificateUpdated",
+					Message: fmt.Sprintf("client certificate rotated starting from %v to %v", *notBefore, *notAfter),
+				}
+				recorder.Eventf(ctx, "ClientCertificateCreated", "A new client certificate for %s is available", controllerName)
+			}
+			c.reset()
+			return secret, cond, err
 		}
-		c.reset()
-		return secret, cond, err
 	}
 
 	// create a csr to request new client certificate if
@@ -188,14 +237,15 @@ func (c *CSRDriver) Process(
 		return secret, nil, err
 	}
 	if !shouldCreate {
-		return nil, nil, nil
+		// No replacement is needed, but a drop still has to be saved.
+		return secretIfCleared(secret, pendingCleared), nil, nil
 	}
 
 	shouldHalt := c.haltCSRCreation()
 	if shouldHalt {
 		recorder.Eventf(ctx, "ClientCertificateCreationHalted",
 			"Stop creating CSR for %s since there are too many CSRs created already on the hub.", controllerName)
-		return nil, &metav1.Condition{
+		return secretIfCleared(secret, pendingCleared), &metav1.Condition{
 			Type:    "ClusterCertificateRotated",
 			Status:  metav1.ConditionFalse,
 			Reason:  "ClientCertificateUpdateFailed",
@@ -242,12 +292,58 @@ func (c *CSRDriver) Process(
 
 	c.keyData = keyData
 	c.csrName = createdCSRName
-	return nil, nil, nil
+	persistPendingCSRState(secret, createdCSRName, keyData)
+	// Return secret so pending CSR name/key are written before the next reconcile/restart.
+	return secret, nil, nil
 }
 
 func (c *CSRDriver) reset() {
 	c.csrName = ""
 	c.keyData = nil
+}
+
+// restorePendingCSRState loads a previously persisted pending CSR name and private key from the
+// secret into the in-memory driver state. No-op if memory already has pending state or secret lacks it.
+func (c *CSRDriver) restorePendingCSRState(logger klog.Logger, secret *corev1.Secret) {
+	if len(c.csrName) > 0 || len(c.keyData) > 0 {
+		return
+	}
+	if secret == nil || secret.Data == nil {
+		return
+	}
+	name := string(secret.Data[PendingCSRNameFile])
+	key := secret.Data[PendingCSRKeyFile]
+	if len(name) == 0 || len(key) == 0 {
+		return
+	}
+	c.csrName = name
+	c.keyData = key
+	logger.V(4).Info("Restored pending CSR state from secret", "csrName", name)
+}
+
+func persistPendingCSRState(secret *corev1.Secret, csrName string, keyData []byte) {
+	if secret.Data == nil {
+		secret.Data = map[string][]byte{}
+	}
+	secret.Data[PendingCSRNameFile] = []byte(csrName)
+	secret.Data[PendingCSRKeyFile] = keyData
+}
+
+// secretIfCleared hands the secret back only when it carries a pending-state drop that still
+// needs saving, so an early return does not silently discard it.
+func secretIfCleared(secret *corev1.Secret, cleared bool) *corev1.Secret {
+	if cleared {
+		return secret
+	}
+	return nil
+}
+
+func clearPendingCSRState(secret *corev1.Secret) {
+	if secret == nil || secret.Data == nil {
+		return
+	}
+	delete(secret.Data, PendingCSRNameFile)
+	delete(secret.Data, PendingCSRKeyFile)
 }
 
 func (c *CSRDriver) BuildKubeConfigFromTemplate(kubeConfig *clientcmdapi.Config) *clientcmdapi.Config {

@@ -143,6 +143,41 @@ func TestSync(t *testing.T) {
 				}
 			},
 		},
+		{
+			// The driver compares the stored additional data against the expected values to
+			// decide a rotation is needed. Writing it beside the still-in-use certificate while
+			// the new credential is only pending would make the two agree again, so the trigger
+			// would be gone if that pending request were later lost.
+			name: "additional secret data is withheld while a csr is pending",
+			option: SecretOption{
+				SecretName:              "test",
+				SecretNamespace:         "test",
+				ClusterName:             "cluster1",
+				AgentName:               "agent1",
+				BootStrapKubeConfigFile: path.Join(tempDir, "bootstrap-kubeconfig"),
+			},
+			secrets: []runtime.Object{},
+			driver: newFakeDriver(testinghelpers.NewHubKubeconfigSecret(
+				"test", "test", "", nil, map[string][]byte{
+					PendingCSRNameFile: []byte("pending-csr"),
+					PendingCSRKeyFile:  []byte("pending-key"),
+				}), nil, nil),
+			validatAction: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "get", "create")
+				secret := actions[1].(clienttesting.CreateActionImpl).Object.(*corev1.Secret)
+				if string(secret.Data[PendingCSRNameFile]) != "pending-csr" {
+					t.Errorf("pending csr name should be saved")
+				}
+				if string(secret.Data[PendingCSRKeyFile]) != "pending-key" {
+					t.Errorf("pending csr key should be saved")
+				}
+				for _, key := range []string{ClusterNameFile, AgentNameFile, KubeconfigFile} {
+					if _, ok := secret.Data[key]; ok {
+						t.Errorf("%q must not be written while the csr is only pending", key)
+					}
+				}
+			},
+		},
 	}
 
 	for _, c := range testCases {

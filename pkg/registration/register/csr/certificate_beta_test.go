@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	certificates "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -73,6 +74,20 @@ func TestV1beta1CSRControlApprovedAndIssued(t *testing.T) {
 		})
 	}
 
+}
+
+func TestV1beta1GetPreservesNotFound(t *testing.T) {
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+	})
+	client := fake.NewSimpleClientset()
+	ctrl := v1beta1CSRControl{
+		hubCSRLister: v1beta1.NewCertificateSigningRequestLister(indexer),
+		hubCSRClient: client.CertificatesV1beta1().CertificateSigningRequests(),
+	}
+
+	_, err := ctrl.get("missing")
+	assert.True(t, apierrors.IsNotFound(err), "got %v", err)
 }
 
 func newV1beta1CSR(name string, isApproved bool, certData []byte) *certificates.CertificateSigningRequest {
