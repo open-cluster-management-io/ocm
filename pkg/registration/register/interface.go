@@ -22,6 +22,15 @@ const (
 	AgentNameFile   = "agent-name"
 	// KubeconfigFile is the name of the kubeconfig file in kubeconfigSecret
 	KubeconfigFile = "kubeconfig"
+
+	// PendingCSRNameFile is the secret data key storing the name of a CSR waiting for approval.
+	// Persisted so the agent can resume the same CSR after restart (the private key is only
+	// useful with this CSR name). Its presence marks a save that carries pending state rather
+	// than an issued certificate.
+	PendingCSRNameFile = "pending-csr-name"
+	// PendingCSRKeyFile is the secret data key storing the PEM private key for PendingCSRNameFile.
+	// Must not overwrite TLSKeyFile while an older tls.crt is still in use for hub connections.
+	PendingCSRKeyFile = "pending-csr-key"
 )
 
 // CSRConfiguration provides configuration for CSR-based authentication.

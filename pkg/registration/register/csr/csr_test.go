@@ -13,14 +13,17 @@ import (
 
 	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
+	certificatesv1listers "k8s.io/client-go/listers/certificates/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2/ktesting"
 
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -87,6 +90,12 @@ func TestProcess(t *testing.T) {
 				if !valid {
 					t.Error("client certificate is invalid")
 				}
+				if _, ok := secret.Data[PendingCSRNameFile]; ok {
+					t.Error("pending csr name should be cleared after certificate is stored")
+				}
+				if _, ok := secret.Data[PendingCSRKeyFile]; ok {
+					t.Error("pending csr key should be cleared after certificate is stored")
+				}
 			},
 		},
 		{
@@ -127,6 +136,15 @@ func TestProcess(t *testing.T) {
 				if _, ok := actual.(*unstructured.Unstructured); !ok {
 					t.Errorf("expected csr was created, but failed")
 				}
+				if secret == nil {
+					t.Fatal("expected secret with persisted pending CSR state")
+				}
+				if len(secret.Data[PendingCSRNameFile]) == 0 {
+					t.Error("expected pending csr name to be persisted")
+				}
+				if len(secret.Data[PendingCSRKeyFile]) == 0 {
+					t.Error("expected pending csr key to be persisted")
+				}
 			},
 		},
 		{
@@ -146,6 +164,9 @@ func TestProcess(t *testing.T) {
 				actual := hubActions[0].(clienttesting.CreateActionImpl).Object
 				if _, ok := actual.(*unstructured.Unstructured); !ok {
 					t.Errorf("expected csr was created, but failed")
+				}
+				if secret == nil || len(secret.Data[PendingCSRKeyFile]) == 0 {
+					t.Error("expected pending csr key to be persisted")
 				}
 			},
 		},
@@ -221,6 +242,442 @@ func TestProcess(t *testing.T) {
 
 			c.validateActions(t, hubKubeClient.Actions(), secret)
 		})
+	}
+}
+
+func TestProcessRestoresPendingCSRAfterRestart(t *testing.T) {
+	testSubject := &pkix.Name{CommonName: commonName}
+	approvedCSRCert := testinghelpers.NewTestCert(commonName, 10*time.Second)
+
+	csr := testinghelpers.NewApprovedCSR(testinghelpers.CSRHolder{Name: testCSRName})
+	csr.Status.Certificate = approvedCSRCert.Cert
+	hubKubeClient := kubefake.NewClientset(csr)
+	ctrl := &mockCSRControl{
+		csrClient:      &hubKubeClient.Fake,
+		approved:       true,
+		issuedCertData: approvedCSRCert.Cert,
+	}
+
+	// Simulate a fresh process after restart: in-memory state empty, pending state only in secret.
+	secret := testinghelpers.NewHubKubeconfigSecret(
+		testNamespace, testSecretName, "1", nil,
+		map[string][]byte{
+			register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+			register.AgentNameFile:   []byte(testAgentName),
+			PendingCSRNameFile:       []byte(testCSRName),
+			PendingCSRKeyFile:        approvedCSRCert.Key,
+		})
+
+	driver := &CSRDriver{
+		csrControl:      ctrl,
+		haltCSRCreation: func() bool { return false },
+		csrOption: &CSROption{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
+			Subject:    testSubject,
+			SignerName: certificates.KubeAPIServerClientSignerName,
+		},
+		opt: NewCSROption(),
+	}
+
+	syncCtx := testingcommon.NewFakeSyncContext(t, "test")
+	updated, cond, err := driver.Process(context.TODO(), "test", secret, map[string][]byte{
+		register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+		register.AgentNameFile:   []byte(testAgentName),
+	}, syncCtx.Recorder())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cond == nil || cond.Status != metav1.ConditionTrue {
+		t.Fatalf("expected success condition, got %v", cond)
+	}
+	if updated == nil {
+		t.Fatal("expected updated secret")
+	}
+	logger, _ := ktesting.NewTestContext(t)
+	valid, err := IsCertificateValid(logger, updated.Data[TLSCertFile], testSubject)
+	if err != nil || !valid {
+		t.Fatalf("client certificate invalid: %v", err)
+	}
+	if string(updated.Data[TLSKeyFile]) != string(approvedCSRCert.Key) {
+		t.Error("expected tls.key to match restored pending key")
+	}
+	if _, ok := updated.Data[PendingCSRNameFile]; ok {
+		t.Error("pending csr name should be cleared")
+	}
+	if _, ok := updated.Data[PendingCSRKeyFile]; ok {
+		t.Error("pending csr key should be cleared")
+	}
+	if driver.csrName != "" || driver.keyData != nil {
+		t.Error("in-memory pending state should be reset after certificate is stored")
+	}
+}
+
+func TestProcessKeepsPendingCSRWhileWaiting(t *testing.T) {
+	testSubject := &pkix.Name{CommonName: commonName}
+	keyData, err := keyutil.MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	// CSR must exist on the hub (unapproved) so restore does not treat it as NotFound.
+	pendingCSR := testinghelpers.NewCSR(testinghelpers.CSRHolder{Name: testCSRName})
+	hubKubeClient := kubefake.NewClientset(pendingCSR)
+	ctrl := &mockCSRControl{
+		csrClient: &hubKubeClient.Fake,
+		approved:  false,
+	}
+
+	secret := testinghelpers.NewHubKubeconfigSecret(
+		testNamespace, testSecretName, "1", nil,
+		map[string][]byte{
+			register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+			register.AgentNameFile:   []byte(testAgentName),
+			PendingCSRNameFile:       []byte(testCSRName),
+			PendingCSRKeyFile:        keyData,
+		})
+
+	driver := &CSRDriver{
+		csrControl:      ctrl,
+		haltCSRCreation: func() bool { return false },
+		csrOption: &CSROption{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
+			Subject:    testSubject,
+			SignerName: certificates.KubeAPIServerClientSignerName,
+		},
+		opt: NewCSROption(),
+	}
+
+	syncCtx := testingcommon.NewFakeSyncContext(t, "test")
+	updated, cond, err := driver.Process(context.TODO(), "test", secret, map[string][]byte{
+		register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+		register.AgentNameFile:   []byte(testAgentName),
+	}, syncCtx.Recorder())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updated != nil || cond != nil {
+		t.Fatalf("expected no secret/condition update while waiting, got secret=%v cond=%v", updated, cond)
+	}
+	if driver.csrName != testCSRName {
+		t.Errorf("expected restored csr name %q, got %q", testCSRName, driver.csrName)
+	}
+	if string(driver.keyData) != string(keyData) {
+		t.Error("expected restored pending key in memory")
+	}
+}
+
+func TestProcessRecreatesMissingPendingCSR(t *testing.T) {
+	testSubject := &pkix.Name{CommonName: commonName}
+	keyData, err := keyutil.MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	// Lister and hub API both miss the persisted CSR. The hub NotFound must stay
+	// wrapped so Process can drop the stale pending state and create a replacement.
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+	})
+	hubKubeClient := kubefake.NewClientset()
+	ctrl := &v1CSRControl{
+		hubCSRLister: certificatesv1listers.NewCertificateSigningRequestLister(indexer),
+		hubCSRClient: hubKubeClient.CertificatesV1().CertificateSigningRequests(),
+	}
+	if _, lookupErr := ctrl.IsApproved(testCSRName); !apierrors.IsNotFound(lookupErr) {
+		t.Fatalf("missing CSR must surface NotFound, got %v", lookupErr)
+	}
+
+	secret := testinghelpers.NewHubKubeconfigSecret(
+		testNamespace, testSecretName, "1", nil,
+		map[string][]byte{
+			register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+			register.AgentNameFile:   []byte(testAgentName),
+			PendingCSRNameFile:       []byte(testCSRName),
+			PendingCSRKeyFile:        keyData,
+		})
+
+	driver := &CSRDriver{
+		csrControl:      ctrl,
+		haltCSRCreation: func() bool { return false },
+		csrOption: &CSROption{
+			ObjectMeta: metav1.ObjectMeta{Name: "replacement-csr"},
+			Subject:    testSubject,
+			SignerName: certificates.KubeAPIServerClientSignerName,
+		},
+		opt: NewCSROption(),
+	}
+
+	syncCtx := testingcommon.NewFakeSyncContext(t, "test")
+	updated, cond, err := driver.Process(context.TODO(), "test", secret, map[string][]byte{
+		register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+		register.AgentNameFile:   []byte(testAgentName),
+	}, syncCtx.Recorder())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cond != nil {
+		t.Fatalf("expected no condition while the replacement CSR is pending, got %v", cond)
+	}
+	if updated == nil {
+		t.Fatal("expected secret with the replacement CSR persisted")
+	}
+	gotName := string(updated.Data[PendingCSRNameFile])
+	if gotName != "replacement-csr" {
+		t.Fatalf("expected replacement CSR name to be persisted, got %q", gotName)
+	}
+	if len(updated.Data[PendingCSRKeyFile]) == 0 {
+		t.Fatal("expected replacement private key to be persisted")
+	}
+	if string(updated.Data[PendingCSRKeyFile]) == string(keyData) {
+		t.Fatal("replacement private key should be newly generated")
+	}
+	if driver.csrName != gotName || string(driver.keyData) != string(updated.Data[PendingCSRKeyFile]) {
+		t.Fatalf("in-memory pending state = (%q, %d bytes), secret = (%q, %d bytes)",
+			driver.csrName, len(driver.keyData), gotName, len(updated.Data[PendingCSRKeyFile]))
+	}
+	if _, err := hubKubeClient.CertificatesV1().CertificateSigningRequests().Get(
+		context.TODO(), gotName, metav1.GetOptions{}); err != nil {
+		t.Fatalf("replacement CSR was not created on the hub: %v", err)
+	}
+}
+
+func TestProcessSavesKeyMismatchThenCreatesReplacement(t *testing.T) {
+	testSubject := &pkix.Name{CommonName: commonName}
+	issued := testinghelpers.NewTestCert(commonName, 10*time.Second)
+	pendingKey, err := keyutil.MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	csr := testinghelpers.NewApprovedCSR(testinghelpers.CSRHolder{Name: testCSRName})
+	csr.Status.Certificate = issued.Cert
+	hubKubeClient := kubefake.NewClientset(csr)
+	ctrl := &mockCSRControl{
+		csrClient:      &hubKubeClient.Fake,
+		approved:       true,
+		issuedCertData: issued.Cert,
+	}
+
+	secret := testinghelpers.NewHubKubeconfigSecret(
+		testNamespace, testSecretName, "1", nil,
+		map[string][]byte{
+			register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+			register.AgentNameFile:   []byte(testAgentName),
+			PendingCSRNameFile:       []byte(testCSRName),
+			PendingCSRKeyFile:        pendingKey,
+		})
+
+	driver := &CSRDriver{
+		csrControl:      ctrl,
+		haltCSRCreation: func() bool { return false },
+		csrOption: &CSROption{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
+			Subject:    testSubject,
+			SignerName: certificates.KubeAPIServerClientSignerName,
+		},
+		opt: NewCSROption(),
+	}
+
+	syncCtx := testingcommon.NewFakeSyncContext(t, "test")
+	additional := map[string][]byte{
+		register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+		register.AgentNameFile:   []byte(testAgentName),
+	}
+	cleared, cond, err := driver.Process(context.TODO(), "test", secret, additional, syncCtx.Recorder())
+	if err != nil {
+		t.Fatalf("mismatch must return no error so the cleared secret is saved, got %v", err)
+	}
+	if cond == nil || cond.Status != metav1.ConditionFalse {
+		t.Fatalf("expected failed condition, got %v", cond)
+	}
+	if _, ok := cleared.Data[PendingCSRNameFile]; ok {
+		t.Fatal("pending csr name should be cleared before save")
+	}
+	if _, ok := cleared.Data[PendingCSRKeyFile]; ok {
+		t.Fatal("pending csr key should be cleared before save")
+	}
+	if driver.csrName != "" || driver.keyData != nil {
+		t.Fatal("in-memory pending state should be reset")
+	}
+
+	// What secretController.sync persists when Process returns the secret and no error.
+	saved := cleared.DeepCopy()
+	replaced, cond, err := driver.Process(context.TODO(), "test", saved, additional, syncCtx.Recorder())
+	if err != nil {
+		t.Fatalf("replacement reconcile failed: %v", err)
+	}
+	if cond != nil {
+		t.Fatalf("expected no condition while the replacement CSR is pending, got %v", cond)
+	}
+	if replaced == nil {
+		t.Fatal("expected secret with the replacement CSR persisted")
+	}
+	gotName := string(replaced.Data[PendingCSRNameFile])
+	if gotName == "" || gotName == testCSRName {
+		t.Fatalf("expected a replacement CSR name, got %q", gotName)
+	}
+	if len(replaced.Data[PendingCSRKeyFile]) == 0 {
+		t.Fatal("expected replacement private key to be persisted")
+	}
+}
+
+func TestProcessKeepsPendingCSROnTransientLookupError(t *testing.T) {
+	keyData, err := keyutil.MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+	secret := testinghelpers.NewHubKubeconfigSecret(
+		testNamespace, testSecretName, "1", nil,
+		map[string][]byte{
+			register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+			register.AgentNameFile:   []byte(testAgentName),
+			PendingCSRNameFile:       []byte(testCSRName),
+			PendingCSRKeyFile:        keyData,
+		})
+	driver := &CSRDriver{
+		csrControl:      &lookupErrCSRControl{err: fmt.Errorf("temporary hub failure")},
+		haltCSRCreation: func() bool { return false },
+		csrOption: &CSROption{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
+			Subject:    &pkix.Name{CommonName: commonName},
+			SignerName: certificates.KubeAPIServerClientSignerName,
+		},
+		opt: NewCSROption(),
+	}
+
+	syncCtx := testingcommon.NewFakeSyncContext(t, "test")
+	updated, cond, err := driver.Process(context.TODO(), "test", secret, nil, syncCtx.Recorder())
+	if err == nil {
+		t.Fatal("expected transient lookup error")
+	}
+	if updated != nil {
+		t.Fatal("transient lookup must not return a secret to save")
+	}
+	if cond == nil || cond.Status != metav1.ConditionFalse {
+		t.Fatalf("expected failed condition, got %v", cond)
+	}
+	if string(secret.Data[PendingCSRNameFile]) != testCSRName || string(secret.Data[PendingCSRKeyFile]) != string(keyData) {
+		t.Fatal("pending csr name and key must stay unchanged")
+	}
+	if driver.csrName != testCSRName || string(driver.keyData) != string(keyData) {
+		t.Fatal("in-memory pending state must stay unchanged")
+	}
+}
+
+type lookupErrCSRControl struct {
+	err error
+}
+
+func (c *lookupErrCSRControl) Create(context.Context, events.Recorder, metav1.ObjectMeta, []byte, string, *int32) (string, error) {
+	return "", fmt.Errorf("create should not be called")
+}
+
+func (c *lookupErrCSRControl) IsApproved(string) (bool, error) {
+	return false, c.err
+}
+
+func (c *lookupErrCSRControl) GetIssuedCertificate(string) ([]byte, error) {
+	return nil, c.err
+}
+
+func (c *lookupErrCSRControl) Informer() cache.SharedIndexInformer {
+	return nil
+}
+
+// TestProcessKeepsPendingCSROnTransientLookupError stubs CSRControl, so it cannot see whether a
+// real lookup reports the failure at all. The watcher store miss falls back to a live hub GET,
+// and only that GET decides absence: a failure there has to surface as an error instead of an
+// empty csr with no error, which the caller would read as "not approved yet".
+func TestCSRControlReturnsTransientHubLookupError(t *testing.T) {
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+	})
+	hubKubeClient := kubefake.NewClientset()
+	hubKubeClient.PrependReactor("get", "certificatesigningrequests",
+		func(clienttesting.Action) (bool, runtime.Object, error) {
+			return true, nil, apierrors.NewInternalError(fmt.Errorf("hub is unavailable"))
+		})
+	ctrl := &v1CSRControl{
+		hubCSRLister: certificatesv1listers.NewCertificateSigningRequestLister(indexer),
+		hubCSRClient: hubKubeClient.CertificatesV1().CertificateSigningRequests(),
+	}
+
+	if _, err := ctrl.IsApproved(testCSRName); err == nil || apierrors.IsNotFound(err) {
+		t.Errorf("IsApproved must report the hub failure, got %v", err)
+	}
+	if _, err := ctrl.GetIssuedCertificate(testCSRName); err == nil || apierrors.IsNotFound(err) {
+		t.Errorf("GetIssuedCertificate must report the hub failure, got %v", err)
+	}
+}
+
+// Dropping a missing csr and creating its replacement are independent: when the current
+// certificate is still healthy no replacement is created, and the drop is lost unless the secret
+// is still handed back for saving.
+func TestProcessSavesClearedPendingCSRWithoutReplacement(t *testing.T) {
+	// Plenty of life left on the certificate keeps shouldCreateCSR from firing.
+	currentCert := testinghelpers.NewTestCert(commonName, 1*time.Hour)
+	orphanKey, err := keyutil.MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	// Neither the watcher store nor the hub has the saved csr.
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+	})
+	hubKubeClient := kubefake.NewClientset()
+	ctrl := &v1CSRControl{
+		hubCSRLister: certificatesv1listers.NewCertificateSigningRequestLister(indexer),
+		hubCSRClient: hubKubeClient.CertificatesV1().CertificateSigningRequests(),
+	}
+
+	secret := testinghelpers.NewHubKubeconfigSecret(
+		testNamespace, testSecretName, "1", currentCert,
+		map[string][]byte{
+			register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+			register.AgentNameFile:   []byte(testAgentName),
+			PendingCSRNameFile:       []byte(testCSRName),
+			PendingCSRKeyFile:        orphanKey,
+		})
+
+	driver := &CSRDriver{
+		csrControl:      ctrl,
+		haltCSRCreation: func() bool { return false },
+		csrOption: &CSROption{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
+			Subject:    &pkix.Name{CommonName: commonName},
+			SignerName: certificates.KubeAPIServerClientSignerName,
+		},
+		opt: NewCSROption(),
+	}
+
+	syncCtx := testingcommon.NewFakeSyncContext(t, "test")
+	updated, cond, err := driver.Process(context.TODO(), "test", secret, map[string][]byte{
+		register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+		register.AgentNameFile:   []byte(testAgentName),
+	}, syncCtx.Recorder())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cond != nil {
+		t.Fatalf("expected no condition, got %v", cond)
+	}
+	if updated == nil {
+		t.Fatal("secret must be returned so the cleared pending state is saved")
+	}
+	if _, ok := updated.Data[PendingCSRNameFile]; ok {
+		t.Error("stale pending csr name should be cleared")
+	}
+	if _, ok := updated.Data[PendingCSRKeyFile]; ok {
+		t.Error("stale pending csr key should be cleared")
+	}
+	if string(updated.Data[TLSCertFile]) != string(currentCert.Cert) {
+		t.Error("the in-use certificate must be left untouched")
+	}
+	for _, action := range hubKubeClient.Actions() {
+		if action.GetVerb() == "create" {
+			t.Error("no csr should be created while the current certificate is healthy")
+		}
 	}
 }
 

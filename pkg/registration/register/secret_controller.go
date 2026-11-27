@@ -146,7 +146,13 @@ func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext
 			return nil
 		}
 
-		if len(c.additionalSecretData) > 0 {
+		// A save carrying pending credential state must not also carry the new additional
+		// data: the driver compares the stored copy against the expected values to decide a
+		// rotation is needed, so writing it next to the still-in-use certificate would make
+		// the two agree again and drop the trigger if the pending request is later lost.
+		// The data is written with the credential it belongs to, once that is issued.
+		_, pendingCredential := secret.Data[PendingCSRNameFile]
+		if len(c.additionalSecretData) > 0 && !pendingCredential {
 			// append additional data into client certificate secret
 			for k, v := range c.additionalSecretData {
 				secret.Data[k] = v
