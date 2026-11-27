@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,8 +23,10 @@ import (
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	"open-cluster-management.io/api/feature"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
@@ -551,6 +554,10 @@ func TestSchedulingController_sync(t *testing.T) {
 		},
 	}
 
+	if err := features.HubMutableFeatureGate.Add(feature.DefaultHubPlacementFeatureGates); err != nil {
+		t.Fatalf("failed to register placement feature gates")
+	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			c.initObjs = append(c.initObjs, c.placement)
@@ -958,17 +965,20 @@ func TestNewMisconfiguredCondition(t *testing.T) {
 
 func TestBind(t *testing.T) {
 	cases := []struct {
-		name            string
-		initObjs        []runtime.Object
-		placement       *clusterapiv1beta1.Placement
-		clusters        []*clusterapiv1.ManagedCluster
-		expectedErr     string
-		validateActions func(t *testing.T, actions []clienttesting.Action)
+		name                         string
+		initObjs                     []runtime.Object
+		placement                    *clusterapiv1beta1.Placement
+		clusters                     []*clusterapiv1.ManagedCluster
+		expectedErr                  string
+		enableScoreStatusFeatureGate bool
+		scores                       PrioritizerScore
+		validateActions              func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
 			name:      "create single placementdecision",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
 			clusters:  newClusters(10),
+			scores:    newPrioritizerScore(newSelectedClusters(10), 0, 1, 2, 3),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "create")
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
@@ -976,7 +986,10 @@ func TestBind(t *testing.T) {
 				if !ok {
 					t.Errorf("expected PlacementDecision was updated")
 				}
-				assertClustersSelected(t, placementDecision.Status.Decisions, newSelectedClusters(10)...)
+				clusters := newSelectedClusters(10)
+				assertClustersSelected(t, placementDecision.Status.Decisions, clusters...)
+				// PlacementDecisionScoreStatus feature gate disabled by default, no scores recorded
+				assertClusterScores(t, placementDecision.Status.Decisions, newPrioritizerScore(clusters, 0))
 				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
 					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
 				}
@@ -986,9 +999,35 @@ func TestBind(t *testing.T) {
 			},
 		},
 		{
-			name:      "create multiple placementdecisions",
-			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
-			clusters:  newClusters(101),
+			name:                         "create single placementdecision with feature gate",
+			placement:                    testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
+			clusters:                     newClusters(10),
+			scores:                       newPrioritizerScore(newSelectedClusters(10), 0, 1, 2, 3),
+			enableScoreStatusFeatureGate: true,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create")
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was updated")
+				}
+				clusters := newSelectedClusters(10)
+				assertClustersSelected(t, placementDecision.Status.Decisions, clusters...)
+				assertClusterScores(t, placementDecision.Status.Decisions, newPrioritizerScore(clusters, 0, 1, 2, 3))
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+			},
+		},
+		{
+			name:                         "create multiple placementdecisions",
+			placement:                    testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
+			clusters:                     newClusters(101),
+			scores:                       newPrioritizerScore(newSelectedClusters(101), 5, 10),
+			enableScoreStatusFeatureGate: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "create", "create")
 				selectedClusters := newSelectedClusters(101)
@@ -998,6 +1037,7 @@ func TestBind(t *testing.T) {
 					t.Errorf("expected PlacementDecision was updated")
 				}
 				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[0:100]...)
+				assertClusterScores(t, placementDecision.Status.Decisions, newPrioritizerScore(selectedClusters[0:100], 5, 10))
 				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
 					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
 				}
@@ -1008,6 +1048,7 @@ func TestBind(t *testing.T) {
 					t.Errorf("expected PlacementDecision was updated")
 				}
 				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[100:]...)
+				assertClusterScores(t, placementDecision.Status.Decisions, newPrioritizerScore(selectedClusters[100:], 5, 10))
 				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
 					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
 				}
@@ -1359,11 +1400,225 @@ func TestBind(t *testing.T) {
 				testingcommon.AssertActions(t, actions, "create")
 			},
 		},
+		{
+			name: "decisions not patched with score update when feature disabled",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).
+				WithScoreRateLimit("5m").
+				WithLastSoreUpdateTime(metav1.Time{Time: time.Now().Add(-6 * time.Minute)}).
+				Build(),
+			clusters:                     newClusters(2),
+			scores:                       newPrioritizerScore(newSelectedClusters(2), 1, 2),
+			enableScoreStatusFeatureGate: false,
+			initObjs: []runtime.Object{
+				// Feature gate disabled, no scores recorded
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
+					WithDecisions(newSelectedClusters(2)...).Build(),
+			},
+			validateActions: testingcommon.AssertNoActions,
+		},
+		{
+			name: "decisions not patched with score update before rate limit",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).
+				WithScoreRateLimit("5m").
+				WithLastSoreUpdateTime(metav1.Now()).
+				Build(),
+			clusters:                     newClusters(2),
+			scores:                       newPrioritizerScore(newSelectedClusters(2), 1, 2),
+			enableScoreStatusFeatureGate: true,
+			initObjs: []runtime.Object{
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
+					WithScores(newPrioritizerScore(newSelectedClusters(2), 1)).
+					WithDecisions(newSelectedClusters(2)...).Build(),
+			},
+			validateActions: testingcommon.AssertNoActions,
+		},
+		{
+			name: "decisions patched with score update after rate limit",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).
+				WithScoreRateLimit("5m").
+				WithLastSoreUpdateTime(metav1.Time{Time: time.Now().Add(-6 * time.Minute)}).
+				Build(),
+			clusters:                     newClusters(2),
+			scores:                       newPrioritizerScore(newSelectedClusters(2), 1, 2),
+			enableScoreStatusFeatureGate: true,
+			initObjs: []runtime.Object{
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
+					WithScores(newPrioritizerScore(newSelectedClusters(2), 1)).
+					WithDecisions(newSelectedClusters(2)...).Build(),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				selectedClusters := newSelectedClusters(2)
+				placementDecision := &clusterapiv1beta1.PlacementDecision{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placementDecision)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters...)
+				assertClusterScores(t, placementDecision.Status.Decisions, newPrioritizerScore(selectedClusters, 1, 2))
+			},
+		},
+		{
+			name: "decisions patched with cluster update before rate limit",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).
+				WithScoreRateLimit("5m").
+				WithLastSoreUpdateTime(metav1.Now()).
+				Build(),
+			clusters:                     newClusters(3),
+			scores:                       newPrioritizerScore(newSelectedClusters(3), 1, 2, 3),
+			enableScoreStatusFeatureGate: true,
+			initObjs: []runtime.Object{
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
+					WithScores(newPrioritizerScore(newSelectedClusters(2), 1)).
+					WithDecisions(newSelectedClusters(2)...).Build(),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				selectedClusters := newSelectedClusters(3)
+				placementDecision := &clusterapiv1beta1.PlacementDecision{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placementDecision)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters...)
+				assertClusterScores(t, placementDecision.Status.Decisions, newPrioritizerScore(selectedClusters, 1, 2, 3))
+			},
+		},
+		{
+			name: "decisions patched with decision group update before rate limit",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).
+				WithScoreRateLimit("5m").
+				WithLastSoreUpdateTime(metav1.Now()).
+				WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+					DecisionGroups: []clusterapiv1beta1.DecisionGroup{
+						{GroupName: "newgroup"},
+					},
+				}).
+				Build(),
+			clusters:                     newClusters(2),
+			scores:                       newPrioritizerScore(newSelectedClusters(2), 1, 2),
+			enableScoreStatusFeatureGate: true,
+			initObjs: []runtime.Object{
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
+					WithScores(newPrioritizerScore(newSelectedClusters(2), 1)).
+					WithDecisions(newSelectedClusters(2)...).Build(),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				selectedClusters := newSelectedClusters(2)
+				placementDecision := &clusterapiv1beta1.PlacementDecision{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placementDecision)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters...)
+				assertClusterScores(t, placementDecision.Status.Decisions, newPrioritizerScore(selectedClusters, 1, 2))
+			},
+		},
+		{
+			// Scores move clusters across group indexes, [cluster1,cluster2][cluster3,cluster4] ->
+			// [cluster3,cluster1][cluster2,cluster4], without changing the selected clusters or group strategy.
+			name: "decisions not patched with score-driven decision group index update before rate limit",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).
+				WithScoreRateLimit("5m").
+				WithLastSoreUpdateTime(metav1.Now()).
+				WithSortBy(clusterapiv1beta1.PlacementSortByScore).
+				WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+					ClustersPerDecisionGroup: intstr.FromInt(2),
+				}).
+				Build(),
+			clusters:                     newClusters(4),
+			scores:                       newPrioritizerScore(newSelectedClusters(4), 3, 1, 4, 0),
+			enableScoreStatusFeatureGate: true,
+			initObjs: []runtime.Object{
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
+					WithScores(newPrioritizerScore(newSelectedClusters(2), 4, 3)).
+					WithDecisions(newSelectedClusters(2)...).Build(),
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 2)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "1").
+					WithScores(newPrioritizerScore(newSelectedClusters(4)[2:], 2, 1)).
+					WithDecisions(newSelectedClusters(4)[2:]...).Build(),
+			},
+			validateActions: testingcommon.AssertNoActions,
+		},
+		{
+			// ClustersPerDecisionGroup changed from 3 to 2: [cluster1,cluster2,cluster3][cluster4] ->
+			// [cluster1,cluster2][cluster3,cluster4]
+			name: "decisions patched with decision group size update before rate limit",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).
+				WithScoreRateLimit("5m").
+				WithLastSoreUpdateTime(metav1.Now()).
+				WithSortBy(clusterapiv1beta1.PlacementSortByScore).
+				WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+					ClustersPerDecisionGroup: intstr.FromInt(2),
+				}).
+				Build(),
+			clusters:                     newClusters(4),
+			scores:                       newPrioritizerScore(newSelectedClusters(4), 4, 3, 2, 1),
+			enableScoreStatusFeatureGate: true,
+			initObjs: []runtime.Object{
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
+					WithScores(newPrioritizerScore(newSelectedClusters(3), 4, 3, 2)).
+					WithDecisions(newSelectedClusters(3)...).Build(),
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 2)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "1").
+					WithScores(newPrioritizerScore(newSelectedClusters(4)[3:], 1)).
+					WithDecisions(newSelectedClusters(4)[3:]...).Build(),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch", "patch")
+			},
+		},
 	}
+
+	if err := features.HubMutableFeatureGate.Add(feature.DefaultHubPlacementFeatureGates); err != nil {
+		t.Fatalf("failed to register placement feature gates")
+	}
+	t.Cleanup(func() {
+		defaultEnabled := feature.DefaultHubPlacementFeatureGates[feature.PlacementDecisionScoreStatus].Default
+		if err := features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=%v", feature.PlacementDecisionScoreStatus, defaultEnabled)); err != nil {
+			t.Fatalf("failed to reset %s feature gate", feature.PlacementDecisionScoreStatus)
+		}
+	})
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
+
+			if err := features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=%v", feature.PlacementDecisionScoreStatus, c.enableScoreStatusFeatureGate)); err != nil {
+				t.Fatalf("failed to set %s feature gate", feature.PlacementDecisionScoreStatus)
+			}
 
 			// GenerateName is not working for fake clent, set the name with random suffix
 			clusterClient.PrependReactor(
@@ -1402,8 +1657,8 @@ func TestBind(t *testing.T) {
 				metricsRecorder:         metrics.NewScheduleMetrics(clock.RealClock{}),
 			}
 
-			decisions, _, _ := ctrl.generatePlacementDecisionsAndStatus(c.placement, c.clusters)
-			err := ctrl.bind(
+			decisions, _, _ := ctrl.generatePlacementDecisionsAndStatus(c.placement, c.clusters, c.scores)
+			_, _, err := ctrl.bind(
 				t.Context(),
 				c.placement,
 				decisions,
@@ -1434,6 +1689,15 @@ func assertClustersSelected(t *testing.T, decisons []clusterapiv1beta1.ClusterDe
 	}
 }
 
+func assertClusterScores(t *testing.T, decisions []clusterapiv1beta1.ClusterDecision, scores PrioritizerScore) {
+	t.Helper()
+	for _, decision := range decisions {
+		if score, ok := scores[decision.ClusterName]; ok && decision.Score != score {
+			t.Errorf("expected cluster %s score %d, but got %d", decision.ClusterName, score, decision.Score)
+		}
+	}
+}
+
 func newClusters(num int) (clusters []*clusterapiv1.ManagedCluster) {
 	for i := range num {
 		ClusterName := fmt.Sprintf("cluster%d", i+1)
@@ -1453,6 +1717,19 @@ func newSelectedClusters(num int) (clusters []string) {
 	})
 
 	return clusters
+}
+
+func newPrioritizerScore(clusters []string, scores ...int64) PrioritizerScore {
+	prioritizerScores := PrioritizerScore{}
+	for i, cluster := range clusters {
+		score := int64(0)
+		if len(scores) > 0 {
+			score = scores[i%len(scores)]
+		}
+		prioritizerScores[cluster] = score
+	}
+
+	return prioritizerScores
 }
 
 // newTestSchedulingController creates a test scheduling controller with the given objects.

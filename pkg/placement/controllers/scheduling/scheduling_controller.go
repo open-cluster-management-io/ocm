@@ -1,16 +1,20 @@
 package scheduling
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"maps"
 	"math"
 	"reflect"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,10 +39,12 @@ import (
 	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	"open-cluster-management.io/api/feature"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/helpers"
@@ -242,7 +248,7 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 	c.metricsRecorder.StartSchedule(queueKey)
 	scheduleResult, status := c.scheduler.Schedule(ctx, placement, clusters)
 	// generate placement decision and status
-	decisions, groupStatus, s := c.generatePlacementDecisionsAndStatus(placement, scheduleResult.Decisions())
+	decisions, groupStatus, s := c.generatePlacementDecisionsAndStatus(placement, scheduleResult.Decisions(), scheduleResult.PrioritizerScores())
 	if s.IsError() {
 		status = s
 	}
@@ -268,14 +274,17 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 	// create/update placement decisions
 	c.metricsRecorder.StartBind(queueKey)
 	defer c.metricsRecorder.Done(queueKey)
-	err = c.bind(ctx, placement, decisions, scheduleResult.PrioritizerScores(), status)
+	requeueAfter, updatedDecisions, err := c.bind(ctx, placement, decisions, scheduleResult.PrioritizerScores(), status)
 	if err != nil {
 		return err
+	}
+	if requeueAfter > 0 && syncCtx != nil {
+		syncCtx.Queue().AddAfter(queueKey, requeueAfter)
 	}
 
 	// update placement status if necessary to signal no bindings
 	if err := c.updateStatus(
-		ctx, placement, groupStatus, int32(len(scheduleResult.Decisions())), misconfiguredCondition, satisfiedCondition); err != nil { // nolint:gosec
+		ctx, placement, groupStatus, int32(len(scheduleResult.Decisions())), updatedDecisions, misconfiguredCondition, satisfiedCondition); err != nil { // nolint:gosec
 		return err
 	}
 
@@ -288,11 +297,20 @@ func (c *schedulingController) updateStatus(
 	placement *clusterapiv1beta1.Placement,
 	decisionGroupStatus []*clusterapiv1beta1.DecisionGroupStatus,
 	numberOfSelectedClusters int32,
+	updatedDecisions bool,
 	conditions ...metav1.Condition,
 ) error {
 	newPlacement := placement.DeepCopy()
 	newPlacement.Status.NumberOfSelectedClusters = numberOfSelectedClusters
 	newPlacement.Status.DecisionGroups = []clusterapiv1beta1.DecisionGroupStatus{}
+	if features.HubMutableFeatureGate.Enabled(feature.PlacementDecisionScoreStatus) {
+		if updatedDecisions {
+			now := metav1.Now()
+			newPlacement.Status.LastScoreUpdateTime = &now
+		}
+	} else {
+		newPlacement.Status.LastScoreUpdateTime = nil
+	}
 
 	for _, status := range decisionGroupStatus {
 		newPlacement.Status.DecisionGroups = append(newPlacement.Status.DecisionGroups, *status)
@@ -381,13 +399,14 @@ func newMisconfiguredCondition(status *framework.Status) metav1.Condition {
 func (c *schedulingController) generatePlacementDecisionsAndStatus(
 	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
+	scores PrioritizerScore,
 ) ([]*clusterapiv1beta1.PlacementDecision, []*clusterapiv1beta1.DecisionGroupStatus, *framework.Status) {
 	placementDecisionIndex := 1
 	var placementDecisions []*clusterapiv1beta1.PlacementDecision
 	var decisionGroupStatus []*clusterapiv1beta1.DecisionGroupStatus
 
 	// generate decision group
-	decisionGroups, status := c.generateDecisionGroups(placement, clusters)
+	decisionGroups, status := c.generateDecisionGroups(placement, clusters, scores)
 
 	// generate placement decision for each decision group
 	for decisionGroupIndex, decisionGroup := range decisionGroups {
@@ -408,6 +427,7 @@ func (c *schedulingController) generatePlacementDecisionsAndStatus(
 func (c *schedulingController) generateDecisionGroups(
 	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
+	scores PrioritizerScore,
 ) (clusterDecisionGroups, *framework.Status) {
 	var groups []clusterDecisionGroup
 
@@ -428,25 +448,27 @@ func (c *schedulingController) generateDecisionGroups(
 	// First groups the clusters by ClusterSelector defined in spec.DecisionStrategy.GroupStrategy.DecisionGroups.
 	for _, d := range placement.Spec.DecisionStrategy.GroupStrategy.DecisionGroups {
 		// filter clusters by cluster selector
-		matched, status := filterClustersBySelector(d.ClusterSelector, clusters, clusterNameSet)
+		matched, status := filterClustersBySelector(d.ClusterSelector, clusters, clusterNameSet, scores)
 		if status.IsError() {
 			return groups, status
 		}
-		// If matched clusters number meets groupLength, divide into multiple groups.
-		decisionGroups := divideDecisionGroups(d.GroupName, matched, groupLength)
+		// Sort group and divide into multiple groups if matched clusters number meets groupLength.
+		decisionGroups := divideDecisionGroups(d.GroupName, matched, groupLength, placement.Spec.SortBy)
 		groups = append(groups, decisionGroups...)
 	}
 
 	// The rest of the clusters will also be put into decision groups.
 	var matched []clusterapiv1beta1.ClusterDecision
 	for _, cluster := range clusterNameSet.UnsortedList() {
-		matched = append(matched, clusterapiv1beta1.ClusterDecision{
-			ClusterName: cluster,
-		})
+		decision := clusterapiv1beta1.ClusterDecision{ClusterName: cluster}
+		if features.HubMutableFeatureGate.Enabled(feature.PlacementDecisionScoreStatus) {
+			decision.Score = scores[cluster]
+		}
+		matched = append(matched, decision)
 	}
 
-	// If the rest of clusters number meets groupLength, divide into multiple groups.
-	decisionGroups := divideDecisionGroups("", matched, groupLength)
+	// Sort remaining clusters and divide into multiple groups if matched clusters number meets groupLength.
+	decisionGroups := divideDecisionGroups("", matched, groupLength, placement.Spec.SortBy)
 	groups = append(groups, decisionGroups...)
 
 	// generate at least on empty decisionGroup, this is to ensure there's an empty placement decision if no cluster selected.
@@ -532,32 +554,37 @@ func (c *schedulingController) bind(
 	placementdecisions []*clusterapiv1beta1.PlacementDecision,
 	clusterScores PrioritizerScore,
 	status *framework.Status,
-) error {
+) (requeueAfter time.Duration, updatedDecisions bool, err error) {
 	var errs []error
-	placementDecisionNames := sets.NewString()
+
+	// query existing placementdecisions of the placement
+	requirement, err := labels.NewRequirement(clusterapiv1beta1.PlacementLabel, selection.Equals, []string{placement.Name})
+	if err != nil {
+		return 0, updatedDecisions, err
+	}
+	labelSelector := labels.NewSelector().Add(*requirement)
+	existingPlacementDecisions, err := c.placementDecisionLister.PlacementDecisions(placement.Namespace).List(labelSelector)
+	if err != nil {
+		return 0, updatedDecisions, err
+	}
+
+	if delay, err := shouldDelayScoreUpdate(placement, placementdecisions, existingPlacementDecisions); delay > 0 || err != nil {
+		return delay, updatedDecisions, err
+	}
 
 	// create/update placement decisions
+	placementDecisionNames := sets.NewString()
 	for _, pd := range placementdecisions {
 		placementDecisionNames.Insert(pd.Name)
-		err := c.createOrUpdatePlacementDecision(ctx, placement, pd, clusterScores, status)
+		updated, err := c.createOrUpdatePlacementDecision(ctx, placement, pd, clusterScores, status)
+		updatedDecisions = updatedDecisions || updated
 		if err != nil {
 			errs = append(errs, err)
 		}
 	}
 
-	// query all placementdecisions of the placement
-	requirement, err := labels.NewRequirement(clusterapiv1beta1.PlacementLabel, selection.Equals, []string{placement.Name})
-	if err != nil {
-		return err
-	}
-	labelSelector := labels.NewSelector().Add(*requirement)
-	pds, err := c.placementDecisionLister.PlacementDecisions(placement.Namespace).List(labelSelector)
-	if err != nil {
-		return err
-	}
-
 	// delete redundant placementdecisions
-	for _, pd := range pds {
+	for _, pd := range existingPlacementDecisions {
 		if placementDecisionNames.Has(pd.Name) {
 			continue
 		}
@@ -574,7 +601,7 @@ func (c *schedulingController) bind(
 			"DecisionDelete", "DecisionDeleted",
 			"Decision %s is deleted with placement %s in namespace %s", pd.Name, placement.Name, placement.Namespace)
 	}
-	return errorhelpers.NewMultiLineAggregate(errs)
+	return 0, updatedDecisions, errorhelpers.NewMultiLineAggregate(errs)
 }
 
 // createOrUpdatePlacementDecision creates a new PlacementDecision if it does not exist and
@@ -585,12 +612,12 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 	placementDecision *clusterapiv1beta1.PlacementDecision,
 	clusterScores PrioritizerScore,
 	status *framework.Status,
-) error {
+) (updatedDecisions bool, err error) {
 	placementDecisionName := placementDecision.Name
 	clusterDecisions := placementDecision.Status.Decisions
 
 	if len(clusterDecisions) > maxNumOfClusterDecisions {
-		return fmt.Errorf("the number of clusterdecisions %d exceeds the max limitation %d", len(clusterDecisions), maxNumOfClusterDecisions)
+		return false, fmt.Errorf("the number of clusterdecisions %d exceeds the max limitation %d", len(clusterDecisions), maxNumOfClusterDecisions)
 	}
 
 	existPlacementDecision, err := c.placementDecisionLister.PlacementDecisions(placementDecision.Namespace).Get(placementDecisionName)
@@ -600,14 +627,14 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 		existPlacementDecision, err = c.clusterClient.ClusterV1beta1().PlacementDecisions(
 			placement.Namespace).Create(ctx, placementDecision, metav1.CreateOptions{})
 		if err != nil {
-			return err
+			return false, err
 		}
 		c.eventsRecorder.Eventf(
 			placement, existPlacementDecision, corev1.EventTypeNormal,
 			"DecisionCreate", "DecisionCreated",
 			"Decision %s is created with placement %s in namespace %s", existPlacementDecision.Name, placement.Name, placement.Namespace)
 	case err != nil:
-		return err
+		return false, err
 	}
 
 	// update the status and labels of the placementdecision if decisions change
@@ -624,11 +651,11 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 	if updated {
 		// Record events when status is updated
 		c.recordDecisionEvents(placement, existPlacementDecision, clusterScores, status)
-		return err
+		return true, err
 	}
 	// Do not record events when label is updated
 	_, err = placementDecisionPatcher.PatchLabelAnnotations(ctx, newPlacementDecision, newPlacementDecision.ObjectMeta, existPlacementDecision.ObjectMeta)
-	return err
+	return false, err
 }
 
 // recordDecisionEvents records DecisionUpdate and ScoreUpdate events for placement decision
@@ -710,6 +737,7 @@ func filterClustersBySelector(
 	groupSelector clusterapiv1beta1.GroupClusterSelector,
 	clusters []*clusterapiv1.ManagedCluster,
 	clusterNames sets.Set[string],
+	scores PrioritizerScore,
 ) ([]clusterapiv1beta1.ClusterDecision, *framework.Status) {
 	var matched []clusterapiv1beta1.ClusterDecision
 	// set CEL env to nil since placement decision groups do not support CEL expressions.
@@ -732,9 +760,11 @@ func filterClustersBySelector(
 			continue
 		}
 
-		matched = append(matched, clusterapiv1beta1.ClusterDecision{
-			ClusterName: cluster.Name,
-		})
+		decision := clusterapiv1beta1.ClusterDecision{ClusterName: cluster.Name}
+		if features.HubMutableFeatureGate.Enabled(feature.PlacementDecisionScoreStatus) {
+			decision.Score = scores[cluster.Name]
+		}
+		matched = append(matched, decision)
 		clusterNames.Delete(cluster.Name)
 	}
 
@@ -742,13 +772,15 @@ func filterClustersBySelector(
 }
 
 // divideDecisionGroups divide the matched clusters to the groups and ensuring that each group has the specified length.
-func divideDecisionGroups(groupName string, matched []clusterapiv1beta1.ClusterDecision, groupLength int) []clusterDecisionGroup {
+func divideDecisionGroups(groupName string, matched []clusterapiv1beta1.ClusterDecision, groupLength int, sortBy clusterapiv1beta1.PlacementSortByType) []clusterDecisionGroup {
 	var groups []clusterDecisionGroup
 
-	// sort the matched cluster decisions by name before divide
-	sort.SliceStable(matched, func(i, j int) bool {
-		return matched[i].ClusterName < matched[j].ClusterName
-	})
+	// sort the matched cluster decisions before divide
+	sortFn := compareClusterDecisionName
+	if sortBy == clusterapiv1beta1.PlacementSortByScore && features.HubMutableFeatureGate.Enabled(feature.PlacementDecisionScoreStatus) {
+		sortFn = compareClusterDecisionScore
+	}
+	slices.SortStableFunc(matched, sortFn)
 
 	for len(matched) > 0 {
 		groupClusters := matched
@@ -767,4 +799,98 @@ func divideDecisionGroups(groupName string, matched []clusterapiv1beta1.ClusterD
 	}
 
 	return groups
+}
+
+func compareClusterDecisionName(a, b clusterapiv1beta1.ClusterDecision) int {
+	return strings.Compare(a.ClusterName, b.ClusterName)
+}
+
+func compareClusterDecisionScore(a, b clusterapiv1beta1.ClusterDecision) int {
+	// Swap a <-> b when comparing score for descending sort order
+	if c := cmp.Compare(b.Score, a.Score); c != 0 {
+		return c
+	}
+	// Secondary sort on names in ascending order
+	return compareClusterDecisionName(a, b)
+}
+
+// shouldDelayScoreUpdate checks if the placement is currently rate limited on score changes, and if there are any differences between
+// decisions other than changes in score. A change to the sort order of decisions when placement has `SortBy: Score` is subject to the same rate limit.
+//
+// When the PlacementDecisionScoreStatus feature gate is disabled, no score is recorded in PlacementDecision so updates are never skipped.
+func shouldDelayScoreUpdate(placement *clusterapiv1beta1.Placement, newDecisions, existingDecisions []*clusterapiv1beta1.PlacementDecision) (delayUpdate time.Duration, err error) {
+	if !features.HubMutableFeatureGate.Enabled(feature.PlacementDecisionScoreStatus) ||
+		placement.Spec.ScoreRateLimit == "" ||
+		placement.Status.LastScoreUpdateTime == nil ||
+		len(newDecisions) != len(existingDecisions) {
+		return 0, nil
+	}
+
+	rateLimit, err := time.ParseDuration(placement.Spec.ScoreRateLimit)
+	if err != nil || rateLimit <= 0 {
+		return 0, err
+	}
+	delayUpdate = min(rateLimit, rateLimit-time.Since(placement.Status.LastScoreUpdateTime.Time))
+	if delayUpdate <= 0 {
+		// Greater than rate limit since last update, no need to check scores
+		return 0, nil
+	}
+
+	// Check if any changes to the selected clusters exist. Always update immediately if non-score changes are found.
+
+	// A change in the number of clusters per decision group index means the group strategy changed
+	// (e.g. ClustersPerDecisionGroup)
+	if !maps.Equal(decisionGroupSizes(existingDecisions), decisionGroupSizes(newDecisions)) {
+		return 0, nil
+	}
+
+	existingClusterDecisions := map[string]clusterapiv1beta1.ClusterDecision{}
+	for _, pd := range existingDecisions {
+		for _, cd := range pd.Status.Decisions {
+			// ClusterDecisions are keyed by cluster name and decision group so that changes to groupings
+			// will always ignore rate limiting
+			key := clusterDecisionKey(pd, cd.ClusterName)
+			existingClusterDecisions[key] = cd
+		}
+	}
+
+	for _, pd := range newDecisions {
+		for _, cd := range pd.Status.Decisions {
+			key := clusterDecisionKey(pd, cd.ClusterName)
+			if existingCD, ok := existingClusterDecisions[key]; ok {
+				// Check if anything besides score has changed
+				existingCD.Score = cd.Score
+				if !equality.Semantic.DeepEqual(cd, existingCD) {
+					return 0, nil
+				}
+			} else {
+				// Cluster decision was removed
+				return 0, nil
+			}
+			delete(existingClusterDecisions, key)
+		}
+	}
+
+	if len(existingClusterDecisions) > 0 {
+		// Cluster was added
+		return 0, nil
+	}
+	return delayUpdate, nil
+}
+
+func clusterDecisionKey(placementDecision *clusterapiv1beta1.PlacementDecision, clusterName string) string {
+	decisionGroup := placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel]
+	return decisionGroup + ":" + clusterName
+}
+
+// decisionGroupSizes returns the number of cluster decisions per decision group name and index. A decision group
+// index may span multiple PlacementDecisions, so counts are aggregated across them.
+func decisionGroupSizes(placementDecisions []*clusterapiv1beta1.PlacementDecision) map[string]int {
+	sizes := map[string]int{}
+	for _, pd := range placementDecisions {
+		decisionGroup := pd.Labels[clusterapiv1beta1.DecisionGroupNameLabel]
+		decisionGroupIdx := pd.Labels[clusterapiv1beta1.DecisionGroupIndexLabel]
+		sizes[decisionGroup+":"+decisionGroupIdx] += len(pd.Status.Decisions)
+	}
+	return sizes
 }
