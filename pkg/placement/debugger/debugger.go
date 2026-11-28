@@ -55,7 +55,11 @@ type DebugResult struct {
 	FilterResults     []scheduling.FilterResult      `json:"filteredPipelineResults,omitempty"`
 	PrioritizeResults []scheduling.PrioritizerResult `json:"prioritizeResults,omitempty"`
 	AggregatedScores  []ClusterScore                 `json:"aggregatedScores,omitempty"`
-	Error             string                         `json:"error,omitempty"`
+	// SelectedClusters is populated when the caller cannot list ManagedClusters:
+	// only the clusters the Placement selected (already visible via PlacementDecisions).
+	SelectedClusters []string `json:"selectedClusters,omitempty"`
+	Note             string   `json:"note,omitempty"`
+	Error            string   `json:"error,omitempty"`
 }
 
 func NewDebugger(
@@ -119,6 +123,12 @@ func (d *Debugger) Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	canListClusters, err := d.canListManagedClusters(r)
+	if err != nil {
+		d.reportPermissionErr(w, err)
+		return
+	}
+
 	// Get valid clustersetbindings in the placement namespace
 	bindings, err := scheduling.GetValidManagedClusterSetBindings(placement.Namespace, d.clusterSetBindingLister, d.clusterSetLister)
 	if err != nil {
@@ -148,11 +158,22 @@ func (d *Debugger) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	placementCopy.Status = clusterv1beta1.PlacementStatus{}
 
-	result := DebugResult{
-		Placement:         placementCopy,
-		FilterResults:     scheduleResults.FilterResults(),
-		PrioritizeResults: scheduleResults.PrioritizerResults(),
-		AggregatedScores:  convertAndSortScores(scheduleResults.PrioritizerScores()),
+	result := DebugResult{Placement: placementCopy}
+	if canListClusters {
+		result.FilterResults = scheduleResults.FilterResults()
+		result.PrioritizeResults = scheduleResults.PrioritizerResults()
+		result.AggregatedScores = convertAndSortScores(scheduleResults.PrioritizerScores())
+	} else {
+		// Caller can already see selected clusters via PlacementDecisions; do not
+		// leak filtered-out names or prioritizer scores.
+		selected := scheduleResults.Decisions()
+		names := make([]string, 0, len(selected))
+		for _, c := range selected {
+			names = append(names, c.Name)
+		}
+		sort.Strings(names)
+		result.SelectedClusters = names
+		result.Note = "result limited: caller cannot list ManagedClusters; filter and score details omitted"
 	}
 
 	resultByte, _ := json.Marshal(result)
@@ -228,20 +249,29 @@ func placementPermissionVerb(r *http.Request) (string, error) {
 	}
 }
 
-// checkPermission checks if the user has permission to access placements in the namespace using SAR
-func (d *Debugger) checkPermission(r *http.Request, namespace string) error {
-	// Get user from request context (authenticated by GenericAPIServer)
+func (d *Debugger) userSARSpec(r *http.Request) (authorizationv1.SubjectAccessReviewSpec, error) {
 	ctx := r.Context()
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
-		return fmt.Errorf("user information not found in request context")
+		return authorizationv1.SubjectAccessReviewSpec{}, fmt.Errorf("user information not found in request context")
 	}
 
-	username := userInfo.GetName()
-	groups := userInfo.GetGroups()
 	extra := make(map[string]authorizationv1.ExtraValue)
 	for k, v := range userInfo.GetExtra() {
 		extra[k] = authorizationv1.ExtraValue(v)
+	}
+	return authorizationv1.SubjectAccessReviewSpec{
+		User:   userInfo.GetName(),
+		Groups: userInfo.GetGroups(),
+		Extra:  extra,
+	}, nil
+}
+
+// checkPermission checks if the user has permission to access placements in the namespace using SAR
+func (d *Debugger) checkPermission(r *http.Request, namespace string) error {
+	base, err := d.userSARSpec(r)
+	if err != nil {
+		return err
 	}
 
 	verb, err := placementPermissionVerb(r)
@@ -249,23 +279,17 @@ func (d *Debugger) checkPermission(r *http.Request, namespace string) error {
 		return err
 	}
 
-	// Create SubjectAccessReview to check if user can access placements
 	sar := &authorizationv1.SubjectAccessReview{
-		Spec: authorizationv1.SubjectAccessReviewSpec{
-			User:   username,
-			Groups: groups,
-			Extra:  extra,
-			ResourceAttributes: &authorizationv1.ResourceAttributes{
-				Namespace: namespace,
-				Verb:      verb,
-				Group:     "cluster.open-cluster-management.io",
-				Version:   "v1beta1",
-				Resource:  "placements",
-			},
-		},
+		Spec: base,
+	}
+	sar.Spec.ResourceAttributes = &authorizationv1.ResourceAttributes{
+		Namespace: namespace,
+		Verb:      verb,
+		Group:     "cluster.open-cluster-management.io",
+		Version:   "v1beta1",
+		Resource:  "placements",
 	}
 
-	// Perform the SAR check
 	// TODO: Cache successful permission checks to avoid SAR API calls on every request.
 	result, err := d.kubeClient.AuthorizationV1().SubjectAccessReviews().Create(
 		context.TODO(), sar, metav1.CreateOptions{})
@@ -279,6 +303,30 @@ func (d *Debugger) checkPermission(r *http.Request, namespace string) error {
 	}
 
 	return nil
+}
+
+// canListManagedClusters reports whether the caller may list ManagedClusters.
+// Cluster names and scores in the debug payload must not leak to callers who cannot.
+func (d *Debugger) canListManagedClusters(r *http.Request) (bool, error) {
+	base, err := d.userSARSpec(r)
+	if err != nil {
+		return false, err
+	}
+
+	sar := &authorizationv1.SubjectAccessReview{Spec: base}
+	sar.Spec.ResourceAttributes = &authorizationv1.ResourceAttributes{
+		Verb:     "list",
+		Group:    "cluster.open-cluster-management.io",
+		Version:  "v1",
+		Resource: "managedclusters",
+	}
+
+	result, err := d.kubeClient.AuthorizationV1().SubjectAccessReviews().Create(
+		context.TODO(), sar, metav1.CreateOptions{})
+	if err != nil {
+		return false, fmt.Errorf("failed to check permissions: %w", err)
+	}
+	return result.Status.Allowed, nil
 }
 
 // convertAndSortScores converts a map of cluster scores to a sorted slice.
