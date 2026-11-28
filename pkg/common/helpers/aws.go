@@ -14,20 +14,33 @@ const DefaultAwsPartition = "aws"
 
 // GetAwsAccountIdAndClusterName Parses aws accountId and cluster-name from clusterArn
 // e.g. if clusterArn is arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1
-// accountId is 123456789012 and clusterName is hub-cluster1
+// accountId is 123456789012 and clusterName is hub-cluster1.
+// When clusterArn does not parse, empty strings are returned instead of panicking so a
+// malformed ARN cannot crash the controller.
 func GetAwsAccountIdAndClusterName(clusterArn string) (string, string) {
-	clusterStringParts := strings.Split(clusterArn, ":")
-	clusterName := strings.Split(clusterStringParts[5], "/")[1]
-	awsAccountId := clusterStringParts[4]
-	return awsAccountId, clusterName
+	parsedArn, err := arn.Parse(clusterArn)
+	if err != nil {
+		return "", ""
+	}
+	// the resource section looks like "cluster/hub-cluster1"; the cluster name follows the first "/"
+	clusterName := ""
+	if parts := strings.SplitN(parsedArn.Resource, "/", 2); len(parts) == 2 {
+		clusterName = parts[1]
+	}
+	return parsedArn.AccountID, clusterName
 }
 
-// GetAwsRegion Parses aws accountId and cluster-name from clusterArn
+// GetAwsRegion Parses aws region from clusterArn
 // e.g. if clusterArn is arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1
-// awsRegion is us-west-2
+// awsRegion is us-west-2.
+// When clusterArn does not parse, an empty string is returned instead of panicking so a
+// malformed ARN cannot crash the controller.
 func GetAwsRegion(clusterArn string) string {
-	clusterStringParts := strings.Split(clusterArn, ":")
-	return clusterStringParts[3]
+	parsedArn, err := arn.Parse(clusterArn)
+	if err != nil {
+		return ""
+	}
+	return parsedArn.Region
 }
 
 // GetAwsPartition parses the aws partition from clusterArn.
