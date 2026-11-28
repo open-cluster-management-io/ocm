@@ -20,6 +20,7 @@ import (
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/helper"
+	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/objectreader"
 )
 
@@ -95,8 +96,9 @@ func (m *appliedManifestWorkReconciler) reconcile(
 	objectreader.UnRegisterInformerFromAppliedManifestWork(
 		ctx, m.objectReader, appliedManifestWork.Spec.ManifestWorkName, noLongerMaintainedResources)
 
-	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
-		ctx, noLongerMaintainedResources, reason, m.spokeDynamicClient, *owner)
+	resourcesPendingFinalization, errs := helper.DeleteAppliedResourcesWithHostingOwner(
+		ctx, noLongerMaintainedResources, reason, m.spokeDynamicClient, *owner,
+		apply.ExpectedHostingOwner(manifestWork.Labels))
 	if len(errs) != 0 {
 		return manifestWork, appliedManifestWork, results, utilerrors.NewAggregate(errs)
 	}

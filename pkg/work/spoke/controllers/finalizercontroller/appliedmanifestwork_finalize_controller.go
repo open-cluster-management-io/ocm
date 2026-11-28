@@ -22,6 +22,7 @@ import (
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/work/helper"
+	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/objectreader"
 )
 
@@ -112,8 +113,9 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	if others, rbac := splitRBACResources(resources); len(others) != 0 {
 		resources, deferred = others, rbac
 	}
-	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
-		ctx, resources, reason, m.spokeDynamicClient, *owner)
+	resourcesPendingFinalization, errs := helper.DeleteAppliedResourcesWithHostingOwner(
+		ctx, resources, reason, m.spokeDynamicClient, *owner,
+		apply.ExpectedHostingOwner(appliedManifestWork.Labels))
 	if len(errs) != 0 {
 		return utilerrors.NewAggregate(errs)
 	}

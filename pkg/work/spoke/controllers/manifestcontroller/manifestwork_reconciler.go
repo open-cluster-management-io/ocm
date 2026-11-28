@@ -372,6 +372,12 @@ func (m *manifestworkReconciler) applyOneManifest(
 
 	result.strategy = strategy.Type
 	applier := m.appliers.GetApplier(strategy.Type)
+	// Prototype (enhancement 192): a Work labelled with an expected hosting owner applies its
+	// writable manifests through the ownership check.
+	if expected := apply.ExpectedHostingOwner(wm.labels); expected != "" &&
+		strategy.Type != workapiv1.UpdateStrategyTypeReadOnly {
+		applier = m.appliers.GetHostingOwnerApplier(expected)
+	}
 	result.Result, result.Error = applier.Apply(ctx, om.gvr, om.obj, requiredOwner, option, recorder)
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyMetrics) {
 		outcome := outcomeApplied

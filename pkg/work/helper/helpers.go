@@ -192,12 +192,28 @@ func FindUntrackedResources(appliedResources, newAppliedResources []workapiv1.Ap
 
 // DeleteAppliedResources deletes all given applied resources and returns those pending for finalization
 // If the uid recorded in resources is different from what we get by client, ignore the deletion.
+// hostingAddonAnnotation is the ownership annotation of enhancement 192 (prototype).
+const hostingAddonAnnotation = "addon.open-cluster-management.io/hosting-addon"
+
 func DeleteAppliedResources(
 	ctx context.Context,
 	resources []workapiv1.AppliedManifestResourceMeta,
 	reason string,
 	dynamicClient dynamic.Interface,
 	owner metav1.OwnerReference) ([]workapiv1.AppliedManifestResourceMeta, []error) {
+	return DeleteAppliedResourcesWithHostingOwner(ctx, resources, reason, dynamicClient, owner, "")
+}
+
+// DeleteAppliedResourcesWithHostingOwner is DeleteAppliedResources for a Work that enforces a hosting
+// owner (prototype for enhancement 192). A resource whose hosting-addon annotation no longer matches
+// expectedOwner is kept, and only this Work's owner reference is removed from it.
+func DeleteAppliedResourcesWithHostingOwner(
+	ctx context.Context,
+	resources []workapiv1.AppliedManifestResourceMeta,
+	reason string,
+	dynamicClient dynamic.Interface,
+	owner metav1.OwnerReference,
+	expectedOwner string) ([]workapiv1.AppliedManifestResourceMeta, []error) {
 	var resourcesPendingFinalization []workapiv1.AppliedManifestResourceMeta
 	var errs []error
 
@@ -238,8 +254,10 @@ func DeleteAppliedResources(
 			continue
 		}
 
-		// If there are still any other existing appliedManifestWorks owners, update ownerrefs only.
-		if existOtherAppliedManifestWorkOwners(owner, existingOwner) {
+		// If there are still any other existing appliedManifestWorks owners, or the resource no longer
+		// belongs to the expected hosting owner, update ownerrefs only.
+		if existOtherAppliedManifestWorkOwners(owner, existingOwner) ||
+			(expectedOwner != "" && u.GetAnnotations()[hostingAddonAnnotation] != expectedOwner) {
 			err := ApplyOwnerReferences(ctx, dynamicClient, gvr, u, *ownerCopy)
 			if err != nil {
 				errs = append(errs, fmt.Errorf(

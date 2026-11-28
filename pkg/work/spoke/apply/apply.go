@@ -25,7 +25,8 @@ type Applier interface {
 }
 
 type Appliers struct {
-	appliers map[workapiv1.UpdateStrategyType]Applier
+	appliers      map[workapiv1.UpdateStrategyType]Applier
+	dynamicClient dynamic.Interface
 }
 
 func NewAppliers(dynamicClient dynamic.Interface, kubeclient kubernetes.Interface, apiExtensionClient apiextensionsclient.Interface) *Appliers {
@@ -36,9 +37,15 @@ func NewAppliers(dynamicClient dynamic.Interface, kubeclient kubernetes.Interfac
 			workapiv1.UpdateStrategyTypeUpdate:          NewUpdateApply(dynamicClient, kubeclient, apiExtensionClient),
 			workapiv1.UpdateStrategyTypeReadOnly:        NewReadOnlyApply(),
 		},
+		dynamicClient: dynamicClient,
 	}
 }
 
 func (a *Appliers) GetApplier(strategy workapiv1.UpdateStrategyType) Applier {
 	return a.appliers[strategy]
+}
+
+// GetHostingOwnerApplier returns the prototype applier that enforces the expected hosting owner.
+func (a *Appliers) GetHostingOwnerApplier(expected string) Applier {
+	return NewHostingOwnerApply(a.dynamicClient, expected)
 }
